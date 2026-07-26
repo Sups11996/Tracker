@@ -2,9 +2,7 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "ignoreDeprecations": "6.0",
     "baseUrl": ".",
-    "allowArbitraryExtensions": true,
     "paths": {
       "@/*": ["src/*"],
       "@components/*": ["src/components/*"],
