@@ -16,11 +16,11 @@ export function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
+        tabBarActiveTintColor: COLORS.textPrimary,
         tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: {
           backgroundColor: COLORS.surface,
-          borderTopColor: COLORS.border,
+          borderTopColor: COLORS.glassBorder,
           borderTopWidth: 1,
           height: 60,
           paddingBottom: 8,
@@ -37,9 +37,7 @@ export function MainTabs() {
         component={HomeScreen}
         options={{
           tabBarLabel: 'Home',
-          tabBarIcon: ({ color }) => (
-            <Home size={TAB_ICON_SIZE} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Home size={TAB_ICON_SIZE} color={color} />,
         }}
       />
       <Tab.Screen
@@ -47,9 +45,7 @@ export function MainTabs() {
         component={DashboardScreen}
         options={{
           tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ color }) => (
-            <BarChart2 size={TAB_ICON_SIZE} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <BarChart2 size={TAB_ICON_SIZE} color={color} />,
         }}
       />
       <Tab.Screen
@@ -57,9 +53,7 @@ export function MainTabs() {
         component={SettingsScreen}
         options={{
           tabBarLabel: 'Settings',
-          tabBarIcon: ({ color }) => (
-            <Settings size={TAB_ICON_SIZE} color={color} />
-          ),
+          tabBarIcon: ({ color }) => <Settings size={TAB_ICON_SIZE} color={color} />,
         }}
       />
     </Tab.Navigator>

@@ -1,29 +1,49 @@
 {
   "expo": {
     "newArchEnabled": true,
-    "name": "TrackerApp",
+    "name": "Tracker",
     "slug": "TrackerApp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#12141C",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_HEALTH",
+        "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+        "android.permission.PACKAGE_USAGE_STATS",
+        "android.permission.WAKE_LOCK",
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#12141C",
+          "defaultChannel": "default"
+        }
+      ],
+      "expo-status-bar"
     ]
   }
 }

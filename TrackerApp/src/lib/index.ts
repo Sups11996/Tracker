@@ -1,1 +1,1 @@
-export { supabase } from './supabase';
+export { initDatabase, DATABASE_NAME } from './database';

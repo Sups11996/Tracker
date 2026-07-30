@@ -1,18 +1,25 @@
 import React from 'react';
-import { View, type ViewProps } from 'react-native';
+import { View, StyleSheet, type ViewProps } from 'react-native';
+import { COLORS, RADIUS, SPACING } from '../../constants';
 
 interface CardProps extends ViewProps {
   children: React.ReactNode;
 }
 
-export function Card({ children, className, ...rest }: CardProps) {
+export function Card({ children, style, ...rest }: CardProps) {
   return (
-    <View
-      className={`bg-white rounded-2xl p-5 shadow-sm ${className ?? ''}`}
-      style={{ elevation: 2 }}
-      {...rest}
-    >
+    <View style={[styles.card, style]} {...rest}>
       {children}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: COLORS.glass,
+    borderRadius: RADIUS.xl,
+    padding: SPACING.xl,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+  },
+});

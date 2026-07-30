@@ -1,23 +1,57 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Text, View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card } from '../../components/ui';
+import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
 
 export function DashboardScreen() {
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <View className="flex-1 px-5 pt-6">
-        <Text className="mb-1 text-2xl font-bold text-slate-900">Dashboard</Text>
-        <Text className="mb-6 text-sm text-slate-500">
-          Your weekly health summary will appear here.
-        </Text>
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Dashboard</Text>
+        <Text style={styles.subtitle}>Your weekly health summary</Text>
 
-        <Card>
-          <Text className="text-center text-slate-400">
-            Charts and stats coming soon.
+        <View style={styles.placeholder}>
+          <Text style={styles.placeholderText}>
+            Charts and stats coming in Chunks 4–9.
           </Text>
-        </Card>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  container: {
+    flex: 1,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.xxl,
+  },
+  title: {
+    fontSize: TYPOGRAPHY.size.xxl,
+    fontWeight: TYPOGRAPHY.weight.bold,
+    color: COLORS.textPrimary,
+  },
+  subtitle: {
+    fontSize: TYPOGRAPHY.size.md,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
+  },
+  placeholder: {
+    marginTop: SPACING.xxxl,
+    padding: SPACING.xl,
+    borderRadius: 16,
+    backgroundColor: COLORS.glass,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+    alignItems: 'center',
+  },
+  placeholderText: {
+    color: COLORS.textMuted,
+    fontSize: TYPOGRAPHY.size.md,
+    textAlign: 'center',
+  },
+});
