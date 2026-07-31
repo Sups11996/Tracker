@@ -7,3 +7,9 @@ export {
   isToday,
   isYesterday,
 } from './dateUtils';
+export {
+  isBatteryOptimizationIgnored,
+  requestIgnoreBatteryOptimizations,
+  openUsageAccessSettings,
+  openAppSettings,
+} from './permissions';

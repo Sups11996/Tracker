@@ -6,6 +6,7 @@ import { BarChart2, Home, Settings } from 'lucide-react-native';
 import { HomeScreen } from '../features/home/HomeScreen';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { SettingsScreen } from '../features/settings/SettingsScreen';
+import { useAppHydration } from '../hooks/useAppHydration';
 import type { MainTabParamList } from '../types';
 import { COLORS, TYPOGRAPHY } from '../constants';
 
@@ -25,6 +26,10 @@ function TabBarBackground() {
 }
 
 export function MainTabs() {
+  // Central hydration: runs on mount and every time app comes to foreground.
+  // Covers cold start after phone restart and OS-kill recovery.
+  useAppHydration();
+
   return (
     <Tab.Navigator
       screenOptions={{

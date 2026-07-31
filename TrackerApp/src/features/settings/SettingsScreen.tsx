@@ -1,7 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
   Alert,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -24,6 +23,11 @@ import { Button } from '../../components/ui/Button';
 import { TextInput } from '../../components/ui/TextInput';
 import { useUserStore } from '../../stores/userStore';
 import { getTodayLocal } from '../../lib/dateUtils';
+import {
+  requestIgnoreBatteryOptimizations,
+  openUsageAccessSettings,
+  openAppSettings,
+} from '../../lib/permissions';
 import { StepSettingsSection } from '../steps/StepSettingsSection';
 import { SleepSettingsSection } from '../sleep/SleepSettingsSection';
 import { WaterSettingsSection } from '../water/WaterSettingsSection';
@@ -124,9 +128,7 @@ export function SettingsScreen() {
   }, [profile]);
 
   const openSystemSettings = useCallback(() => {
-    Linking.openSettings().catch(() => {
-      Alert.alert('Error', 'Could not open system settings.');
-    });
+    openAppSettings();
   }, []);
 
   if (!profile) {
@@ -334,7 +336,7 @@ export function SettingsScreen() {
                   <Text style={styles.permissionName}>Battery Optimization</Text>
                   <Text style={styles.permissionDesc}>Keep services running</Text>
                 </View>
-                <TouchableOpacity onPress={openSystemSettings}>
+                <TouchableOpacity onPress={() => requestIgnoreBatteryOptimizations()}>
                   <Text style={styles.permissionAction}>Fix</Text>
                 </TouchableOpacity>
               </View>
@@ -347,7 +349,7 @@ export function SettingsScreen() {
                   <Text style={styles.permissionName}>Usage Stats</Text>
                   <Text style={styles.permissionDesc}>Track screen time</Text>
                 </View>
-                <TouchableOpacity onPress={openSystemSettings}>
+                <TouchableOpacity onPress={() => openUsageAccessSettings()}>
                   <Text style={styles.permissionAction}>Enable</Text>
                 </TouchableOpacity>
               </View>

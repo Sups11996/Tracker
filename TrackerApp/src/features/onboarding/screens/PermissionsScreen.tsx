@@ -14,6 +14,10 @@ import * as Notifications from 'expo-notifications';
 import { Activity, Battery, Bell, CheckCircle, ChevronRight } from 'lucide-react-native';
 import { OnboardingLayout } from '../components/OnboardingLayout';
 import { Button } from '../../../components/ui/Button';
+import {
+  requestIgnoreBatteryOptimizations,
+  openUsageAccessSettings,
+} from '../../../lib/permissions';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../../constants';
 import type { OnboardingStackParamList } from '../../../types';
 
@@ -44,9 +48,8 @@ export function PermissionsScreen() {
   }
 
   function requestBatteryOptimization() {
-    // Deep-link to battery optimization settings on Android
     if (Platform.OS === 'android') {
-      Linking.openSettings();
+      requestIgnoreBatteryOptimizations();
       setBatteryStatus('granted');
     }
   }
