@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRoute, type RouteProp } from '@react-navigation/native';
+import { useRoute, useIsFocused, type RouteProp } from '@react-navigation/native';
 import { StepDashboard } from '../steps/StepDashboard';
 import { SleepDashboard } from '../sleep/SleepDashboard';
 import { WaterDashboard } from '../water/WaterDashboard';
@@ -20,7 +20,7 @@ import type { MainTabParamList, DashboardTab } from '../../types/navigation';
 
 type Tab = DashboardTab;
 
-const TABS: { key: Tab; label: string; color: string }[] = [
+const ALL_TABS: { key: Tab; label: string; color: string }[] = [
   { key: 'steps',    label: 'Steps',    color: COLORS.steps },
   { key: 'sleep',    label: 'Sleep',    color: COLORS.sleep },
   { key: 'water',    label: 'Water',    color: COLORS.water },
@@ -31,12 +31,25 @@ const TABS: { key: Tab; label: string; color: string }[] = [
 
 export function DashboardScreen() {
   const route = useRoute<RouteProp<MainTabParamList, 'Dashboard'>>();
+  const isFocused = useIsFocused();
   const { profile } = useUserStore();
-  const initialTab = route.params?.tab ?? 'steps';
-  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
-  // Filter out ABC tab if user hasn't enabled it
-  const visibleTabs = TABS.filter(t => t.key !== 'abc' || profile?.uses_abc);
+  const [activeTab, setActiveTab] = useState<Tab>(route.params?.tab ?? 'steps');
+
+  // When navigated to with a specific tab param, switch to it
+  useEffect(() => {
+    if (isFocused && route.params?.tab) {
+      setActiveTab(route.params.tab);
+    }
+  }, [isFocused, route.params?.tab]);
+
+  // Hide ABC tab if not enabled, hide Calories if gym off
+  const visibleTabs = ALL_TABS.filter(t => {
+    if (t.key === 'abc' && !profile?.uses_abc) return false;
+    return true;
+  });
+
+  const activeColor = ALL_TABS.find(t => t.key === activeTab)?.color ?? COLORS.textMuted;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -57,8 +70,9 @@ export function DashboardScreen() {
                   active && { borderColor: t.color, backgroundColor: `${t.color}18` },
                 ]}
                 onPress={() => setActiveTab(t.key)}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.tabLabel, active && { color: t.color }]}>
+                <Text style={[styles.tabLabel, active && { color: t.color, fontWeight: TYPOGRAPHY.weight.semibold }]}>
                   {t.label}
                 </Text>
               </TouchableOpacity>
@@ -66,6 +80,9 @@ export function DashboardScreen() {
           })}
         </ScrollView>
       </View>
+
+      {/* Active indicator bar */}
+      <View style={[styles.activeBar, { backgroundColor: activeColor }]} />
 
       {/* Dashboard content */}
       {activeTab === 'steps'    && <StepDashboard />}
@@ -75,17 +92,6 @@ export function DashboardScreen() {
       {activeTab === 'screen'   && <ScreenTimeDashboard />}
       {activeTab === 'abc'      && <AbcDashboard />}
     </SafeAreaView>
-  );
-}
-
-function PlaceholderDash({ tab }: { tab: Tab }) {
-  const color = TABS.find((t) => t.key === tab)?.color ?? COLORS.textMuted;
-  return (
-    <View style={styles.placeholder}>
-      <Text style={[styles.placeholderText, { color }]}>
-        {tab.charAt(0).toUpperCase() + tab.slice(1)} dashboard coming soon.
-      </Text>
-    </View>
   );
 }
 
@@ -113,13 +119,8 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.weight.medium,
     color: COLORS.textMuted,
   },
-  placeholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    fontSize: TYPOGRAPHY.size.md,
-    color: COLORS.textMuted,
+  activeBar: {
+    height: 2,
+    opacity: 0.6,
   },
 });
