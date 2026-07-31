@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StepDashboard } from '../steps/StepDashboard';
+import { SleepDashboard } from '../sleep/SleepDashboard';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../constants';
 
 type Tab = 'steps' | 'sleep' | 'water' | 'calories' | 'screen' | 'abc';
@@ -54,8 +55,9 @@ export function DashboardScreen() {
       </View>
 
       {/* Dashboard content */}
-      {activeTab === 'steps'    && <StepDashboard />}
-      {activeTab !== 'steps'    && <PlaceholderDash tab={activeTab} />}
+      {activeTab === 'steps' && <StepDashboard />}
+      {activeTab === 'sleep' && <SleepDashboard />}
+      {activeTab !== 'steps' && activeTab !== 'sleep' && <PlaceholderDash tab={activeTab} />}
     </SafeAreaView>
   );
 }

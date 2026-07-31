@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUserStore } from '../../stores';
 import { StepHomeCard } from '../steps/StepHomeCard';
+import { SleepHomeCard } from '../sleep/SleepHomeCard';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
 
 export function HomeScreen() {
@@ -34,8 +35,9 @@ export function HomeScreen() {
 
         {/* Feature cards */}
         <StepHomeCard />
+        <SleepHomeCard />
 
-        {/* More cards added in chunks 5–9 */}
+        {/* More cards added in chunks 6–9 */}
       </ScrollView>
     </SafeAreaView>
   );
