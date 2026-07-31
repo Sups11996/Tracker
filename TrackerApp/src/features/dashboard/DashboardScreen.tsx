@@ -7,15 +7,18 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRoute, type RouteProp } from '@react-navigation/native';
 import { StepDashboard } from '../steps/StepDashboard';
 import { SleepDashboard } from '../sleep/SleepDashboard';
 import { WaterDashboard } from '../water/WaterDashboard';
 import { CaloriesDashboard } from '../calories/CaloriesDashboard';
 import { ScreenTimeDashboard } from '../screentime/ScreenTimeDashboard';
 import { AbcDashboard } from '../abc/AbcDashboard';
+import { useUserStore } from '../../stores';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../constants';
+import type { MainTabParamList, DashboardTab } from '../../types/navigation';
 
-type Tab = 'steps' | 'sleep' | 'water' | 'calories' | 'screen' | 'abc';
+type Tab = DashboardTab;
 
 const TABS: { key: Tab; label: string; color: string }[] = [
   { key: 'steps',    label: 'Steps',    color: COLORS.steps },
@@ -27,7 +30,13 @@ const TABS: { key: Tab; label: string; color: string }[] = [
 ];
 
 export function DashboardScreen() {
-  const [activeTab, setActiveTab] = useState<Tab>('steps');
+  const route = useRoute<RouteProp<MainTabParamList, 'Dashboard'>>();
+  const { profile } = useUserStore();
+  const initialTab = route.params?.tab ?? 'steps';
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+
+  // Filter out ABC tab if user hasn't enabled it
+  const visibleTabs = TABS.filter(t => t.key !== 'abc' || profile?.uses_abc);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -38,7 +47,7 @@ export function DashboardScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabs}
         >
-          {TABS.map((t) => {
+          {visibleTabs.map((t) => {
             const active = activeTab === t.key;
             return (
               <TouchableOpacity

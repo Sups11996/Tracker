@@ -14,9 +14,11 @@ export type OnboardingStackParamList = {
 };
 
 // ── Main bottom tabs ──────────────────────────────────────────────────────────
+export type DashboardTab = 'steps' | 'sleep' | 'water' | 'calories' | 'screen' | 'abc';
+
 export type MainTabParamList = {
   Home: undefined;
-  Dashboard: undefined;
+  Dashboard: { tab?: DashboardTab } | undefined;
   Settings: undefined;
 };
 
