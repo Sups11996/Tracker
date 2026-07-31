@@ -7,6 +7,7 @@ import { HomeScreen } from '../features/home/HomeScreen';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { useAppHydration } from '../hooks/useAppHydration';
+import { AppReadyProvider } from '../contexts/AppReadyContext';
 import type { MainTabParamList } from '../types';
 import { COLORS, TYPOGRAPHY } from '../constants';
 
@@ -28,10 +29,11 @@ function TabBarBackground() {
 export function MainTabs() {
   // Central hydration: runs on mount and every time app comes to foreground.
   // Covers cold start after phone restart and OS-kill recovery.
-  useAppHydration();
+  const { isReady } = useAppHydration();
 
   return (
-    <Tab.Navigator
+    <AppReadyProvider isReady={isReady}>
+      <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: COLORS.textPrimary,
@@ -90,6 +92,7 @@ export function MainTabs() {
         }}
       />
     </Tab.Navigator>
+    </AppReadyProvider>
   );
 }
 

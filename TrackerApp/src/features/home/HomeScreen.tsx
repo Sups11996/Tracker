@@ -23,6 +23,8 @@ import { CaloriesHomeCard } from '../calories/CaloriesHomeCard';
 import { ScreenTimeHomeCard } from '../screentime/ScreenTimeHomeCard';
 import { AbcHomeCard } from '../abc/AbcHomeCard';
 import { AnimatedCard } from '../../components/ui/AnimatedCard';
+import { SkeletonCard } from '../../components/ui/SkeletonCard';
+import { useAppReady } from '../../contexts/AppReadyContext';
 import { useSQLiteContext } from 'expo-sqlite';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
 import type { MainTabParamList, DashboardTab } from '../../types/navigation';
@@ -34,6 +36,7 @@ export function HomeScreen() {
   const navigation = useNavigation<HomeNav>();
   const db = useSQLiteContext();
   const [refreshing, setRefreshing] = useState(false);
+  const isReady = useAppReady();
 
   const hour = new Date().getHours();
   const greeting =
@@ -91,15 +94,27 @@ export function HomeScreen() {
         </View>
 
         {/* Feature cards — each taps to its dashboard tab */}
-        <AnimatedCard index={0}><StepHomeCard onPress={() => goToDashboard('steps')} /></AnimatedCard>
-        <AnimatedCard index={1}><SleepHomeCard onPress={() => goToDashboard('sleep')} /></AnimatedCard>
-        <AnimatedCard index={2}><WaterHomeCard onPress={() => goToDashboard('water')} /></AnimatedCard>
-        {profile?.uses_gym !== false && (
-          <AnimatedCard index={3}><CaloriesHomeCard onPress={() => goToDashboard('calories')} /></AnimatedCard>
-        )}
-        <AnimatedCard index={4}><ScreenTimeHomeCard onPress={() => goToDashboard('screen')} /></AnimatedCard>
-        {profile?.uses_abc && (
-          <AnimatedCard index={5}><AbcHomeCard onPress={() => goToDashboard('abc')} /></AnimatedCard>
+        {!isReady ? (
+          // Show skeleton shimmer cards while hydrating
+          <>
+            <SkeletonCard lines={4} height={160} />
+            <SkeletonCard lines={3} height={130} />
+            <SkeletonCard lines={3} height={120} />
+            <SkeletonCard lines={3} height={130} />
+          </>
+        ) : (
+          <>
+            <AnimatedCard index={0}><StepHomeCard onPress={() => goToDashboard('steps')} /></AnimatedCard>
+            <AnimatedCard index={1}><SleepHomeCard onPress={() => goToDashboard('sleep')} /></AnimatedCard>
+            <AnimatedCard index={2}><WaterHomeCard onPress={() => goToDashboard('water')} /></AnimatedCard>
+            {profile?.uses_gym !== false && (
+              <AnimatedCard index={3}><CaloriesHomeCard onPress={() => goToDashboard('calories')} /></AnimatedCard>
+            )}
+            <AnimatedCard index={4}><ScreenTimeHomeCard onPress={() => goToDashboard('screen')} /></AnimatedCard>
+            {profile?.uses_abc && (
+              <AnimatedCard index={5}><AbcHomeCard onPress={() => goToDashboard('abc')} /></AnimatedCard>
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>

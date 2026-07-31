@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useUserStore } from '../stores/userStore';
@@ -19,12 +19,15 @@ import {
  * - On foreground: re-hydrates all stores when app comes back from background
  *   (covers phone restart + OS-kill recovery — stores would be empty after kill).
  * - On mount: subscribes to native step events; cleans up on unmount.
+ *
+ * Returns `isReady` — false during first hydration, true afterwards.
  */
-export function useAppHydration() {
+export function useAppHydration(): { isReady: boolean } {
   const db = useSQLiteContext();
   const { profile } = useUserStore();
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const hasHydratedOnce = useRef(false);
+  const [isReady, setIsReady] = useState(false);
 
   async function hydrateAll() {
     try {
@@ -47,7 +50,7 @@ export function useAppHydration() {
   useEffect(() => {
     if (!hasHydratedOnce.current) {
       hasHydratedOnce.current = true;
-      hydrateAll();
+      hydrateAll().finally(() => setIsReady(true));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -75,4 +78,6 @@ export function useAppHydration() {
       unsubscribeFromStepEvents();
     };
   }, []);
+
+  return { isReady };
 }
