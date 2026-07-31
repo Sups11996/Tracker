@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import { requireNativeModule } from 'expo-modules-core';
 import { Footprints, PauseCircle, PlayCircle, Car } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { ProgressRing } from '../../components/ui/ProgressRing';
@@ -17,6 +18,8 @@ import {
   unsubscribeFromStepEvents,
 } from '../../stores/stepStore';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
+
+const StepServiceModule = requireNativeModule('StepServiceModule');
 
 interface StepHomeCardProps {
   onPress?: () => void;
@@ -51,9 +54,11 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
 
   function sendServiceAction(action: string) {
     if (Platform.OS !== 'android') return;
-    // Communicate to native service via intent
-    // In bare workflow we use NativeModules or startActivity
-    // For now we expose a simple module — full implementation in native
+    try {
+      StepServiceModule.sendAction(action);
+    } catch (error) {
+      console.error('Failed to send action to step service:', error);
+    }
   }
 
   return (
@@ -97,7 +102,7 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
               icon={<Car size={16} color={COLORS.calories} />}
               label="Exit Vehicle Mode"
               color={COLORS.calories}
-              onPress={() => sendServiceAction('STEP_VEHICLE_TOGGLE')}
+              onPress={() => sendServiceAction('vehicle')}
             />
           ) : (
             <>
@@ -109,14 +114,14 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
                 label={status === 'paused' ? 'Resume' : 'Pause'}
                 color={status === 'paused' ? COLORS.steps : COLORS.textMuted}
                 onPress={() => sendServiceAction(
-                  status === 'paused' ? 'STEP_RESUME' : 'STEP_PAUSE'
+                  status === 'paused' ? 'resume' : 'pause'
                 )}
               />
               <ActionBtn
                 icon={<Car size={16} color={COLORS.textMuted} />}
                 label="Vehicle Mode"
                 color={COLORS.textMuted}
-                onPress={() => sendServiceAction('STEP_VEHICLE_TOGGLE')}
+                onPress={() => sendServiceAction('vehicle')}
               />
             </>
           )}
