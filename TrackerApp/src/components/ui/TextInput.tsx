@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -11,26 +11,37 @@ import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../constants';
 interface InputProps extends TextInputProps {
   label?: string;
   error?: string;
+  hint?: string;
 }
 
-export function TextInput({ label, error, style, ...rest }: InputProps) {
+export function TextInput({ label, error, hint, style, ...rest }: InputProps) {
+  const [focused, setFocused] = useState(false);
+
+  const borderColor = error
+    ? COLORS.error
+    : focused
+    ? COLORS.textSecondary
+    : COLORS.glassBorder;
+
   return (
     <View style={styles.wrapper}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
 
       <RNTextInput
-        style={[
-          styles.input,
-          error ? styles.inputError : styles.inputNormal,
-          style,
-        ]}
+        style={[styles.input, { borderColor }, style]}
         placeholderTextColor={COLORS.textMuted}
         autoCapitalize="none"
         autoCorrect={false}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         {...rest}
       />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <Text style={styles.error}>{error}</Text>
+      ) : hint ? (
+        <Text style={styles.hint}>{hint}</Text>
+      ) : null}
     </View>
   );
 }
@@ -54,14 +65,12 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     backgroundColor: COLORS.glass,
   },
-  inputNormal: {
-    borderColor: COLORS.glassBorder,
-  },
-  inputError: {
-    borderColor: COLORS.error,
-  },
   error: {
     fontSize: TYPOGRAPHY.size.xs,
     color: COLORS.error,
+  },
+  hint: {
+    fontSize: TYPOGRAPHY.size.xs,
+    color: COLORS.textMuted,
   },
 });
