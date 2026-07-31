@@ -5,6 +5,7 @@ import { useUserStore } from '../../stores';
 import { StepHomeCard } from '../steps/StepHomeCard';
 import { SleepHomeCard } from '../sleep/SleepHomeCard';
 import { WaterHomeCard } from '../water/WaterHomeCard';
+import { CaloriesHomeCard } from '../calories/CaloriesHomeCard';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
 
 export function HomeScreen() {
@@ -38,8 +39,9 @@ export function HomeScreen() {
         <StepHomeCard />
         <SleepHomeCard />
         <WaterHomeCard />
+        <CaloriesHomeCard />
 
-        {/* More cards added in chunks 7–9 */}
+        {/* More cards added in chunks 8–9 */}
       </ScrollView>
     </SafeAreaView>
   );
