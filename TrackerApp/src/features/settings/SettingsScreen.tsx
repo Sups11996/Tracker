@@ -23,6 +23,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { TextInput } from '../../components/ui/TextInput';
 import { useUserStore } from '../../stores/userStore';
+import { getTodayLocal } from '../../lib/dateUtils';
 import { StepSettingsSection } from '../steps/StepSettingsSection';
 import { SleepSettingsSection } from '../sleep/SleepSettingsSection';
 import { WaterSettingsSection } from '../water/WaterSettingsSection';
@@ -388,7 +389,7 @@ export function SettingsScreen() {
                 description="Clears all step records except today"
                 color={COLORS.steps}
                 onClear={async () => {
-                  const today = new Date().toISOString().split('T')[0];
+                  const today = getTodayLocal();
                   await db.runAsync('DELETE FROM daily_steps WHERE date < ?', [today]);
                   await hydrateStepStore(db);
                 }}
@@ -411,7 +412,7 @@ export function SettingsScreen() {
                 description="Clears all water logs except today"
                 color={COLORS.water}
                 onClear={async () => {
-                  const today = new Date().toISOString().split('T')[0];
+                  const today = getTodayLocal();
                   await db.runAsync('DELETE FROM water_logs WHERE date < ?', [today]);
                   await db.runAsync('DELETE FROM water_daily_summary WHERE date < ?', [today]);
                   await hydrateWaterStore(db);
@@ -424,7 +425,7 @@ export function SettingsScreen() {
                 description="Clears all workout logs except today"
                 color={COLORS.calories}
                 onClear={async () => {
-                  const today = new Date().toISOString().split('T')[0];
+                  const today = getTodayLocal();
                   await db.runAsync('DELETE FROM workout_logs WHERE date < ?', [today]);
                   await db.runAsync('DELETE FROM calories_daily_summary WHERE date < ?', [today]);
                   await hydrateCaloriesStore(db);
@@ -437,7 +438,7 @@ export function SettingsScreen() {
                 description="Clears all screen time data except today"
                 color={COLORS.screenTime}
                 onClear={async () => {
-                  const today = new Date().toISOString().split('T')[0];
+                  const today = getTodayLocal();
                   await db.runAsync('DELETE FROM app_usage_sessions WHERE date < ?', [today]);
                   await db.runAsync('DELETE FROM screen_time_daily_summary WHERE date < ?', [today]);
                 }}
@@ -450,7 +451,7 @@ export function SettingsScreen() {
                   description="Clears all ABC logs except today"
                   color={COLORS.abc}
                   onClear={async () => {
-                    const today = new Date().toISOString().split('T')[0];
+                    const today = getTodayLocal();
                     await db.runAsync('DELETE FROM abc_logs WHERE date < ?', [today]);
                     await db.runAsync('DELETE FROM abc_daily_summary WHERE date < ?', [today]);
                     await hydrateAbcStore(db);
@@ -486,7 +487,7 @@ export function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const today = new Date().toISOString().split('T')[0];
+              const today = getTodayLocal();
               
               await db.runAsync('DELETE FROM daily_steps WHERE date < ?', [today]);
               await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0');

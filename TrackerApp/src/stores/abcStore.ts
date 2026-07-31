@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { getTodayLocal, getYesterdayLocal } from '../lib/dateUtils';
 
 interface AbcEntry {
   id: number;
@@ -47,8 +48,8 @@ export const useAbcStore = create<AbcState>((set) => ({
  */
 export async function hydrateAbcStore(db: SQLiteDatabase): Promise<void> {
   try {
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const today = getTodayLocal();
+    const yesterday = getYesterdayLocal();
 
     // Today's entries
     const todayEntries = await db.getAllAsync<AbcEntry>(
@@ -82,7 +83,7 @@ export async function hydrateAbcStore(db: SQLiteDatabase): Promise<void> {
  */
 export async function logAbc(db: SQLiteDatabase): Promise<void> {
   const now = Date.now();
-  const today = new Date(now).toISOString().split('T')[0];
+  const today = getTodayLocal();
   const state = useAbcStore.getState();
   const newCount = state.todayCount + 1;
 
@@ -140,7 +141,7 @@ export async function undoLastAbc(db: SQLiteDatabase): Promise<void> {
   const { undoEntry, undoTimer } = state;
   if (!undoEntry) return;
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayLocal();
   const now = Date.now();
 
   try {
