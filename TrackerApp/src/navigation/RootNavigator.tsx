@@ -3,43 +3,29 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useUserStore } from '../stores';
 import { MainTabs } from './MainTabs';
+import { OnboardingNavigator } from './OnboardingNavigator';
 import type { RootStackParamList } from '../types';
-
-// Placeholder — will be replaced in Chunk 3
-import { View, Text, StyleSheet } from 'react-native';
-import { COLORS } from '../constants';
-
-function OnboardingPlaceholder() {
-  return (
-    <View style={styles.center}>
-      <Text style={styles.text}>Onboarding — Coming in Chunk 3</Text>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  center: { flex: 1, backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
-  text: { color: COLORS.textSecondary, fontSize: 16 },
-});
 
 const Root = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
   const db = useSQLiteContext();
-  const { setProfile } = useUserStore();
+  const { profile, setProfile } = useUserStore();
   const [isReady, setIsReady] = useState(false);
-  const [onboardingDone, setOnboardingDone] = useState(false);
 
   useEffect(() => {
     async function bootstrap() {
       try {
-        // Load profile from SQLite
-        const profile = await db.getFirstAsync<{ onboarding_complete: number }>(
+        const row = await db.getFirstAsync<any>(
           'SELECT * FROM user_profile WHERE id = 1'
         );
-        if (profile && profile.onboarding_complete === 1) {
-          setProfile(profile as any);
-          setOnboardingDone(true);
+        if (row && row.onboarding_complete === 1) {
+          setProfile({
+            ...row,
+            uses_gym: row.uses_gym === 1,
+            uses_abc: row.uses_abc === 1,
+            onboarding_complete: true,
+          });
         }
       } catch (e) {
         console.error('[RootNavigator] bootstrap error:', e);
@@ -50,14 +36,17 @@ export function RootNavigator() {
     bootstrap();
   }, []);
 
+  // Re-run when profile changes (i.e. onboarding just completed)
+  const onboardingDone = profile?.onboarding_complete === true;
+
   if (!isReady) return null;
 
   return (
     <Root.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
       {onboardingDone ? (
-        <Root.Screen name="Main" component={MainTabs} />
+        <Root.Screen name="Main"       component={MainTabs} />
       ) : (
-        <Root.Screen name="Onboarding" component={OnboardingPlaceholder} />
+        <Root.Screen name="Onboarding" component={OnboardingNavigator} />
       )}
     </Root.Navigator>
   );
