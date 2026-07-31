@@ -11,6 +11,7 @@
       "supportsTablet": false
     },
     "android": {
+      "package": "com.trackerapp.personal",
       "adaptiveIcon": {
         "backgroundColor": "#12141C",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -38,7 +39,6 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
           "color": "#12141C",
           "defaultChannel": "default"
         }
