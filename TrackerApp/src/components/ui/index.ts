@@ -7,3 +7,4 @@ export { ScreenWrapper } from './ScreenWrapper';
 export { StatCard } from './StatCard';
 export { ErrorBoundary } from './ErrorBoundary';
 export { SkeletonCard } from './SkeletonCard';
+export { AppBackground } from './AppBackground';

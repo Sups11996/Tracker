@@ -1,44 +1,94 @@
 import React from 'react';
 import { StyleSheet, View, type ViewProps } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { COLORS, RADIUS, SPACING } from '../../constants';
+import { GLASS, SPACING } from '../../constants';
 
 interface CardProps extends ViewProps {
   children: React.ReactNode;
-  /** Use blur overlay — looks best on top of background images or gradients */
-  blur?: boolean;
-  /** Extra padding override */
+  /**
+   * Accent colour for the subtle top-edge highlight line.
+   * Pass a feature colour (COLORS.steps etc.) to tint the card edge.
+   * Omit for the default neutral glass border.
+   */
+  accentColor?: string;
+  /** Override inner padding */
   padding?: number;
+  /** Disable blur (use on very long lists where BlurView count matters) */
+  noBlur?: boolean;
 }
 
-export function Card({ children, blur = false, padding, style, ...rest }: CardProps) {
+/**
+ * Glass card — the primary surface component.
+ *
+ * Structure:
+ *   BlurView (backdrop blur)
+ *   └── semi-transparent white tint layer  ← sells the "frosted glass" look
+ *       └── optional 1px accent top border  ← adds depth / feature identity
+ *           └── content
+ *
+ * Keep glass deliberate: use Card for the main content containers,
+ * not for every single row item inside them.
+ */
+export function Card({
+  children,
+  accentColor,
+  padding,
+  noBlur = false,
+  style,
+  ...rest
+}: CardProps) {
   const inner = (
-    <View style={[styles.inner, padding !== undefined && { padding }, style]} {...rest}>
+    <View
+      style={[
+        styles.tint,
+        accentColor && { borderTopColor: `${accentColor}55`, borderTopWidth: 1.5 },
+        padding !== undefined && { padding },
+        style,
+      ]}
+      {...rest}
+    >
       {children}
     </View>
   );
 
-  if (blur) {
+  if (noBlur) {
     return (
-      <BlurView intensity={18} tint="dark" style={[styles.card, style]}>
+      <View style={[styles.shell, styles.noBlurShell]}>
         {inner}
-      </BlurView>
+      </View>
     );
   }
 
-  return <View style={[styles.card, style]} {...rest}>{children}</View>;
+  return (
+    <BlurView
+      intensity={GLASS.blurCard}
+      tint="dark"
+      style={styles.shell}
+    >
+      {inner}
+    </BlurView>
+  );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.glass,
-    borderRadius: RADIUS.xl,
-    padding: SPACING.xl,
-    borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+  /** Outer container — clips blur to rounded corners */
+  shell: {
+    borderRadius: GLASS.radius,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: GLASS.border,
+    // Soft drop shadow
+    ...GLASS.shadow,
   },
-  inner: {
-    flex: 1,
+  /** Fallback shell when noBlur=true */
+  noBlurShell: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  /** Semi-transparent white tint on top of the blur */
+  tint: {
+    backgroundColor: GLASS.cardBg,
+    padding: SPACING.xl,
+    // No border here — border lives on the shell (BlurView)
+    overflow: 'hidden',
   },
 });

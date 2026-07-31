@@ -124,7 +124,7 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
   scroll: { flex: 1 },
   content: {

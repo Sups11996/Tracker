@@ -1,31 +1,47 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated, Easing } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
+import { MOTION } from '../../constants';
 
 interface AnimatedCardProps {
   children: React.ReactNode;
-  index?: number; // stagger delay based on index
+  /** Stagger delay index — each card enters MOTION.stagger ms after the previous */
+  index?: number;
 }
 
-const STAGGER_MS = 80;
-const DURATION_MS = 350;
-
+/**
+ * Entrance animation wrapper for home screen cards.
+ *
+ * Motion spec:
+ *   - Opacity 0 → 1, translateY 28 → 0
+ *   - ease-out curve (things entering)
+ *   - Stagger: MOTION.stagger ms per index
+ *   - Respects system reduced-motion: snaps immediately if enabled
+ *   - Animates transform/opacity only — never layout — stays 60 fps
+ */
 export function AnimatedCard({ children, index = 0 }: AnimatedCardProps) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(24)).current;
+  const reducedMotion = useReducedMotion();
+  const opacity    = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const translateY = useRef(new Animated.Value(reducedMotion ? 0 : 28)).current;
 
   useEffect(() => {
-    const delay = index * STAGGER_MS;
+    if (reducedMotion) return; // already visible — nothing to animate
+
+    const delay = index * MOTION.stagger;
+
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
-        duration: DURATION_MS,
+        duration: MOTION.standard,
         delay,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
         toValue: 0,
-        duration: DURATION_MS,
+        duration: MOTION.standard,
         delay,
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     ]).start();

@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, type ViewProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS, SPACING } from '../../constants';
 
 interface ScreenWrapperProps extends ViewProps {
   children: React.ReactNode;
@@ -11,6 +10,11 @@ interface ScreenWrapperProps extends ViewProps {
   edges?: Array<'top' | 'bottom' | 'left' | 'right'>;
 }
 
+/**
+ * Transparent safe-area wrapper.
+ * Background depth comes from AppBackground (global gradient + orbs in App.tsx).
+ * Never set backgroundColor here — that would paint over the gradient.
+ */
 export function ScreenWrapper({
   children,
   padded = true,
@@ -33,13 +37,13 @@ export function ScreenWrapper({
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
   padded: {
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: 20,
   },
 });

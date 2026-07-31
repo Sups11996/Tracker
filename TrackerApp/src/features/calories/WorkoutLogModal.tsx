@@ -8,11 +8,10 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { X } from 'lucide-react-native';
-import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { TextInput } from '../../components/ui/TextInput';
 import { calcWorkoutCalories, type Intensity } from '../../stores/caloriesStore';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
+import { COLORS, GLASS, MOTION, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90];
 
@@ -70,16 +69,23 @@ export function WorkoutLogModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleCancel}>
-      <BlurView intensity={40} style={styles.overlay}>
-        <View style={styles.container}>
-          <Card style={styles.card}>
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.title}>Log Workout</Text>
-              <TouchableOpacity onPress={handleCancel} hitSlop={8}>
-                <X size={24} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            </View>
+      {/* Dim scrim — light blur so background content is still readable */}
+      <BlurView intensity={GLASS.blurOverlay} tint="dark" style={styles.overlay}>
+        <View style={styles.overlayTint}>
+          {/* Modal sheet — full glass surface */}
+          <View style={styles.container}>
+            <BlurView intensity={GLASS.blurModal} tint="dark" style={styles.sheetBlur}>
+              <View style={styles.sheetTint}>
+                {/* Top accent line — calories colour */}
+                <View style={[styles.accentLine, { backgroundColor: COLORS.calories }]} />
+
+                {/* Header */}
+                <View style={styles.header}>
+                  <Text style={styles.title}>Log Workout</Text>
+                  <TouchableOpacity onPress={handleCancel} hitSlop={8}>
+                    <X size={24} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                </View>
 
             {/* Duration */}
             <View style={styles.section}>
@@ -154,7 +160,9 @@ export function WorkoutLogModal({
               <Button label="Log Workout" onPress={handleSave} variant="primary" accentColor={COLORS.calories} style={styles.actionBtn} />
               <Button label="Cancel" onPress={handleCancel} variant="ghost" style={styles.actionBtn} />
             </View>
-          </Card>
+              </View>
+            </BlurView>
+          </View>
         </View>
       </BlurView>
     </Modal>
@@ -166,10 +174,39 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
   },
-  container: { width: '92%', maxWidth: 420 },
-  card: { gap: SPACING.lg },
+  overlayTint: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: GLASS.overlayBg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  container: {
+    width: '92%',
+    maxWidth: 420,
+    borderRadius: GLASS.radius,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: GLASS.border,
+    ...GLASS.shadow,
+  },
+  sheetBlur: {
+    // BlurView clips to container's borderRadius via overflow:hidden above
+  },
+  sheetTint: {
+    backgroundColor: GLASS.modalBg,
+    gap: SPACING.lg,
+    padding: SPACING.xl,
+  },
+  accentLine: {
+    height: 3,
+    borderRadius: 2,
+    width: 40,
+    alignSelf: 'center',
+    marginBottom: SPACING.xs,
+    opacity: 0.8,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -196,10 +233,10 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1.5,
-    borderColor: COLORS.glassBorder,
-    backgroundColor: COLORS.glassHighlight,
+    borderRadius: GLASS.radiusInner,
+    borderWidth: 1,
+    borderColor: GLASS.borderSubtle,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   chipActive: {
     borderColor: COLORS.calories,
@@ -220,10 +257,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    borderWidth: 1.5,
-    borderColor: COLORS.glassBorder,
-    backgroundColor: COLORS.glassHighlight,
+    borderRadius: GLASS.radiusInner,
+    borderWidth: 1,
+    borderColor: GLASS.borderSubtle,
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
   intensityActive: {
     borderColor: COLORS.calories,
@@ -247,9 +284,11 @@ const styles = StyleSheet.create({
   },
   estimate: {
     padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    backgroundColor: `${COLORS.calories}15`,
+    borderRadius: GLASS.radiusInner,
+    backgroundColor: `${COLORS.calories}18`,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: `${COLORS.calories}30`,
   },
   estimateText: {
     fontSize: TYPOGRAPHY.size.sm,

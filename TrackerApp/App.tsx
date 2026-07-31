@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SQLiteProvider } from 'expo-sqlite';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { ErrorBoundary } from './src/components/ui/ErrorBoundary';
+import { AppBackground } from './src/components/ui/AppBackground';
 import { initDatabase, DATABASE_NAME } from './src/lib';
 
 export default function App() {
@@ -15,6 +16,8 @@ export default function App() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ErrorBoundary>
+          {/* Gradient + ambient orbs — lives behind every screen */}
+          <AppBackground />
           <SQLiteProvider databaseName={DATABASE_NAME} onInit={initDatabase}>
             <NavigationContainer>
               <StatusBar style="light" />

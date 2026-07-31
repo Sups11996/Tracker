@@ -3,19 +3,20 @@
 /** App background and surface colors */
 export const COLORS = {
   // Backgrounds
-  background: '#12141C',      // main screen background
-  surface: '#1A1D27',         // card / sheet surface
-  surfaceHigh: '#1F2330',     // elevated surface
+  background: '#0D0F18',      // deeper dark for better glass contrast
+  surface: '#14172200',       // transparent — let blur do the work
+  surfaceHigh: '#1F2330',     // elevated surface (opaque fallback)
 
-  // Glassmorphism
-  glass: 'rgba(255,255,255,0.06)',
-  glassBorder: 'rgba(255,255,255,0.10)',
-  glassHighlight: 'rgba(255,255,255,0.03)',
+  // Glassmorphism surfaces — use these as backgroundColor on BlurView containers
+  glass: 'rgba(255,255,255,0.09)',
+  glassBorder: 'rgba(255,255,255,0.22)',
+  glassHighlight: 'rgba(255,255,255,0.05)',
+  glassDark: 'rgba(0,0,0,0.25)',          // darker glass for overlays
 
   // Text
-  textPrimary: 'rgba(255,255,255,0.88)',
-  textSecondary: 'rgba(255,255,255,0.55)',
-  textMuted: 'rgba(255,255,255,0.30)',
+  textPrimary: 'rgba(255,255,255,0.90)',
+  textSecondary: 'rgba(255,255,255,0.58)',
+  textMuted: 'rgba(255,255,255,0.32)',
   textDisabled: 'rgba(255,255,255,0.18)',
 
   // Feature accent colors (matte / desaturated)
@@ -55,7 +56,7 @@ export const RADIUS = {
   md:  12,
   lg:  16,
   xl:  20,
-  xxl: 28,
+  xxl: 24,   // glass card standard
   full: 999,
 } as const;
 
@@ -83,6 +84,69 @@ export const TYPOGRAPHY = {
     semibold: 'Inter_600SemiBold',
     bold:     'Inter_700Bold',
   },
+} as const;
+
+// ─── Glass Tokens ─────────────────────────────────────────────────────────────
+// Use these as the single source of truth. Never hard-code blur/border values.
+
+export const GLASS = {
+  /** expo-blur intensity for standard cards (maps roughly to blur(16px)) */
+  blurCard: 18,
+  /** expo-blur intensity for modals / overlays */
+  blurModal: 28,
+  /** expo-blur intensity for the nav tab bar */
+  blurNav: 50,
+  /** expo-blur intensity for dim scrim behind modals */
+  blurOverlay: 6,
+
+  /** Card background tint on top of the BlurView */
+  cardBg: 'rgba(255,255,255,0.09)' as string,
+  /** Modal sheet background */
+  modalBg: 'rgba(20,22,34,0.65)' as string,
+  /** Overlay/scrim that dims content behind a modal */
+  overlayBg: 'rgba(0,0,0,0.55)' as string,
+
+  /** The "edge" border that sells the glass effect */
+  border: 'rgba(255,255,255,0.22)' as string,
+  borderSubtle: 'rgba(255,255,255,0.12)' as string,
+
+  /** Soft drop shadow — large, low opacity */
+  shadow: {
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,             // Android
+  },
+
+  /** Radius used on every glass surface */
+  radius: RADIUS.xxl,          // 24
+  /** Tighter radius for nested chips / inner elements */
+  radiusInner: RADIUS.lg,      // 16
+} as const;
+
+// ─── Motion Tokens ────────────────────────────────────────────────────────────
+// All durations in ms. Use these + the spring config everywhere.
+
+export const MOTION = {
+  // Durations
+  micro:      150,   // tiny state changes (chip tap, toggle)
+  quick:      220,   // micro-interactions (button press feedback)
+  standard:   300,   // card enter, element reveal
+  screen:     350,   // screen / modal transitions
+
+  // Easing names (used with Animated.timing easing param via Easing import)
+  // For Reanimated withTiming, use the withTiming duration + easing directly
+  easeOut: 'easeOut' as const,
+  easeIn:  'easeIn'  as const,
+
+  // Spring configs — reference these in withSpring / Animated.spring
+  springSnappy: { damping: 18, stiffness: 320, mass: 0.9 },
+  springBouncy: { damping: 14, stiffness: 260, mass: 1.0 },
+  springGentle: { damping: 22, stiffness: 200, mass: 1.0 },
+
+  // Stagger between list items (ms per item)
+  stagger: 70,
 } as const;
 
 // ─── Feature Defaults ─────────────────────────────────────────────────────────

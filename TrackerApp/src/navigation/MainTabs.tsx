@@ -9,99 +9,138 @@ import { SettingsScreen } from '../features/settings/SettingsScreen';
 import { useAppHydration } from '../hooks/useAppHydration';
 import { AppReadyProvider } from '../contexts/AppReadyContext';
 import type { MainTabParamList } from '../types';
-import { COLORS, TYPOGRAPHY } from '../constants';
+import { COLORS, GLASS, TYPOGRAPHY } from '../constants';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const ICON_SIZE = 22;
 
-/** Glassy tab bar background rendered via BlurView */
+/**
+ * Glass tab bar background.
+ * BlurView sits at full size, then a semi-transparent tint + top border layered on top.
+ * This is the same pattern as Card but adapted for the nav bar.
+ */
 function TabBarBackground() {
   return (
-    <BlurView
-      intensity={40}
-      tint="dark"
-      style={StyleSheet.absoluteFill}
-    />
+    <BlurView intensity={GLASS.blurNav} tint="dark" style={StyleSheet.absoluteFill}>
+      {/* Tint layer — mirrors Card's tint */}
+      <View style={styles.tabBarTint} />
+    </BlurView>
   );
 }
 
 export function MainTabs() {
-  // Central hydration: runs on mount and every time app comes to foreground.
-  // Covers cold start after phone restart and OS-kill recovery.
   const { isReady } = useAppHydration();
 
   return (
     <AppReadyProvider isReady={isReady}>
       <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: COLORS.textPrimary,
-        tabBarInactiveTintColor: COLORS.textMuted,
-        tabBarBackground: () => <TabBarBackground />,
-        tabBarStyle: {
-          position: 'absolute',
-          backgroundColor: 'rgba(18,20,28,0.75)',
-          borderTopColor: COLORS.glassBorder,
-          borderTopWidth: 1,
-          height: 62,
-          paddingBottom: 10,
-          paddingTop: 8,
-          elevation: 0,
-        },
-        tabBarLabelStyle: {
-          fontSize: TYPOGRAPHY.size.xs,
-          fontWeight: TYPOGRAPHY.weight.semibold,
-        },
-      }}
-    >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeIcon : undefined}>
-              <Home size={ICON_SIZE} color={color} strokeWidth={focused ? 2.2 : 1.8} />
-            </View>
-          ),
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: COLORS.textPrimary,
+          tabBarInactiveTintColor: COLORS.textMuted,
+          tabBarBackground: () => <TabBarBackground />,
+          tabBarStyle: {
+            position: 'absolute',
+            // Fully transparent — blur + tint layer do all the work
+            backgroundColor: 'transparent',
+            borderTopColor: GLASS.border,
+            borderTopWidth: 1,
+            height: 64,
+            paddingBottom: 10,
+            paddingTop: 8,
+            elevation: 0,
+          },
+          tabBarLabelStyle: {
+            fontSize: TYPOGRAPHY.size.xs,
+            fontWeight: TYPOGRAPHY.weight.semibold,
+            letterSpacing: 0.2,
+          },
         }}
-      />
-      <Tab.Screen
-        name="Dashboard"
-        component={DashboardScreen}
-        options={{
-          tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeIcon : undefined}>
-              <BarChart2 size={ICON_SIZE} color={color} strokeWidth={focused ? 2.2 : 1.8} />
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          tabBarLabel: 'Settings',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={focused ? styles.activeIcon : undefined}>
-              <Settings size={ICON_SIZE} color={color} strokeWidth={focused ? 2.2 : 1.8} />
-            </View>
-          ),
-        }}
-      />
-    </Tab.Navigator>
+      >
+        <Tab.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{
+            tabBarLabel: 'Home',
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon focused={focused} color={color}>
+                <Home size={ICON_SIZE} color={color} strokeWidth={focused ? 2.2 : 1.6} />
+              </TabIcon>
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Dashboard"
+          component={DashboardScreen}
+          options={{
+            tabBarLabel: 'Dashboard',
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon focused={focused} color={color}>
+                <BarChart2 size={ICON_SIZE} color={color} strokeWidth={focused ? 2.2 : 1.6} />
+              </TabIcon>
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Settings"
+          component={SettingsScreen}
+          options={{
+            tabBarLabel: 'Settings',
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon focused={focused} color={color}>
+                <Settings size={ICON_SIZE} color={color} strokeWidth={focused ? 2.2 : 1.6} />
+              </TabIcon>
+            ),
+          }}
+        />
+      </Tab.Navigator>
     </AppReadyProvider>
   );
 }
 
+/**
+ * Icon wrapper — adds a pill highlight behind the active icon.
+ * The pill is a small glass surface itself: subtle bg + the accent of the icon colour.
+ */
+function TabIcon({
+  children,
+  focused,
+  color,
+}: {
+  children: React.ReactNode;
+  focused: boolean;
+  color: string;
+}) {
+  if (!focused) return <View style={styles.iconWrap}>{children}</View>;
+
+  return (
+    <View
+      style={[
+        styles.iconWrap,
+        styles.iconWrapActive,
+        { backgroundColor: `${color}18`, borderColor: `${color}30` },
+      ]}
+    >
+      {children}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  activeIcon: {
-    // subtle glow dot under active icon — purely decorative
-    shadowColor: COLORS.textPrimary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+  tabBarTint: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(13,15,24,0.55)',
+  },
+  iconWrap: {
+    width: 40,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+  },
+  iconWrapActive: {
+    borderWidth: 1,
   },
 });

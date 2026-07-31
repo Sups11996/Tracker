@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { TouchableOpacity } from 'react-native';
-import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../constants';
+import { COLORS, RADIUS, SPACING, TYPOGRAPHY, MOTION } from '../../constants';
 
 interface ButtonProps extends TouchableOpacityProps {
   label: string;
@@ -40,11 +40,11 @@ export function Button({
   }));
 
   function handlePressIn() {
-    scale.value = withSpring(0.96, { damping: 15, stiffness: 300 });
+    scale.value = withSpring(0.96, MOTION.springSnappy);
   }
 
   function handlePressOut() {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    scale.value = withSpring(1, MOTION.springSnappy);
   }
 
   const containerStyle = [

@@ -8,10 +8,9 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { X } from 'lucide-react-native';
-import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { TextInput } from '../../components/ui/TextInput';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
+import { COLORS, GLASS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 interface SleepLatencyPromptProps {
   visible: boolean;
@@ -72,74 +71,81 @@ export function SleepLatencyPrompt({
       animationType="fade"
       onRequestClose={handleCancel}
     >
-      <BlurView intensity={40} style={styles.overlay}>
-        <View style={styles.container}>
-          <Card style={styles.card}>
-            {/* Header */}
-            <View style={styles.header}>
-              <Text style={styles.title}>How long to fall asleep?</Text>
-              <TouchableOpacity onPress={handleCancel} hitSlop={8}>
-                <X size={24} color={COLORS.textMuted} />
-              </TouchableOpacity>
-            </View>
+      <BlurView intensity={GLASS.blurOverlay} tint="dark" style={styles.overlay}>
+        <View style={styles.overlayTint}>
+          <View style={styles.container}>
+            <BlurView intensity={GLASS.blurModal} tint="dark" style={styles.sheetBlur}>
+              <View style={styles.sheetTint}>
+                {/* Top accent line — sleep colour */}
+                <View style={[styles.accentLine, { backgroundColor: COLORS.sleep }]} />
 
-            <Text style={styles.description}>
-              Select how many minutes it took you to fall asleep after getting into bed.
-            </Text>
+                {/* Header */}
+                <View style={styles.header}>
+                  <Text style={styles.title}>How long to fall asleep?</Text>
+                  <TouchableOpacity onPress={handleCancel} hitSlop={8}>
+                    <X size={24} color={COLORS.textMuted} />
+                  </TouchableOpacity>
+                </View>
 
-            {/* Preset chips */}
-            <View style={styles.presetGrid}>
-              {PRESET_OPTIONS.map((minutes) => (
-                <TouchableOpacity
-                  key={minutes}
-                  style={[
-                    styles.presetChip,
-                    selectedPreset === minutes && styles.presetChipSelected,
-                  ]}
-                  onPress={() => handlePresetSelect(minutes)}
-                >
-                  <Text
-                    style={[
-                      styles.presetText,
-                      selectedPreset === minutes && styles.presetTextSelected,
-                    ]}
-                  >
-                    {minutes === 0 ? 'Instant' : `${minutes} min`}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                <Text style={styles.description}>
+                  Select how many minutes it took you to fall asleep after getting into bed.
+                </Text>
 
-            {/* Custom input */}
-            <View style={styles.customSection}>
-              <Text style={styles.customLabel}>Or enter custom time:</Text>
-              <TextInput
-                value={customValue}
-                onChangeText={setCustomValue}
-                onFocus={handleCustomFocus}
-                keyboardType="number-pad"
-                placeholder="e.g. 25"
-                style={styles.customInput}
-              />
-            </View>
+                {/* Preset chips */}
+                <View style={styles.presetGrid}>
+                  {PRESET_OPTIONS.map((minutes) => (
+                    <TouchableOpacity
+                      key={minutes}
+                      style={[
+                        styles.presetChip,
+                        selectedPreset === minutes && styles.presetChipSelected,
+                      ]}
+                      onPress={() => handlePresetSelect(minutes)}
+                    >
+                      <Text
+                        style={[
+                          styles.presetText,
+                          selectedPreset === minutes && styles.presetTextSelected,
+                        ]}
+                      >
+                        {minutes === 0 ? 'Instant' : `${minutes} min`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
-            {/* Actions */}
-            <View style={styles.actions}>
-              <Button
-                label="Confirm"
-                onPress={handleConfirm}
-                variant="primary"
-                accentColor={COLORS.sleep}
-                style={styles.actionButton}
-              />
-              <Button
-                label="Cancel"
-                onPress={handleCancel}
-                variant="ghost"
-                style={styles.actionButton}
-              />
-            </View>
-          </Card>
+                {/* Custom input */}
+                <View style={styles.customSection}>
+                  <Text style={styles.customLabel}>Or enter custom time:</Text>
+                  <TextInput
+                    value={customValue}
+                    onChangeText={setCustomValue}
+                    onFocus={handleCustomFocus}
+                    keyboardType="number-pad"
+                    placeholder="e.g. 25"
+                    style={styles.customInput}
+                  />
+                </View>
+
+                {/* Actions */}
+                <View style={styles.actions}>
+                  <Button
+                    label="Confirm"
+                    onPress={handleConfirm}
+                    variant="primary"
+                    accentColor={COLORS.sleep}
+                    style={styles.actionButton}
+                  />
+                  <Button
+                    label="Cancel"
+                    onPress={handleCancel}
+                    variant="ghost"
+                    style={styles.actionButton}
+                  />
+                </View>
+              </View>
+            </BlurView>
+          </View>
         </View>
       </BlurView>
     </Modal>
@@ -151,14 +157,36 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  overlayTint: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: GLASS.overlayBg,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   container: {
     width: '90%',
     maxWidth: 400,
+    borderRadius: GLASS.radius,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: GLASS.border,
+    ...GLASS.shadow,
   },
-  card: {
+  sheetBlur: {},
+  sheetTint: {
+    backgroundColor: GLASS.modalBg,
     gap: SPACING.lg,
+    padding: SPACING.xl,
+  },
+  accentLine: {
+    height: 3,
+    borderRadius: 2,
+    width: 40,
+    alignSelf: 'center',
+    marginBottom: SPACING.xs,
+    opacity: 0.8,
   },
   header: {
     flexDirection: 'row',
@@ -169,6 +197,8 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.size.lg,
     fontWeight: TYPOGRAPHY.weight.bold,
     color: COLORS.textPrimary,
+    flex: 1,
+    paddingRight: SPACING.sm,
   },
   description: {
     fontSize: TYPOGRAPHY.size.sm,
@@ -183,10 +213,10 @@ const styles = StyleSheet.create({
   presetChip: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1.5,
-    borderColor: COLORS.glassBorder,
-    backgroundColor: COLORS.glassHighlight,
+    borderRadius: GLASS.radiusInner,
+    borderWidth: 1,
+    borderColor: GLASS.borderSubtle,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     minWidth: 80,
     alignItems: 'center',
   },
@@ -216,7 +246,7 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: SPACING.sm,
-    marginTop: SPACING.sm,
+    marginTop: SPACING.xs,
   },
   actionButton: {
     flex: 1,
