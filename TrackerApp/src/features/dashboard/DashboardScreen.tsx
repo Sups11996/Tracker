@@ -12,6 +12,7 @@ import { SleepDashboard } from '../sleep/SleepDashboard';
 import { WaterDashboard } from '../water/WaterDashboard';
 import { CaloriesDashboard } from '../calories/CaloriesDashboard';
 import { ScreenTimeDashboard } from '../screentime/ScreenTimeDashboard';
+import { AbcDashboard } from '../abc/AbcDashboard';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../constants';
 
 type Tab = 'steps' | 'sleep' | 'water' | 'calories' | 'screen' | 'abc';
@@ -63,7 +64,7 @@ export function DashboardScreen() {
       {activeTab === 'water'    && <WaterDashboard />}
       {activeTab === 'calories' && <CaloriesDashboard />}
       {activeTab === 'screen'   && <ScreenTimeDashboard />}
-      {activeTab !== 'steps' && activeTab !== 'sleep' && activeTab !== 'water' && activeTab !== 'calories' && activeTab !== 'screen' && <PlaceholderDash tab={activeTab} />}
+      {activeTab === 'abc'      && <AbcDashboard />}
     </SafeAreaView>
   );
 }
