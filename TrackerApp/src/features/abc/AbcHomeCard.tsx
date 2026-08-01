@@ -23,7 +23,7 @@ interface AbcHomeCardProps {
 
 export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
   const db = useSQLiteContext();
-  const { todayCount, lastLoggedAt, yesterdayCount, undoEntry } = useAbcStore();
+  const { todayCount, lastLoggedAt, yesterdayCount, undoEntry, undoStack } = useAbcStore();
 
   const toastAnim = useRef(new Animated.Value(0)).current;
   const toastVisible = useRef(false);
@@ -125,7 +125,9 @@ export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
           ]}
           pointerEvents={undoEntry ? 'auto' : 'none'}
         >
-          <Text style={styles.toastText}>ABC Logged</Text>
+          <Text style={styles.toastText}>
+            {undoStack.length > 1 ? `${undoStack.length} logged` : 'ABC Logged'}
+          </Text>
           <TouchableOpacity onPress={handleUndo} hitSlop={8}>
             <Text style={styles.toastUndo}>Undo</Text>
           </TouchableOpacity>

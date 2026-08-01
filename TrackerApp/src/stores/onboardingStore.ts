@@ -8,6 +8,7 @@ export interface OnboardingData {
   gender: 'male' | 'female' | 'other';
   age: string;
   height_cm: string;
+  height_ft_in: string;   // display value e.g. "5.7" — converted to cm before saving
   weight_kg: string;
   water_goal_ml: string;
   uses_gym: boolean;
@@ -25,6 +26,7 @@ const DEFAULTS: OnboardingData = {
   gender: 'male',
   age: '',
   height_cm: '',
+  height_ft_in: '',
   weight_kg: '',
   water_goal_ml: '',
   uses_gym: false,

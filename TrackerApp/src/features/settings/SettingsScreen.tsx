@@ -1,6 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,26 +7,29 @@ import {
   View,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import * as Notifications from 'expo-notifications';
 import {
-  User,
-  Shield,
-  CheckCircle2,
   AlertCircle,
-  Settings,
   Trash2,
-  Database,
 } from 'lucide-react-native';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { TextInput } from '../../components/ui/TextInput';
 import { useUserStore } from '../../stores/userStore';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { getTodayLocal } from '../../lib/dateUtils';
 import {
   requestIgnoreBatteryOptimizations,
   openUsageAccessSettings,
   openAppSettings,
+  isBatteryOptimizationIgnored,
 } from '../../lib/permissions';
+import {
+  checkScreenTimePermission,
+  requestScreenTimePermission,
+} from '../../stores/screenTimeStore';
 import { StepSettingsSection } from '../steps/StepSettingsSection';
 import { SleepSettingsSection } from '../sleep/SleepSettingsSection';
 import { WaterSettingsSection } from '../water/WaterSettingsSection';
@@ -46,6 +48,7 @@ import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 export function SettingsScreen() {
   const db = useSQLiteContext();
   const { profile, setProfile } = useUserStore();
+  const { showSuccess, showError, showConfirm } = useCustomAlert();
 
   // Profile editing state
   const [editingProfile, setEditingProfile] = useState(false);
@@ -58,6 +61,41 @@ export function SettingsScreen() {
 
   // Gender selector state
   const [editingGender, setEditingGender] = useState(false);
+
+  // Live permission state
+  const [activityGranted, setActivityGranted] = useState(false);
+  const [notifGranted, setNotifGranted] = useState(false);
+  const [batteryGranted, setBatteryGranted] = useState(false);
+  const [screenTimeGranted, setScreenTimeGranted] = useState(false);
+
+  // Check all permissions on mount
+  useEffect(() => {
+    async function checkPerms() {
+      // Activity recognition
+      const { status } = await Notifications.getPermissionsAsync();
+      setNotifGranted(status === 'granted');
+
+      // Battery optimization
+      setBatteryGranted(isBatteryOptimizationIgnored());
+
+      // Screen time / usage stats
+      const st = await checkScreenTimePermission();
+      setScreenTimeGranted(st);
+
+      // Activity recognition — checked via the step service being able to run
+      // We check via Notifications as proxy isn't accurate; use android permission check
+      try {
+        const { PermissionsAndroid } = require('react-native');
+        const result = await PermissionsAndroid.check(
+          'android.permission.ACTIVITY_RECOGNITION'
+        );
+        setActivityGranted(result);
+      } catch {
+        setActivityGranted(false);
+      }
+    }
+    checkPerms();
+  }, []);
 
   const handleUpdateProfile = useCallback(async () => {
     if (!profile) return;
@@ -72,7 +110,7 @@ export function SettingsScreen() {
       isNaN(height) || height < 100 || height > 250 ||
       isNaN(weight) || weight < 30 || weight > 300
     ) {
-      Alert.alert('Invalid input', 'Please check all fields are valid.');
+      showError('Invalid input', 'Please check all fields are valid.');
       return;
     }
 
@@ -95,7 +133,7 @@ export function SettingsScreen() {
       setEditingProfile(false);
     } catch (error) {
       console.error('Failed to update profile:', error);
-      Alert.alert('Error', 'Failed to save changes. Please try again.');
+      showError('Error', 'Failed to save changes. Please try again.');
     }
   }, [profileForm, profile, db, setProfile]);
 
@@ -112,7 +150,7 @@ export function SettingsScreen() {
       setEditingGender(false);
     } catch (error) {
       console.error('Failed to update gender:', error);
-      Alert.alert('Error', 'Failed to save changes. Please try again.');
+      showError('Error', 'Failed to save changes. Please try again.');
     }
   }, [profile, db, setProfile]);
 
@@ -131,9 +169,11 @@ export function SettingsScreen() {
     openAppSettings();
   }, []);
 
+  const tabBarHeight = useBottomTabBarHeight();
+
   if (!profile) {
     return (
-      <ScreenWrapper>
+      <ScreenWrapper padded={false}>
         <View style={styles.container}>
           <Text style={styles.title}>Settings</Text>
           <Card style={styles.errorCard}>
@@ -146,10 +186,10 @@ export function SettingsScreen() {
   }
 
   return (
-    <ScreenWrapper>
+    <ScreenWrapper padded={false}>
       <ScrollView 
         style={styles.scroll} 
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { paddingBottom: tabBarHeight + SPACING.lg }]}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Settings</Text>
@@ -157,7 +197,6 @@ export function SettingsScreen() {
         {/* Profile Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <User size={20} color={COLORS.steps} />
             <Text style={styles.sectionTitle}>Profile</Text>
           </View>
 
@@ -296,7 +335,6 @@ export function SettingsScreen() {
         {/* Permissions Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Shield size={20} color={COLORS.screenTime} />
             <Text style={styles.sectionTitle}>Permissions</Text>
           </View>
 
@@ -307,57 +345,84 @@ export function SettingsScreen() {
 
             <View style={styles.permissionsList}>
               <View style={styles.permissionItem}>
-                <View style={styles.permissionIcon}>
-                  <CheckCircle2 size={16} color={COLORS.success} />
-                </View>
                 <View style={styles.permissionInfo}>
                   <Text style={styles.permissionName}>Activity Recognition</Text>
                   <Text style={styles.permissionDesc}>Count steps automatically</Text>
                 </View>
-                <Text style={styles.permissionStatus}>Granted</Text>
+                {activityGranted ? (
+                  <Text style={styles.permissionStatus}>Granted</Text>
+                ) : (
+                  <TouchableOpacity onPress={async () => {
+                    try {
+                      const { PermissionsAndroid } = require('react-native');
+                      const result = await PermissionsAndroid.request(
+                        'android.permission.ACTIVITY_RECOGNITION'
+                      );
+                      setActivityGranted(result === 'granted');
+                    } catch { openAppSettings(); }
+                  }}>
+                    <Text style={styles.permissionAction}>Allow</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={styles.permissionItem}>
-                <View style={styles.permissionIcon}>
-                  <CheckCircle2 size={16} color={COLORS.success} />
-                </View>
                 <View style={styles.permissionInfo}>
                   <Text style={styles.permissionName}>Notifications</Text>
                   <Text style={styles.permissionDesc}>Show tracking status</Text>
                 </View>
-                <Text style={styles.permissionStatus}>Granted</Text>
+                {notifGranted ? (
+                  <Text style={styles.permissionStatus}>Granted</Text>
+                ) : (
+                  <TouchableOpacity onPress={async () => {
+                    const { status } = await Notifications.requestPermissionsAsync();
+                    setNotifGranted(status === 'granted');
+                  }}>
+                    <Text style={styles.permissionAction}>Allow</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={styles.permissionItem}>
-                <View style={styles.permissionIcon}>
-                  <AlertCircle size={16} color={COLORS.warning} />
-                </View>
                 <View style={styles.permissionInfo}>
                   <Text style={styles.permissionName}>Battery Optimization</Text>
                   <Text style={styles.permissionDesc}>Keep services running</Text>
                 </View>
-                <TouchableOpacity onPress={() => requestIgnoreBatteryOptimizations()}>
-                  <Text style={styles.permissionAction}>Fix</Text>
-                </TouchableOpacity>
+                {batteryGranted ? (
+                  <Text style={styles.permissionStatus}>Granted</Text>
+                ) : (
+                  <TouchableOpacity onPress={() => {
+                    requestIgnoreBatteryOptimizations();
+                    setTimeout(() => setBatteryGranted(isBatteryOptimizationIgnored()), 1500);
+                  }}>
+                    <Text style={styles.permissionAction}>Fix</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={styles.permissionItem}>
-                <View style={styles.permissionIcon}>
-                  <AlertCircle size={16} color={COLORS.warning} />
-                </View>
                 <View style={styles.permissionInfo}>
                   <Text style={styles.permissionName}>Usage Stats</Text>
                   <Text style={styles.permissionDesc}>Track screen time</Text>
                 </View>
-                <TouchableOpacity onPress={() => openUsageAccessSettings()}>
-                  <Text style={styles.permissionAction}>Enable</Text>
-                </TouchableOpacity>
+                {screenTimeGranted ? (
+                  <Text style={styles.permissionStatus}>Granted</Text>
+                ) : (
+                  <TouchableOpacity onPress={async () => {
+                    await requestScreenTimePermission();
+                    setTimeout(async () => {
+                      const ok = await checkScreenTimePermission();
+                      setScreenTimeGranted(ok);
+                    }, 1500);
+                  }}>
+                    <Text style={styles.permissionAction}>Enable</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
 
             <View style={styles.permissionsFooter}>
               <TouchableOpacity style={styles.systemSettingsBtn} onPress={openSystemSettings}>
-                <Settings size={16} color={COLORS.textSecondary} />
                 <Text style={styles.systemSettingsText}>Open System Settings</Text>
               </TouchableOpacity>
             </View>
@@ -370,12 +435,11 @@ export function SettingsScreen() {
         <WaterSettingsSection />
         <CaloriesSettingsSection />
         <ScreenTimeSettingsSection />
-        {profile.uses_abc && <AbcSettingsSection />}
-
+        {/* ABC Settings — always shown so user can enable it later */}
+        <AbcSettingsSection />
         {/* Data Management Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Database size={20} color={COLORS.error} />
             <Text style={styles.sectionTitle}>Data Management</Text>
           </View>
 
@@ -446,8 +510,7 @@ export function SettingsScreen() {
                 }}
               />
 
-              {profile.uses_abc && (
-                <DataClearButton
+              <DataClearButton
                   db={db}
                   label="ABC History"
                   description="Clears all ABC logs except today"
@@ -458,9 +521,7 @@ export function SettingsScreen() {
                     await db.runAsync('DELETE FROM abc_daily_summary WHERE date < ?', [today]);
                     await hydrateAbcStore(db);
                   }}
-                />
-              )}
-            </View>
+                />            </View>
 
             <View style={styles.dangerZone}>
               <Text style={styles.dangerTitle}>Danger Zone</Text>
@@ -468,7 +529,6 @@ export function SettingsScreen() {
                 style={styles.dangerBtn}
                 onPress={() => handleClearAllData()}
               >
-                <Trash2 size={16} color={COLORS.error} />
                 <Text style={styles.dangerBtnText}>Clear All Data</Text>
               </TouchableOpacity>
             </View>
@@ -479,43 +539,38 @@ export function SettingsScreen() {
   );
 
   async function handleClearAllData() {
-    Alert.alert(
+    showConfirm(
       'Clear All Data',
       'This will delete ALL historical data across all features. This action cannot be undone. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear All',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const today = getTodayLocal();
-              
-              await db.runAsync('DELETE FROM daily_steps WHERE date < ?', [today]);
-              await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0');
-              await db.runAsync('DELETE FROM water_logs WHERE date < ?', [today]);
-              await db.runAsync('DELETE FROM water_daily_summary WHERE date < ?', [today]);
-              await db.runAsync('DELETE FROM workout_logs WHERE date < ?', [today]);
-              await db.runAsync('DELETE FROM calories_daily_summary WHERE date < ?', [today]);
-              await db.runAsync('DELETE FROM app_usage_sessions WHERE date < ?', [today]);
-              await db.runAsync('DELETE FROM screen_time_daily_summary WHERE date < ?', [today]);
-              await db.runAsync('DELETE FROM abc_logs WHERE date < ?', [today]);
-              await db.runAsync('DELETE FROM abc_daily_summary WHERE date < ?', [today]);
+      async () => {
+        try {
+          const today = getTodayLocal();
+          
+          await db.runAsync('DELETE FROM daily_steps WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0');
+          await db.runAsync('DELETE FROM water_logs WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM water_daily_summary WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM workout_logs WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM calories_daily_summary WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM app_usage_sessions WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM screen_time_daily_summary WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM abc_logs WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM abc_daily_summary WHERE date < ?', [today]);
 
-              await hydrateStepStore(db);
-              await hydrateSleepStore(db);
-              await hydrateWaterStore(db);
-              await hydrateCaloriesStore(db);
-              await hydrateAbcStore(db);
+          await hydrateStepStore(db);
+          await hydrateSleepStore(db);
+          await hydrateWaterStore(db);
+          await hydrateCaloriesStore(db);
+          await hydrateAbcStore(db);
 
-              Alert.alert('Success', 'All historical data has been cleared.');
-            } catch (error) {
-              console.error('Failed to clear data:', error);
-              Alert.alert('Error', 'Failed to clear data. Please try again.');
-            }
-          },
-        },
-      ]
+          showSuccess('Success', 'All historical data has been cleared.');
+        } catch (error) {
+          console.error('Failed to clear data:', error);
+          showError('Error', 'Failed to clear data. Please try again.');
+        }
+      },
+      'Clear All',
+      true
     );
   }
 }
@@ -530,30 +585,26 @@ interface DataClearButtonProps {
 
 function DataClearButton({ db, label, description, color, onClear }: DataClearButtonProps) {
   const [clearing, setClearing] = useState(false);
+  const { showSuccess, showError, showConfirm } = useCustomAlert();
 
   async function handleClear() {
-    Alert.alert(
+    showConfirm(
       `Clear ${label}`,
       `${description}. This cannot be undone. Continue?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            setClearing(true);
-            try {
-              await onClear();
-              Alert.alert('Success', `${label} cleared successfully.`);
-            } catch (error) {
-              console.error(`Failed to clear ${label}:`, error);
-              Alert.alert('Error', `Failed to clear ${label}. Please try again.`);
-            } finally {
-              setClearing(false);
-            }
-          },
-        },
-      ]
+      async () => {
+        setClearing(true);
+        try {
+          await onClear();
+          showSuccess('Success', `${label} cleared successfully.`);
+        } catch (error) {
+          console.error(`Failed to clear ${label}:`, error);
+          showError('Error', `Failed to clear ${label}. Please try again.`);
+        } finally {
+          setClearing(false);
+        }
+      },
+      'Clear',
+      true
     );
   }
 
@@ -568,7 +619,7 @@ function DataClearButton({ db, label, description, color, onClear }: DataClearBu
         <Text style={styles.dataClearLabel}>{label}</Text>
         <Text style={styles.dataClearDesc}>{description}</Text>
       </View>
-      <Trash2 size={16} color={clearing ? COLORS.textMuted : COLORS.error} />
+      <Trash2 size={16} color={COLORS.textMuted} />
     </TouchableOpacity>
   );
 }
@@ -699,10 +750,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.glassHighlight,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
-  },
-  permissionIcon: {
-    width: 24,
-    alignItems: 'center',
   },
   permissionInfo: {
     flex: 1,

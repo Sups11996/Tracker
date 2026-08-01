@@ -22,7 +22,7 @@ export function AbcQuestionScreen() {
     <OnboardingLayout
       step={5}
       totalSteps={8}
-      title="Do you use\nABC?"
+      title={'Do you use\nABC?'}
       subtitle="Enables a private daily count tracker. Only visible to you."
       onBack={() => navigation.goBack()}
     >

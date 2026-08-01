@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Smartphone } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
@@ -22,6 +23,7 @@ interface DayScreenTime {
 export function ScreenTimeDashboard() {
   const db = useSQLiteContext();
   const { hasPermission, apps } = useScreenTimeStore();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const [refreshing, setRefreshing] = useState(false);
   const [last7, setLast7] = useState<DayScreenTime[]>([]);
@@ -97,7 +99,7 @@ export function ScreenTimeDashboard() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.screenTime} />
@@ -187,7 +189,7 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING.lg,
     gap: SPACING.lg,
-    paddingBottom: SPACING.huge,
+    paddingBottom: SPACING.xl,
   },
   header: {
     flexDirection: 'row',

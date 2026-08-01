@@ -1,10 +1,16 @@
 import { create } from 'zustand';
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
 
-const UsageStatsModule = Platform.OS === 'android'
-  ? requireNativeModule('UsageStatsModule')
-  : null;
+const UsageStatsModule = (() => {
+  if (Platform.OS !== 'android') return null;
+  try {
+    const m = requireNativeModule('UsageStatsModule');
+    if (m) return m;
+  } catch {}
+  // Fallback to classic NativeModules bridge
+  return NativeModules.UsageStatsModule ?? null;
+})();
 
 export interface AppUsage {
   packageName: string;

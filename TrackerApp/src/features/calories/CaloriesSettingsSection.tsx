@@ -10,7 +10,7 @@ export function CaloriesSettingsSection() {
   const db = useSQLiteContext();
   const { profile } = useUserStore();
   
-  const [gymEnabled, setGymEnabled] = useState(profile?.uses_gym ?? false);
+  const [gymEnabled, setGymEnabled] = useState(!!(profile?.uses_gym));
   const [reminderEnabled, setReminderEnabled] = useState(false);
 
   async function handleGymToggle(enabled: boolean) {

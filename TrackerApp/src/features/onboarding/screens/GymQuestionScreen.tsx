@@ -23,7 +23,7 @@ export function GymQuestionScreen() {
     <OnboardingLayout
       step={4}
       totalSteps={8}
-      title="Do you go\nto the gym?"
+      title={'Do you go\nto the gym?'}
       subtitle="Enables manual workout logging and calorie tracking for gym sessions."
       onBack={() => navigation.goBack()}
     >

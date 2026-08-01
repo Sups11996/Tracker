@@ -35,7 +35,7 @@ export function WelcomeScreen() {
     <OnboardingLayout
       step={0}
       totalSteps={8}
-      title={'Hey there 👋\nWhat should we\ncall you?'}
+      title={'Hey there\nWhat should we\ncall you?'}
       subtitle="This is just for display. No account needed."
       hideBack
     >

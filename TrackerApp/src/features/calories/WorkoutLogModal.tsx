@@ -69,8 +69,8 @@ export function WorkoutLogModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleCancel}>
-      {/* Dim scrim — light blur so background content is still readable */}
-      <BlurView intensity={GLASS.blurOverlay} tint="dark" style={styles.overlay}>
+      {/* Dim scrim — strong blur so background is properly obscured */}
+      <BlurView intensity={90} tint="dark" style={styles.overlay}>
         <View style={styles.overlayTint}>
           {/* Modal sheet — full glass surface */}
           <View style={styles.container}>
@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
   overlayTint: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: GLASS.overlayBg,
+    backgroundColor: 'rgba(0,0,0,0.70)',
     justifyContent: 'center',
     alignItems: 'center',
   },

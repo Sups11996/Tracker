@@ -3,9 +3,14 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { Platform } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
 
-const SleepServiceModule = Platform.OS === 'android'
-  ? requireNativeModule('SleepServiceModule')
-  : null;
+const SleepServiceModule = (() => {
+  if (Platform.OS !== 'android') return null;
+  try {
+    return requireNativeModule('SleepServiceModule');
+  } catch {
+    return null;
+  }
+})();
 
 interface SleepSession {
   id: number;
@@ -68,7 +73,7 @@ export const useSleepStore = create<SleepState>((set) => ({
       if (!state.sessionStartTime) return state;
       
       const sessionDuration = Math.floor((endTime - state.sessionStartTime) / 1000 / 60);
-      const actualDuration = sessionDuration - latencyMins;
+      const actualDuration = Math.max(0, sessionDuration - latencyMins);
       
       return {
         isActive: false,
@@ -191,7 +196,7 @@ export async function endSleepSession(
   
   const now = Date.now();
   const sessionDuration = Math.floor((now - state.sessionStartTime) / 1000 / 60);
-  const actualDuration = sessionDuration - latencyMins;
+  const actualDuration = Math.max(0, sessionDuration - latencyMins);
   const goalMet = actualDuration >= state.goalMinutes ? 1 : 0;
   
   try {

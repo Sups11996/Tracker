@@ -66,7 +66,7 @@ export function PermissionsScreen() {
     <OnboardingLayout
       step={6}
       totalSteps={8}
-      title="A few\npermissions"
+      title={'A few\npermissions'}
       subtitle="These keep your tracking accurate and running in the background."
       onBack={() => navigation.goBack()}
     >

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Circle } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
@@ -23,6 +24,7 @@ interface TimeBreakdown {
 export function AbcDashboard() {
   const db = useSQLiteContext();
   const { todayCount } = useAbcStore();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const [last7, setLast7] = useState<DayData[]>([]);
   const [last30, setLast30] = useState<DayData[]>([]);
@@ -108,7 +110,7 @@ export function AbcDashboard() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
@@ -165,10 +167,10 @@ export function AbcDashboard() {
         <Card style={styles.timeCard}>
           <Text style={styles.chartTitle}>Today's Breakdown</Text>
           <View style={styles.timeGrid}>
-            <TimeSlot label="Morning" count={timeBreakdown.morning} icon="🌅" />
-            <TimeSlot label="Afternoon" count={timeBreakdown.afternoon} icon="☀️" />
-            <TimeSlot label="Evening" count={timeBreakdown.evening} icon="🌆" />
-            <TimeSlot label="Night" count={timeBreakdown.night} icon="🌙" />
+            <TimeSlot label="Morning" count={timeBreakdown.morning} />
+            <TimeSlot label="Afternoon" count={timeBreakdown.afternoon} />
+            <TimeSlot label="Evening" count={timeBreakdown.evening} />
+            <TimeSlot label="Night" count={timeBreakdown.night} />
           </View>
         </Card>
       )}
@@ -176,10 +178,9 @@ export function AbcDashboard() {
   );
 }
 
-function TimeSlot({ label, count, icon }: { label: string; count: number; icon: string }) {
+function TimeSlot({ label, count }: { label: string; count: number }) {
   return (
     <View style={styles.timeSlot}>
-      <Text style={styles.timeIcon}>{icon}</Text>
       <Text style={styles.timeLabel}>{label}</Text>
       <Text style={styles.timeCount}>{count}</Text>
     </View>
@@ -191,7 +192,7 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING.lg,
     gap: SPACING.lg,
-    paddingBottom: SPACING.huge,
+    paddingBottom: SPACING.xl,
   },
   header: {
     flexDirection: 'row',
@@ -239,9 +240,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.glassHighlight,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
-  },
-  timeIcon: {
-    fontSize: 32,
   },
   timeLabel: {
     fontSize: TYPOGRAPHY.size.xs,

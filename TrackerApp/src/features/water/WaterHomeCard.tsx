@@ -93,7 +93,7 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
 
         {/* Remaining */}
         <Text style={styles.remaining}>
-          {remaining > 0 ? `${formatMl(remaining)} remaining` : '🎉 Goal reached!'}
+          {remaining > 0 ? `${formatMl(remaining)} remaining` : 'Goal reached!'}
         </Text>
 
         {/* Container buttons */}

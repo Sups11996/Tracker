@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Droplets } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
@@ -17,6 +18,7 @@ interface DayData {
 export function WaterDashboard() {
   const db = useSQLiteContext();
   const { dailyGoal } = useWaterStore();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const [last7, setLast7] = useState<DayData[]>([]);
   const [stats, setStats] = useState({
@@ -89,7 +91,7 @@ export function WaterDashboard() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
@@ -154,7 +156,7 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING.lg,
     gap: SPACING.lg,
-    paddingBottom: SPACING.huge,
+    paddingBottom: SPACING.xl,
   },
   header: {
     flexDirection: 'row',

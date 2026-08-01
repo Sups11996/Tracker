@@ -36,7 +36,7 @@ export function GenderAgeScreen() {
     <OnboardingLayout
       step={1}
       totalSteps={8}
-      title="Tell us a bit\nabout yourself"
+      title={'Tell us a bit\nabout yourself'}
       subtitle="Used to personalise your health calculations."
       onBack={() => navigation.goBack()}
     >

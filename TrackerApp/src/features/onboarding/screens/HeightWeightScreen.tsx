@@ -11,19 +11,40 @@ import type { OnboardingStackParamList } from '../../../types';
 
 type Nav = NativeStackNavigationProp<OnboardingStackParamList, 'HeightWeight'>;
 
+/**
+ * Convert ft.in format (e.g. 5.7 = 5 ft 7 in) to centimetres.
+ * The decimal part is inches (0–11), NOT a fractional foot.
+ */
+function ftInToCm(ftIn: string): number {
+  const parsed = parseFloat(ftIn);
+  if (isNaN(parsed)) return NaN;
+  const feet = Math.floor(parsed);
+  const inches = Math.round((parsed - feet) * 10); // e.g. 5.7 → inches = 7
+  if (inches > 11) return NaN;
+  return Math.round(feet * 30.48 + inches * 2.54);
+}
+
+/**
+ * Validate ft.in input: value like 4.0 – 7.11
+ */
+function isValidFtIn(ftIn: string): boolean {
+  const cm = ftInToCm(ftIn);
+  return !isNaN(cm) && cm >= 120 && cm <= 230;
+}
+
 export function HeightWeightScreen() {
   const navigation = useNavigation<Nav>();
   const { data, update } = useOnboardingStore();
+  const [heightFtIn, setHeightFtIn] = useState(data.height_ft_in || '');
   const [heightError, setHeightError] = useState('');
   const [weightError, setWeightError] = useState('');
 
   function handleNext() {
     let valid = true;
-    const h = parseFloat(data.height_cm);
     const w = parseFloat(data.weight_kg);
 
-    if (!data.height_cm || isNaN(h) || h < 100 || h > 250) {
-      setHeightError('Enter a valid height (100–250 cm)');
+    if (!heightFtIn || !isValidFtIn(heightFtIn)) {
+      setHeightError('Enter height as ft.in (e.g. 5.7 for 5\'7")');
       valid = false;
     } else {
       setHeightError('');
@@ -38,6 +59,11 @@ export function HeightWeightScreen() {
 
     if (!valid) return;
 
+    const cm = ftInToCm(heightFtIn);
+
+    // Store both the display value and the converted cm
+    update({ height_cm: String(cm), height_ft_in: heightFtIn });
+
     // Pre-calculate water goal before navigating
     const waterGoal = calcWaterGoal(w);
     update({ water_goal_ml: String(waterGoal) });
@@ -48,18 +74,18 @@ export function HeightWeightScreen() {
     <OnboardingLayout
       step={2}
       totalSteps={8}
-      title="Height &\nWeight"
-      subtitle="Used to estimate steps distance, calories, and daily water goal."
+      title={'Height &\nWeight'}
+      subtitle="Enter height as ft.in (e.g. 5.7 = 5 ft 7 in). Weight in kg."
       onBack={() => navigation.goBack()}
     >
       <TextInput
-        label="Height (cm)"
-        placeholder="e.g. 175"
-        value={data.height_cm}
-        onChangeText={(v) => { update({ height_cm: v }); setHeightError(''); }}
+        label="Height (ft.in)"
+        placeholder="e.g. 5.7"
+        value={heightFtIn}
+        onChangeText={(v) => { setHeightFtIn(v); setHeightError(''); }}
         error={heightError}
-        keyboardType="numeric"
-        maxLength={5}
+        keyboardType="decimal-pad"
+        maxLength={4}
         returnKeyType="next"
       />
 

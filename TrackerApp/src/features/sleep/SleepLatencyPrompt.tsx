@@ -71,7 +71,7 @@ export function SleepLatencyPrompt({
       animationType="fade"
       onRequestClose={handleCancel}
     >
-      <BlurView intensity={GLASS.blurOverlay} tint="dark" style={styles.overlay}>
+      <BlurView intensity={90} tint="dark" style={styles.overlay}>
         <View style={styles.overlayTint}>
           <View style={styles.container}>
             <BlurView intensity={GLASS.blurModal} tint="dark" style={styles.sheetBlur}>
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   overlayTint: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: GLASS.overlayBg,
+    backgroundColor: 'rgba(0,0,0,0.70)',
     justifyContent: 'center',
     alignItems: 'center',
   },

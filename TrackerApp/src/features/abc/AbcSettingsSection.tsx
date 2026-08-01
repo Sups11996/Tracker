@@ -10,7 +10,7 @@ export function AbcSettingsSection() {
   const db = useSQLiteContext();
   const { profile } = useUserStore();
   
-  const [abcEnabled, setAbcEnabled] = useState(profile?.uses_abc ?? false);
+  const [abcEnabled, setAbcEnabled] = useState(!!(profile?.uses_abc));
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   async function handleAbcToggle(enabled: boolean) {

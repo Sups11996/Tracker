@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Minus, Plus } from 'lucide-react-native';
@@ -9,6 +9,7 @@ import { TextInput } from '../../../components/ui/TextInput';
 import { Button } from '../../../components/ui/Button';
 import { useOnboardingStore } from '../../../stores/onboardingStore';
 import { useUserStore } from '../../../stores/userStore';
+import { useCustomAlert } from '../../../hooks/useCustomAlert';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../../constants';
 import type { OnboardingStackParamList } from '../../../types';
 
@@ -31,6 +32,7 @@ export function WaterContainersScreen() {
   const db = useSQLiteContext();
   const { data: onboarding } = useOnboardingStore();
   const { setProfile } = useUserStore();
+  const { showError } = useCustomAlert();
   const [containers, setContainers] = useState<ContainerDraft[]>([PRESETS[2]]);
   const [saving, setSaving] = useState(false);
 
@@ -64,7 +66,7 @@ export function WaterContainersScreen() {
 
   async function handleFinish() {
     if (containers.some((c) => !c.name.trim())) {
-      Alert.alert('Missing name', 'Please give each container a name.');
+      showError('Missing name', 'Please give each container a name.');
       return;
     }
     setSaving(true);
@@ -115,7 +117,7 @@ export function WaterContainersScreen() {
       }
     } catch (e) {
       console.error('[WaterContainersScreen]', e);
-      Alert.alert('Error', 'Could not save. Please try again.');
+      showError('Error', 'Could not save. Please try again.');
       setSaving(false);
     }
   }

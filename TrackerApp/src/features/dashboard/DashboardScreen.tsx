@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useIsFocused, type RouteProp } from '@react-navigation/native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { StepDashboard } from '../steps/StepDashboard';
 import { SleepDashboard } from '../sleep/SleepDashboard';
 import { WaterDashboard } from '../water/WaterDashboard';
@@ -33,6 +34,7 @@ export function DashboardScreen() {
   const route = useRoute<RouteProp<MainTabParamList, 'Dashboard'>>();
   const isFocused = useIsFocused();
   const { profile } = useUserStore();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const [activeTab, setActiveTab] = useState<Tab>(route.params?.tab ?? 'steps');
 

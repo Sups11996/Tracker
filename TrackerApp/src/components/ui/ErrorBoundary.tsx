@@ -41,7 +41,6 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <View style={styles.container}>
-          <Text style={styles.emoji}>⚠️</Text>
           <Text style={styles.title}>Something went wrong</Text>
           <Text style={styles.message}>
             {this.state.error?.message ?? 'An unexpected error occurred.'}
@@ -65,9 +64,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: SPACING.xxxl,
     gap: SPACING.lg,
-  },
-  emoji: {
-    fontSize: 48,
   },
   title: {
     fontSize: TYPOGRAPHY.size.xl,

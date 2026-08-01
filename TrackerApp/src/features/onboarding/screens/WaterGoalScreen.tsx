@@ -30,7 +30,7 @@ export function WaterGoalScreen() {
     <OnboardingLayout
       step={3}
       totalSteps={8}
-      title="Your water\ngoal"
+      title={'Your water\ngoal'}
       subtitle="Calculated from your weight. You can change this anytime in Settings."
       onBack={() => navigation.goBack()}
     >

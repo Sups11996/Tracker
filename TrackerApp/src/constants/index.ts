@@ -90,19 +90,19 @@ export const TYPOGRAPHY = {
 // Use these as the single source of truth. Never hard-code blur/border values.
 
 export const GLASS = {
-  /** expo-blur intensity for standard cards (maps roughly to blur(16px)) */
-  blurCard: 18,
-  /** expo-blur intensity for modals / overlays */
-  blurModal: 28,
+  /** expo-blur intensity for standard cards - increased for less transparency */
+  blurCard: 40,
+  /** expo-blur intensity for modals / overlays - increased for better readability */
+  blurModal: 80,
   /** expo-blur intensity for the nav tab bar */
-  blurNav: 50,
+  blurNav: 60,
   /** expo-blur intensity for dim scrim behind modals */
-  blurOverlay: 6,
+  blurOverlay: 25,
 
   /** Card background tint on top of the BlurView */
   cardBg: 'rgba(255,255,255,0.09)' as string,
   /** Modal sheet background */
-  modalBg: 'rgba(20,22,34,0.65)' as string,
+  modalBg: 'rgba(12,14,24,0.97)' as string,
   /** Overlay/scrim that dims content behind a modal */
   overlayBg: 'rgba(0,0,0,0.55)' as string,
 

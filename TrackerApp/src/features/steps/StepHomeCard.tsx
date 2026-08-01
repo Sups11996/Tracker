@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import {
+  NativeModules,
   Platform,
   StyleSheet,
   Text,
@@ -7,8 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
-import { requireNativeModule } from 'expo-modules-core';
-import { Footprints, PauseCircle, PlayCircle, Car } from 'lucide-react-native';
+import { Footprints, PauseCircle, PlayCircle } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { ProgressRing } from '../../components/ui/ProgressRing';
 import {
@@ -19,7 +19,8 @@ import {
 } from '../../stores/stepStore';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
 
-const StepServiceModule = requireNativeModule('StepServiceModule');
+// Use classic NativeModules bridge
+const StepServiceModule = Platform.OS === 'android' ? NativeModules.StepServiceModule : null;
 
 interface StepHomeCardProps {
   onPress?: () => void;
@@ -44,17 +45,18 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
 
   const statusColor =
     status === 'tracking' ? COLORS.success :
-    status === 'vehicle'  ? COLORS.calories :
     status === 'paused'   ? COLORS.textMuted : COLORS.error;
 
   const statusLabel =
     status === 'tracking' ? 'Tracking' :
-    status === 'vehicle'  ? 'Vehicle Mode' :
     status === 'paused'   ? 'Paused' : 'Unavailable';
 
   function sendServiceAction(action: string) {
-    if (Platform.OS !== 'android') return;
+    if (Platform.OS !== 'android' || !StepServiceModule) return;
     try {
+      // Optimistically update status so UI responds immediately
+      if (action === 'pause') useStepStore.getState().setStatus('paused');
+      else if (action === 'resume') useStepStore.getState().setStatus('tracking');
       StepServiceModule.sendAction(action);
     } catch (error) {
       console.error('Failed to send action to step service:', error);
@@ -97,34 +99,17 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
 
         {/* Quick actions */}
         <View style={styles.actions}>
-          {status === 'vehicle' ? (
-            <ActionBtn
-              icon={<Car size={16} color={COLORS.calories} />}
-              label="Exit Vehicle Mode"
-              color={COLORS.calories}
-              onPress={() => sendServiceAction('vehicle')}
-            />
-          ) : (
-            <>
-              <ActionBtn
-                icon={status === 'paused'
-                  ? <PlayCircle  size={16} color={COLORS.steps} />
-                  : <PauseCircle size={16} color={COLORS.textMuted} />
-                }
-                label={status === 'paused' ? 'Resume' : 'Pause'}
-                color={status === 'paused' ? COLORS.steps : COLORS.textMuted}
-                onPress={() => sendServiceAction(
-                  status === 'paused' ? 'resume' : 'pause'
-                )}
-              />
-              <ActionBtn
-                icon={<Car size={16} color={COLORS.textMuted} />}
-                label="Vehicle Mode"
-                color={COLORS.textMuted}
-                onPress={() => sendServiceAction('vehicle')}
-              />
-            </>
-          )}
+          <ActionBtn
+            icon={status === 'paused'
+              ? <PlayCircle  size={16} color={COLORS.steps} />
+              : <PauseCircle size={16} color={COLORS.textMuted} />
+            }
+            label={status === 'paused' ? 'Resume' : 'Pause'}
+            color={status === 'paused' ? COLORS.steps : COLORS.textMuted}
+            onPress={() => sendServiceAction(
+              status === 'paused' ? 'resume' : 'pause'
+            )}
+          />
         </View>
       </Card>
     </TouchableOpacity>

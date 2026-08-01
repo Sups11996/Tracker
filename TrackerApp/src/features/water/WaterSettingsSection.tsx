@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -11,6 +10,7 @@ import { Droplets, Plus, Trash2 } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { TextInput } from '../../components/ui/TextInput';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
 import {
   useWaterStore,
   hydrateWaterStore,
@@ -21,6 +21,7 @@ import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 export function WaterSettingsSection() {
   const db = useSQLiteContext();
   const { dailyGoal, containers } = useWaterStore();
+  const { showConfirm } = useCustomAlert();
 
   const [goalInput, setGoalInput] = useState(dailyGoal.toString());
   const [editingGoal, setEditingGoal] = useState(false);
@@ -70,27 +71,22 @@ export function WaterSettingsSection() {
   }
 
   async function handleDeleteContainer(container: WaterContainer) {
-    Alert.alert(
+    showConfirm(
       'Remove Container',
       `Remove "${container.name}"? Past logs will be kept.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await db.runAsync(
-                'UPDATE water_containers SET is_deleted = 1, updated_at = ? WHERE id = ?',
-                [Date.now(), container.id]
-              );
-              await hydrateWaterStore(db);
-            } catch (e) {
-              console.error('Failed to delete container:', e);
-            }
-          },
-        },
-      ]
+      async () => {
+        try {
+          await db.runAsync(
+            'UPDATE water_containers SET is_deleted = 1, updated_at = ? WHERE id = ?',
+            [Date.now(), container.id]
+          );
+          await hydrateWaterStore(db);
+        } catch (e) {
+          console.error('Failed to delete container:', e);
+        }
+      },
+      'Remove',
+      true
     );
   }
 

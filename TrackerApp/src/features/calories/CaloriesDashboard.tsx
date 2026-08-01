@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Flame, Trash2 } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
@@ -20,6 +21,7 @@ interface DayCalories {
 export function CaloriesDashboard() {
   const db = useSQLiteContext();
   const { workoutLogs } = useCaloriesStore();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const [last7, setLast7] = useState<DayCalories[]>([]);
   const [allWorkouts, setAllWorkouts] = useState<WorkoutLog[]>([]);
@@ -103,7 +105,7 @@ export function CaloriesDashboard() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
@@ -181,7 +183,7 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING.lg,
     gap: SPACING.lg,
-    paddingBottom: SPACING.huge,
+    paddingBottom: SPACING.xl,
   },
   header: {
     flexDirection: 'row',

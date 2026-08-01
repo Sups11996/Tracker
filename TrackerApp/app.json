@@ -44,6 +44,12 @@
         }
       ],
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "18b78669-a249-43b7-827f-b6d1d83de75e"
+      }
+    },
+    "owner": "sups11"
   }
 }

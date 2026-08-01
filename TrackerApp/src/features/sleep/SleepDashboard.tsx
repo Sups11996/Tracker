@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { Moon } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
@@ -18,6 +19,7 @@ interface SleepSession {
 export function SleepDashboard() {
   const db = useSQLiteContext();
   const { goalMinutes } = useSleepStore();
+  const tabBarHeight = useBottomTabBarHeight();
   
   const [last7Days, setLast7Days] = useState<SleepSession[]>([]);
   const [last30Days, setLast30Days] = useState<SleepSession[]>([]);
@@ -100,7 +102,7 @@ export function SleepDashboard() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
@@ -206,7 +208,7 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING.lg,
     gap: SPACING.lg,
-    paddingBottom: SPACING.huge,
+    paddingBottom: SPACING.xl,
   },
   header: {
     flexDirection: 'row',

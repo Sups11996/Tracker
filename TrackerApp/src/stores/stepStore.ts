@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 
 export type TrackingStatus = 'tracking' | 'paused' | 'vehicle' | 'unavailable';
@@ -52,15 +52,16 @@ export const useStepStore = create<StepState>((set) => ({
 
 // ── Native event subscription ──────────────────────────────────────────────────
 
-let subscription: ReturnType<NativeEventEmitter['addListener']> | null = null;
-let statusSub:    ReturnType<NativeEventEmitter['addListener']> | null = null;
+let subscription: { remove: () => void } | null = null;
+let statusSub:    { remove: () => void } | null = null;
 
 export function subscribeToStepEvents() {
   if (Platform.OS !== 'android') return;
   try {
-    const emitter = new NativeEventEmitter();
+    // Use DeviceEventEmitter which works without a module reference on Android
+    const { DeviceEventEmitter } = require('react-native');
 
-    subscription = emitter.addListener('STEP_UPDATE', (raw: string) => {
+    subscription = DeviceEventEmitter.addListener('STEP_UPDATE', (raw: string) => {
       try {
         const data = JSON.parse(raw);
         useStepStore.getState().setToday(
@@ -71,7 +72,7 @@ export function subscribeToStepEvents() {
       } catch (_) {}
     });
 
-    statusSub = emitter.addListener('STEP_STATUS', (status: string) => {
+    statusSub = DeviceEventEmitter.addListener('STEP_STATUS', (status: string) => {
       useStepStore.getState().setStatus(status as TrackingStatus);
     });
   } catch (_) {}

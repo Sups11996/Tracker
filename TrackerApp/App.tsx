@@ -9,6 +9,7 @@ import { SQLiteProvider } from 'expo-sqlite';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { ErrorBoundary } from './src/components/ui/ErrorBoundary';
 import { AppBackground } from './src/components/ui/AppBackground';
+import { AlertProvider } from './src/hooks/useCustomAlert';
 import { initDatabase, DATABASE_NAME } from './src/lib';
 
 export default function App() {
@@ -20,8 +21,10 @@ export default function App() {
           <AppBackground />
           <SQLiteProvider databaseName={DATABASE_NAME} onInit={initDatabase}>
             <NavigationContainer>
-              <StatusBar style="light" />
-              <RootNavigator />
+              <AlertProvider>
+                <StatusBar style="light" />
+                <RootNavigator />
+              </AlertProvider>
             </NavigationContainer>
           </SQLiteProvider>
         </ErrorBoundary>

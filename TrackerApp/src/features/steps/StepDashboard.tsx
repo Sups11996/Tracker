@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useStepStore, hydrateStepStore } from '../../stores/stepStore';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
@@ -10,6 +11,7 @@ import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
 export function StepDashboard() {
   const db = useSQLiteContext();
   const { todaySteps, dailyGoal, weeklyData, monthlyData } = useStepStore();
+  const tabBarHeight = useBottomTabBarHeight();
 
   useEffect(() => { hydrateStepStore(db); }, []);
 
@@ -41,7 +43,7 @@ export function StepDashboard() {
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Today overview */}
@@ -136,7 +138,7 @@ function shortDate(date: string): string {
 
 const styles = StyleSheet.create({
   scroll:  { flex: 1 },
-  content: { padding: SPACING.xl, gap: SPACING.lg, paddingBottom: SPACING.huge },
+  content: { padding: SPACING.xl, gap: SPACING.lg },
   section: { gap: SPACING.md },
   statRow: { flexDirection: 'row', gap: SPACING.sm },
   sectionTitle: {
