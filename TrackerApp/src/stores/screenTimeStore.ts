@@ -50,11 +50,27 @@ export const useScreenTimeStore = create<ScreenTimeState>((set) => ({
   setPermission: (hasPermission) => set({ hasPermission }),
 
   setStats: (stats) => {
-    const mostUsed = stats.apps.length > 0 ? stats.apps[0] : null;
+    // Filter out system/launcher apps from display (but total time already includes them)
+    const userApps = stats.apps.filter(app => {
+      const pkg = app.packageName.toLowerCase();
+      // Hide system UI, launchers, and other background system apps
+      return !pkg.includes('launcher') &&
+             !pkg.includes('systemui') &&
+             !pkg.includes('oneui') &&
+             !pkg.includes('inputmethod') &&
+             !pkg.includes('keyboard') &&
+             !pkg.startsWith('com.android.') &&
+             !pkg.startsWith('com.sec.android.') &&
+             !pkg.startsWith('com.google.android.gms') &&
+             !pkg.startsWith('com.google.android.gsf') &&
+             pkg !== 'android';
+    });
+    
+    const mostUsed = userApps.length > 0 ? userApps[0] : null;
     set({
       totalScreenTimeMs: stats.totalScreenTimeMs,
       unlockCount: stats.unlockCount,
-      apps: stats.apps,
+      apps: userApps, // Only show user-facing apps
       mostUsedApp: mostUsed,
     });
   },
