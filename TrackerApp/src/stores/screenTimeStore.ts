@@ -12,11 +12,22 @@ const UsageStatsModule = (() => {
   return NativeModules.UsageStatsModule ?? null;
 })();
 
+export interface UsageSession {
+  start: number;
+  end: number;
+}
+
 export interface AppUsage {
   packageName: string;
   appName: string;
   totalTimeMs: number;
-  launchCount: number;
+  sessions: UsageSession[];
+}
+
+export interface ScreenTimeStats {
+  totalScreenTimeMs: number;
+  unlockCount: number;
+  apps: AppUsage[];
 }
 
 interface ScreenTimeState {
@@ -26,7 +37,7 @@ interface ScreenTimeState {
   apps: AppUsage[];
   mostUsedApp: AppUsage | null;
   setPermission: (hasPermission: boolean) => void;
-  setStats: (stats: { totalScreenTimeMs: number; unlockCount: number; apps: AppUsage[] }) => void;
+  setStats: (stats: ScreenTimeStats) => void;
 }
 
 export const useScreenTimeStore = create<ScreenTimeState>((set) => ({

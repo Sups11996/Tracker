@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Trash2,
 } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -47,6 +48,7 @@ import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 export function SettingsScreen() {
   const db = useSQLiteContext();
+  const navigation = useNavigation();
   const { profile, setProfile } = useUserStore();
   const { showSuccess, showError, showConfirm } = useCustomAlert();
 
@@ -76,7 +78,8 @@ export function SettingsScreen() {
       setNotifGranted(status === 'granted');
 
       // Battery optimization
-      setBatteryGranted(isBatteryOptimizationIgnored());
+      const batteryIgnored = await isBatteryOptimizationIgnored();
+      setBatteryGranted(batteryIgnored);
 
       // Screen time / usage stats
       const st = await checkScreenTimePermission();
@@ -391,9 +394,12 @@ export function SettingsScreen() {
                 {batteryGranted ? (
                   <Text style={styles.permissionStatus}>Granted</Text>
                 ) : (
-                  <TouchableOpacity onPress={() => {
+                  <TouchableOpacity onPress={async () => {
                     requestIgnoreBatteryOptimizations();
-                    setTimeout(() => setBatteryGranted(isBatteryOptimizationIgnored()), 1500);
+                    setTimeout(async () => {
+                      const batteryIgnored = await isBatteryOptimizationIgnored();
+                      setBatteryGranted(batteryIgnored);
+                    }, 1500);
                   }}>
                     <Text style={styles.permissionAction}>Fix</Text>
                   </TouchableOpacity>
@@ -437,6 +443,30 @@ export function SettingsScreen() {
         <ScreenTimeSettingsSection />
         {/* ABC Settings — always shown so user can enable it later */}
         <AbcSettingsSection />
+        
+        {/* Debug Section (DEV only) */}
+        {__DEV__ && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>🔧 Debug Tools</Text>
+            </View>
+            <Card style={styles.card}>
+              <TouchableOpacity
+                style={styles.debugButton}
+                onPress={() => {
+                  // @ts-ignore
+                  navigation.navigate('DebugScreenTime');
+                }}
+              >
+                <Text style={styles.debugButtonText}>Screen Time Debug Harness</Text>
+                <Text style={styles.debugButtonDesc}>
+                  Test and validate screen time accuracy
+                </Text>
+              </TouchableOpacity>
+            </Card>
+          </View>
+        )}
+        
         {/* Data Management Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -872,5 +902,23 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.size.sm,
     fontWeight: TYPOGRAPHY.weight.semibold,
     color: COLORS.error,
+  },
+  debugButton: {
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.glassHighlight,
+    borderWidth: 1,
+    borderColor: '#FFA500',
+    gap: SPACING.xs,
+  },
+  debugButtonText: {
+    fontSize: TYPOGRAPHY.size.md,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    color: '#FFA500',
+  },
+  debugButtonDesc: {
+    fontSize: TYPOGRAPHY.size.xs,
+    color: COLORS.textMuted,
   },
 });
