@@ -32,10 +32,32 @@ export function PermissionsScreen() {
   const [batteryStatus, setBatteryStatus] = useState<PermStatus>('idle');
 
   async function requestActivity() {
-    // On Android, ACTIVITY_RECOGNITION is requested at runtime (Android 10+)
-    // expo-sensors handles this when the step sensor is first used.
-    // Here we just show it as acknowledged so user understands why it's needed.
-    setActivityStatus('granted');
+    if (Platform.OS === 'android') {
+      try {
+        // Request ACTIVITY_RECOGNITION permission on Android 10+
+        const { PermissionsAndroid } = require('react-native');
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION,
+          {
+            title: 'Physical Activity Permission',
+            message: 'TrackerApp needs access to your physical activity to count steps.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
+        );
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          setActivityStatus('granted');
+        } else {
+          setActivityStatus('denied');
+        }
+      } catch (err) {
+        console.error('Failed to request activity permission:', err);
+        setActivityStatus('denied');
+      }
+    } else {
+      setActivityStatus('granted');
+    }
   }
 
   async function requestNotifications() {
