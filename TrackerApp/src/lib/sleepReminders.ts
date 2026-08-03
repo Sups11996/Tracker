@@ -99,7 +99,17 @@ export async function scheduleBedtimeReminder(
     // Cancel existing
     await Notifications.cancelScheduledNotificationAsync(BEDTIME_NOTIFICATION_ID);
 
-    // Schedule new daily notification
+    // Calculate next occurrence
+    const now = new Date();
+    const scheduledTime = new Date();
+    scheduledTime.setHours(hour, minute, 0, 0);
+    
+    // If time has passed today, schedule for tomorrow
+    if (scheduledTime <= now) {
+      scheduledTime.setDate(scheduledTime.getDate() + 1);
+    }
+
+    // Schedule notification
     await Notifications.scheduleNotificationAsync({
       identifier: BEDTIME_NOTIFICATION_ID,
       content: {
@@ -108,7 +118,7 @@ export async function scheduleBedtimeReminder(
         sound: true,
       },
       trigger: {
-        type: 'calendar',
+        type: 'daily',
         hour,
         minute,
         repeats: true,
@@ -133,7 +143,17 @@ export async function scheduleWakeReminder(
     // Cancel existing
     await Notifications.cancelScheduledNotificationAsync(WAKE_NOTIFICATION_ID);
 
-    // Schedule new daily notification
+    // Calculate next occurrence
+    const now = new Date();
+    const scheduledTime = new Date();
+    scheduledTime.setHours(hour, minute, 0, 0);
+    
+    // If time has passed today, schedule for tomorrow
+    if (scheduledTime <= now) {
+      scheduledTime.setDate(scheduledTime.getDate() + 1);
+    }
+
+    // Schedule notification
     await Notifications.scheduleNotificationAsync({
       identifier: WAKE_NOTIFICATION_ID,
       content: {
@@ -142,7 +162,7 @@ export async function scheduleWakeReminder(
         sound: true,
       },
       trigger: {
-        type: 'calendar',
+        type: 'daily',
         hour,
         minute,
         repeats: true,
