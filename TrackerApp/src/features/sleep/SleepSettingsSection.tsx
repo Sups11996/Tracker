@@ -26,13 +26,37 @@ export function SleepSettingsSection() {
   const [isEditing, setIsEditing] = useState(false);
   
   // Reminder settings
-  const [reminderSettings, setReminderSettings] = useState<SleepReminderSettings | null>(null);
+  const [reminderSettings, setReminderSettings] = useState<SleepReminderSettings>({
+    bedtimeEnabled: false,
+    bedtimeHour: 22,
+    bedtimeMinute: 0,
+    wakeEnabled: false,
+    wakeHour: 7,
+    wakeMinute: 0,
+  });
   const [showBedtimePicker, setShowBedtimePicker] = useState(false);
   const [showWakePicker, setShowWakePicker] = useState(false);
   
   // Load reminder settings on mount
   useEffect(() => {
-    loadSleepReminderSettings(db).then(setReminderSettings);
+    async function loadSettings() {
+      try {
+        const settings = await loadSleepReminderSettings(db);
+        setReminderSettings(settings);
+      } catch (error) {
+        console.error('Failed to load sleep reminder settings:', error);
+        // Use default settings on error
+        setReminderSettings({
+          bedtimeEnabled: false,
+          bedtimeHour: 22,
+          bedtimeMinute: 0,
+          wakeEnabled: false,
+          wakeHour: 7,
+          wakeMinute: 0,
+        });
+      }
+    }
+    loadSettings();
   }, [db]);
 
   async function handleSaveGoal() {
@@ -63,8 +87,6 @@ export function SleepSettingsSection() {
   }
 
   async function handleToggleBedtimeReminder(enabled: boolean) {
-    if (!reminderSettings) return;
-    
     const updated = { ...reminderSettings, bedtimeEnabled: enabled };
     setReminderSettings(updated);
     
@@ -77,8 +99,6 @@ export function SleepSettingsSection() {
   }
 
   async function handleToggleWakeReminder(enabled: boolean) {
-    if (!reminderSettings) return;
-    
     const updated = { ...reminderSettings, wakeEnabled: enabled };
     setReminderSettings(updated);
     
@@ -95,7 +115,7 @@ export function SleepSettingsSection() {
       setShowBedtimePicker(false);
     }
     
-    if (!reminderSettings || !selectedDate) return;
+    if (!selectedDate) return;
     
     const updated = {
       ...reminderSettings,
@@ -119,7 +139,7 @@ export function SleepSettingsSection() {
       setShowWakePicker(false);
     }
     
-    if (!reminderSettings || !selectedDate) return;
+    if (!selectedDate) return;
     
     const updated = {
       ...reminderSettings,
@@ -139,24 +159,13 @@ export function SleepSettingsSection() {
   }
 
   function formatTime(hour: number, minute: number): string {
+    if (typeof hour !== 'number' || typeof minute !== 'number') {
+      return '12:00 AM';
+    }
     const h = hour % 12 || 12;
     const m = minute.toString().padStart(2, '0');
     const period = hour >= 12 ? 'PM' : 'AM';
     return `${h}:${m} ${period}`;
-  }
-
-  if (!reminderSettings) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Moon size={20} color={COLORS.sleep} />
-          <Text style={styles.title}>Sleep</Text>
-        </View>
-        <Card style={styles.card}>
-          <Text style={styles.sectionTitle}>Loading...</Text>
-        </Card>
-      </View>
-    ); // Loading
   }
 
   return (
@@ -272,7 +281,7 @@ export function SleepSettingsSection() {
       </Card>
 
       {/* Time Pickers */}
-      {showBedtimePicker && reminderSettings && (
+      {showBedtimePicker && (
         <DateTimePicker
           value={new Date(0, 0, 0, reminderSettings.bedtimeHour, reminderSettings.bedtimeMinute)}
           mode="time"
@@ -282,7 +291,7 @@ export function SleepSettingsSection() {
         />
       )}
 
-      {showWakePicker && reminderSettings && (
+      {showWakePicker && (
         <DateTimePicker
           value={new Date(0, 0, 0, reminderSettings.wakeHour, reminderSettings.wakeMinute)}
           mode="time"
