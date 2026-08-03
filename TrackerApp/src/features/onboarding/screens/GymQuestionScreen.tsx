@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.glass,
+    backgroundColor: 'transparent', // Dark/transparent background
     borderRadius: RADIUS.xl,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,

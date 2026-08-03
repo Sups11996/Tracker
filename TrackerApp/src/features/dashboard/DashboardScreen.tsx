@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
-    backgroundColor: COLORS.glass,
+    backgroundColor: 'transparent', // Transparent background
   },
   tabLabel: {
     fontSize: TYPOGRAPHY.size.sm,

@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: SPACING.md,
-    backgroundColor: COLORS.glass,
+    backgroundColor: 'transparent', // Dark/transparent background
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,

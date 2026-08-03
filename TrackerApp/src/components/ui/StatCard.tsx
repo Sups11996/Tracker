@@ -38,7 +38,7 @@ export function StatCard({
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    backgroundColor: COLORS.glass,
+    backgroundColor: 'transparent', // Transparent background
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     borderWidth: 1,

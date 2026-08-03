@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.xl,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
-    backgroundColor: COLORS.glass,
+    backgroundColor: 'transparent', // Dark/transparent background
     alignItems: 'center',
   },
   chipLabel: {

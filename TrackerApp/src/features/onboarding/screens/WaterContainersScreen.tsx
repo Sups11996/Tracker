@@ -206,11 +206,11 @@ const styles = StyleSheet.create({
   },
   preset: {
     paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.lg, // Increased width
     borderRadius: RADIUS.full,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
-    backgroundColor: COLORS.glass,
+    backgroundColor: 'transparent', // Dark/transparent background
     alignItems: 'center',
   },
   presetAdded: {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
   list: { gap: SPACING.md },
   containerRow: {
-    backgroundColor: COLORS.glass,
+    backgroundColor: 'transparent', // Dark/transparent background
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,

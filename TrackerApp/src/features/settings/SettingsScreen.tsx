@@ -646,7 +646,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.glassHighlight,
+    backgroundColor: 'transparent', // Transparent background
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
   },

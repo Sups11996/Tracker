@@ -63,7 +63,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     fontSize: TYPOGRAPHY.size.md,
     color: COLORS.textPrimary,
-    backgroundColor: COLORS.glass,
+    backgroundColor: 'transparent', // Transparent background
   },
   error: {
     fontSize: TYPOGRAPHY.size.xs,

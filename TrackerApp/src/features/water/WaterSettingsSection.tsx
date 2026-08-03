@@ -242,9 +242,9 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.glassHighlight,
+    backgroundColor: 'transparent', // Transparent like Add Container button
     borderWidth: 1,
-    borderColor: COLORS.glassBorder,
+    borderColor: COLORS.glassBorder, // Visible through border
   },
   containerInfo: { gap: 2 },
   containerName: {
