@@ -395,26 +395,6 @@ export function SettingsScreen() {
                   </TouchableOpacity>
                 )}
               </View>
-
-              <View style={styles.permissionItem}>
-                <View style={styles.permissionInfo}>
-                  <Text style={styles.permissionName}>Usage Stats</Text>
-                  <Text style={styles.permissionDesc}>Track screen time</Text>
-                </View>
-                {screenTimeGranted ? (
-                  <Text style={styles.permissionStatus}>Granted</Text>
-                ) : (
-                  <TouchableOpacity onPress={async () => {
-                    await requestScreenTimePermission();
-                    setTimeout(async () => {
-                      const ok = await checkScreenTimePermission();
-                      setScreenTimeGranted(ok);
-                    }, 1500);
-                  }}>
-                    <Text style={styles.permissionAction}>Enable</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
             </View>
 
             <View style={styles.permissionsFooter}>
@@ -515,18 +495,6 @@ export function SettingsScreen() {
                   await db.runAsync('DELETE FROM workout_logs WHERE date < ?', [today]);
                   await db.runAsync('DELETE FROM calories_daily_summary WHERE date < ?', [today]);
                   await hydrateCaloriesStore(db);
-                }}
-              />
-
-              <DataClearButton
-                db={db}
-                label="Screen Time History"
-                description="Clears all screen time data except today"
-                color={COLORS.screenTime}
-                onClear={async () => {
-                  const today = getTodayLocal();
-                  await db.runAsync('DELETE FROM app_usage_sessions WHERE date < ?', [today]);
-                  await db.runAsync('DELETE FROM screen_time_daily_summary WHERE date < ?', [today]);
                 }}
               />
 
