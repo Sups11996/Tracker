@@ -105,7 +105,6 @@ export function HomeScreen() {
         hydrateSleepStore(db),
         hydrateWaterStore(db),
         hydrateCaloriesStore(db),
-        checkScreenTimePermission().then(ok => ok ? fetchScreenTimeStats() : Promise.resolve()),
         profile?.uses_abc ? hydrateAbcStore(db) : Promise.resolve(),
       ]);
     } catch (e) {
@@ -155,11 +154,11 @@ export function HomeScreen() {
             <AnimatedCard index={0}><StepHomeCard onPress={() => goToDashboard('steps')} /></AnimatedCard>
             <AnimatedCard index={1}><SleepHomeCard onPress={() => goToDashboard('sleep')} /></AnimatedCard>
             <AnimatedCard index={2}><WaterHomeCard onPress={() => goToDashboard('water')} /></AnimatedCard>
-            {profile?.uses_gym !== false && (              <AnimatedCard index={3}><CaloriesHomeCard onPress={() => goToDashboard('calories')} /></AnimatedCard>
+            {profile?.uses_gym !== false && (
+              <AnimatedCard index={3}><CaloriesHomeCard onPress={() => goToDashboard('calories')} /></AnimatedCard>
             )}
-            <AnimatedCard index={4}><ScreenTimeHomeCard onPress={() => goToDashboard('screen')} /></AnimatedCard>
             {!!profile?.uses_abc && (
-              <AnimatedCard index={5}><AbcHomeCard onPress={() => goToDashboard('abc')} /></AnimatedCard>
+              <AnimatedCard index={4}><AbcHomeCard onPress={() => goToDashboard('abc')} /></AnimatedCard>
             )}
           </>
         )}
