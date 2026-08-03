@@ -53,22 +53,25 @@ export const useScreenTimeStore = create<ScreenTimeState>((set) => ({
     // Filter out system/launcher apps from display (but total time already includes them)
     const userApps = stats.apps.filter(app => {
       const pkg = app.packageName.toLowerCase();
-      // Hide system UI, launchers, and other background system apps
+      // Hide only core system components (not all com.android/com.sec apps)
       return !pkg.includes('launcher') &&
              !pkg.includes('systemui') &&
              !pkg.includes('oneui') &&
              !pkg.includes('inputmethod') &&
              !pkg.includes('keyboard') &&
-             !pkg.startsWith('com.android.') &&
-             !pkg.startsWith('com.sec.android.') &&
-             !pkg.startsWith('com.google.android.gms') &&
-             !pkg.startsWith('com.google.android.gsf') &&
-             pkg !== 'android';
+             pkg !== 'android' &&
+             pkg !== 'com.android.systemui' &&
+             pkg !== 'com.sec.android.app.launcher' &&
+             !pkg.includes('com.google.android.gms') &&
+             !pkg.includes('com.google.android.gsf');
     });
+    
+    // Recalculate total from filtered apps only (don't use stats.totalScreenTimeMs which includes system apps)
+    const totalTimeFromUserApps = userApps.reduce((sum, app) => sum + app.totalTimeMs, 0);
     
     const mostUsed = userApps.length > 0 ? userApps[0] : null;
     set({
-      totalScreenTimeMs: stats.totalScreenTimeMs,
+      totalScreenTimeMs: totalTimeFromUserApps,  // Use calculated total from user apps only
       unlockCount: stats.unlockCount,
       apps: userApps, // Only show user-facing apps
       mostUsedApp: mostUsed,

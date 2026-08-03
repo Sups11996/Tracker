@@ -1,25 +1,19 @@
-import { Linking, Platform } from 'react-native';
-import { requireNativeModule } from 'expo-modules-core';
+import { Linking, NativeModules, Platform } from 'react-native';
 
 /**
  * Native permissions helper module.
  * Wraps Android-specific permission APIs that can't be done from JS/Linking.
  */
-const PermissionsModule = (() => {
-  try {
-    return requireNativeModule('PermissionsModule');
-  } catch {
-    return null;
-  }
-})();
+const PermissionsModule = Platform.OS === 'android' ? NativeModules.PermissionsModule : null;
 
 /**
  * Returns true if the app is already ignoring battery optimizations.
  */
-export function isBatteryOptimizationIgnored(): boolean {
+export async function isBatteryOptimizationIgnored(): Promise<boolean> {
   if (!PermissionsModule) return false;
   try {
-    return PermissionsModule.isBatteryOptimizationIgnored() ?? false;
+    const result = await PermissionsModule.isBatteryOptimizationIgnored();
+    return result ?? false;
   } catch {
     return false;
   }
