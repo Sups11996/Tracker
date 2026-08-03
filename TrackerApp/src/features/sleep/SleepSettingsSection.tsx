@@ -146,7 +146,17 @@ export function SleepSettingsSection() {
   }
 
   if (!reminderSettings) {
-    return null; // Loading
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Moon size={20} color={COLORS.sleep} />
+          <Text style={styles.title}>Sleep</Text>
+        </View>
+        <Card style={styles.card}>
+          <Text style={styles.sectionTitle}>Loading...</Text>
+        </Card>
+      </View>
+    ); // Loading
   }
 
   return (
@@ -262,7 +272,7 @@ export function SleepSettingsSection() {
       </Card>
 
       {/* Time Pickers */}
-      {showBedtimePicker && (
+      {showBedtimePicker && reminderSettings && (
         <DateTimePicker
           value={new Date(0, 0, 0, reminderSettings.bedtimeHour, reminderSettings.bedtimeMinute)}
           mode="time"
@@ -272,7 +282,7 @@ export function SleepSettingsSection() {
         />
       )}
 
-      {showWakePicker && (
+      {showWakePicker && reminderSettings && (
         <DateTimePicker
           value={new Date(0, 0, 0, reminderSettings.wakeHour, reminderSettings.wakeMinute)}
           mode="time"
