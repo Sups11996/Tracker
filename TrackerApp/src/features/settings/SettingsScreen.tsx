@@ -27,15 +27,10 @@ import {
   openAppSettings,
   isBatteryOptimizationIgnored,
 } from '../../lib/permissions';
-import {
-  checkScreenTimePermission,
-  requestScreenTimePermission,
-} from '../../stores/screenTimeStore';
 import { StepSettingsSection } from '../steps/StepSettingsSection';
 import { SleepSettingsSection } from '../sleep/SleepSettingsSection';
 import { WaterSettingsSection } from '../water/WaterSettingsSection';
 import { CaloriesSettingsSection } from '../calories/CaloriesSettingsSection';
-import { ScreenTimeSettingsSection } from '../screentime/ScreenTimeSettingsSection';
 import { AbcSettingsSection } from '../abc/AbcSettingsSection';
 import {
   hydrateStepStore,

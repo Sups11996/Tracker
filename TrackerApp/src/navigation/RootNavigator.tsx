@@ -4,7 +4,6 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useUserStore } from '../stores';
 import { MainTabs } from './MainTabs';
 import { OnboardingNavigator } from './OnboardingNavigator';
-import DebugScreenTimeScreen from '../features/debug/DebugScreenTimeScreen';
 import type { RootStackParamList } from '../types';
 
 const Root = createNativeStackNavigator<RootStackParamList>();
@@ -45,23 +44,7 @@ export function RootNavigator() {
   return (
     <Root.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
       {onboardingDone ? (
-        <>
-          <Root.Screen name="Main" component={MainTabs} />
-          {/* Debug screen - only available in __DEV__ mode */}
-          {__DEV__ && (
-            <Root.Screen 
-              name="DebugScreenTime" 
-              component={DebugScreenTimeScreen}
-              options={{
-                headerShown: true,
-                headerTitle: 'Screen Time Debug',
-                headerStyle: { backgroundColor: '#000' },
-                headerTintColor: '#fff',
-                presentation: 'modal',
-              }}
-            />
-          )}
-        </>
+        <Root.Screen name="Main" component={MainTabs} />
       ) : (
         <Root.Screen name="Onboarding" component={OnboardingNavigator} />
       )}
