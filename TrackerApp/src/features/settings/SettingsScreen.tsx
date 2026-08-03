@@ -410,7 +410,6 @@ export function SettingsScreen() {
         <SleepSettingsSection />
         <WaterSettingsSection />
         <CaloriesSettingsSection />
-        <ScreenTimeSettingsSection />
         {/* ABC Settings — always shown so user can enable it later */}
         <AbcSettingsSection />
         
