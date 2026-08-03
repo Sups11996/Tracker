@@ -63,7 +63,6 @@ export function SettingsScreen() {
   const [activityGranted, setActivityGranted] = useState(false);
   const [notifGranted, setNotifGranted] = useState(false);
   const [batteryGranted, setBatteryGranted] = useState(false);
-  const [screenTimeGranted, setScreenTimeGranted] = useState(false);
 
   // Check all permissions on mount
   useEffect(() => {
@@ -75,10 +74,6 @@ export function SettingsScreen() {
       // Battery optimization
       const batteryIgnored = await isBatteryOptimizationIgnored();
       setBatteryGranted(batteryIgnored);
-
-      // Screen time / usage stats
-      const st = await checkScreenTimePermission();
-      setScreenTimeGranted(st);
 
       // Activity recognition — checked via the step service being able to run
       // We check via Notifications as proxy isn't accurate; use android permission check

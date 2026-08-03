@@ -7,10 +7,6 @@ import { hydrateSleepStore } from '../stores/sleepStore';
 import { hydrateWaterStore } from '../stores/waterStore';
 import { hydrateCaloriesStore } from '../stores/caloriesStore';
 import { hydrateAbcStore } from '../stores/abcStore';
-import {
-  checkScreenTimePermission,
-  fetchScreenTimeStats,
-} from '../stores/screenTimeStore';
 
 /**
  * Central app hydration hook.
@@ -36,9 +32,6 @@ export function useAppHydration(): { isReady: boolean } {
         hydrateSleepStore(db),
         hydrateWaterStore(db),
         hydrateCaloriesStore(db),
-        checkScreenTimePermission().then((ok) =>
-          ok ? fetchScreenTimeStats() : Promise.resolve()
-        ),
         profile?.uses_abc ? hydrateAbcStore(db) : Promise.resolve(),
       ]);
     } catch (e) {

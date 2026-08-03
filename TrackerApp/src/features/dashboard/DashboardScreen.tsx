@@ -13,7 +13,6 @@ import { StepDashboard } from '../steps/StepDashboard';
 import { SleepDashboard } from '../sleep/SleepDashboard';
 import { WaterDashboard } from '../water/WaterDashboard';
 import { CaloriesDashboard } from '../calories/CaloriesDashboard';
-import { ScreenTimeDashboard } from '../screentime/ScreenTimeDashboard';
 import { AbcDashboard } from '../abc/AbcDashboard';
 import { useUserStore } from '../../stores';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../constants';
@@ -26,7 +25,6 @@ const ALL_TABS: { key: Tab; label: string; color: string }[] = [
   { key: 'sleep',    label: 'Sleep',    color: COLORS.sleep },
   { key: 'water',    label: 'Water',    color: COLORS.water },
   { key: 'calories', label: 'Calories', color: COLORS.calories },
-  { key: 'screen',   label: 'Screen',   color: COLORS.screenTime },
   { key: 'abc',      label: 'ABC',      color: COLORS.abc },
 ];
 
