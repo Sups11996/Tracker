@@ -64,26 +64,34 @@ export function isYesterday(dateStr: string): boolean {
 }
 
 /**
- * Store and check for date changes using AsyncStorage.
+ * Store and check for date changes using SQLite database.
  * Returns true if the date has changed since last check.
  */
-const LAST_KNOWN_DATE_KEY = 'app_last_known_date';
-
-export async function checkDateChanged(): Promise<boolean> {
+export async function checkDateChanged(db: any): Promise<boolean> {
   try {
-    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
     const today = getTodayLocal();
-    const lastKnownDate = await AsyncStorage.getItem(LAST_KNOWN_DATE_KEY);
     
-    if (lastKnownDate === null) {
+    // Get last known date from database
+    const row = await db.getFirstAsync<{ value: string }>(
+      'SELECT value FROM kv_store WHERE key = ?',
+      ['last_known_date']
+    );
+    
+    if (!row) {
       // First launch - store current date
-      await AsyncStorage.setItem(LAST_KNOWN_DATE_KEY, today);
+      await db.runAsync(
+        'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+        ['last_known_date', today]
+      );
       return false;
     }
     
-    if (lastKnownDate !== today) {
+    if (row.value !== today) {
       // Date changed - update stored date
-      await AsyncStorage.setItem(LAST_KNOWN_DATE_KEY, today);
+      await db.runAsync(
+        'UPDATE kv_store SET value = ? WHERE key = ?',
+        [today, 'last_known_date']
+      );
       return true;
     }
     

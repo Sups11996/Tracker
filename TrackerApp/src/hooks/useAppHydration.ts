@@ -30,7 +30,7 @@ export function useAppHydration(): { isReady: boolean } {
   const [isReady, setIsReady] = useState(false);
 
   async function handleDateChangeIfNeeded() {
-    const dateChanged = await checkDateChanged();
+    const dateChanged = await checkDateChanged(db);
     if (dateChanged) {
       console.log('📅 Date changed detected - resetting daily counters');
       
