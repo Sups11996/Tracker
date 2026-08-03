@@ -15,7 +15,6 @@ export function StepSettingsSection() {
   const [goalInput, setGoalInput] = useState(dailyGoal.toString());
   const [isEditing, setIsEditing] = useState(false);
   const [trackingEnabled, setTrackingEnabled] = useState(status !== 'unavailable');
-  const [vehicleModeDefault, setVehicleModeDefault] = useState(false);
 
   async function handleSaveGoal() {
     const newGoal = parseInt(goalInput, 10);
@@ -107,24 +106,6 @@ export function StepSettingsSection() {
               value={trackingEnabled}
               onValueChange={handleToggleTracking}
               trackColor={{ false: COLORS.glassHighlight, true: COLORS.steps }}
-              thumbColor={COLORS.textPrimary}
-            />
-          </View>
-        </View>
-
-        {/* Vehicle Mode Default */}
-        <View style={styles.section}>
-          <View style={styles.row}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.sectionTitle}>Vehicle Mode Default</Text>
-              <Text style={styles.description}>
-                Start in vehicle mode (step counting disabled)
-              </Text>
-            </View>
-            <Switch
-              value={vehicleModeDefault}
-              onValueChange={setVehicleModeDefault}
-              trackColor={{ false: COLORS.glassHighlight, true: COLORS.calories }}
               thumbColor={COLORS.textPrimary}
             />
           </View>

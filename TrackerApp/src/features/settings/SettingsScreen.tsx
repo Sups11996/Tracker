@@ -56,9 +56,6 @@ export function SettingsScreen() {
     weight_kg: profile?.weight_kg?.toString() || '',
   });
 
-  // Gender selector state
-  const [editingGender, setEditingGender] = useState(false);
-
   // Live permission state
   const [activityGranted, setActivityGranted] = useState(false);
   const [notifGranted, setNotifGranted] = useState(false);
@@ -124,28 +121,12 @@ export function SettingsScreen() {
       };
       setProfile(updated);
       setEditingProfile(false);
+      showSuccess('Success', 'Profile updated successfully.');
     } catch (error) {
       console.error('Failed to update profile:', error);
       showError('Error', 'Failed to save changes. Please try again.');
     }
-  }, [profileForm, profile, db, setProfile]);
-
-  const handleUpdateGender = useCallback(async (gender: 'male' | 'female' | 'other') => {
-    if (!profile) return;
-
-    try {
-      await db.runAsync(
-        'UPDATE user_profile SET gender = ?, updated_at = ? WHERE id = 1',
-        [gender, new Date().toISOString()]
-      );
-
-      setProfile({ ...profile, gender });
-      setEditingGender(false);
-    } catch (error) {
-      console.error('Failed to update gender:', error);
-      showError('Error', 'Failed to save changes. Please try again.');
-    }
-  }, [profile, db, setProfile]);
+  }, [profileForm, profile, db, setProfile, showError, showSuccess]);
 
   const resetProfileForm = useCallback(() => {
     setProfileForm({
@@ -155,7 +136,6 @@ export function SettingsScreen() {
       weight_kg: profile?.weight_kg?.toString() || '',
     });
     setEditingProfile(false);
-    setEditingGender(false);
   }, [profile]);
 
   const openSystemSettings = useCallback(() => {
@@ -194,63 +174,45 @@ export function SettingsScreen() {
           </View>
 
           <Card style={styles.card}>
-            {/* Username */}
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Username</Text>
-              {editingProfile ? (
-                <TextInput
-                  value={profileForm.username}
-                  onChangeText={(value) => setProfileForm(prev => ({ ...prev, username: value }))}
-                  placeholder="Your name"
-                  style={styles.input}
-                />
-              ) : (
-                <View style={styles.fieldRow}>
-                  <Text style={styles.fieldValue}>{profile.username}</Text>
-                  <TouchableOpacity onPress={() => setEditingProfile(true)}>
-                    <Text style={styles.editBtn}>Edit</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-
-            {/* Gender */}
-            <View style={styles.field}>
-              <Text style={styles.fieldLabel}>Gender</Text>
-              {editingGender ? (
-                <View style={styles.genderOptions}>
-                  {(['male', 'female', 'other'] as const).map((option) => (
-                    <TouchableOpacity
-                      key={option}
-                      style={[
-                        styles.genderChip,
-                        profile.gender === option && styles.genderChipActive
-                      ]}
-                      onPress={() => handleUpdateGender(option)}
-                    >
-                      <Text style={[
-                        styles.genderChipText,
-                        profile.gender === option && styles.genderChipTextActive
-                      ]}>
-                        {option.charAt(0).toUpperCase() + option.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ) : (
-                <View style={styles.fieldRow}>
-                  <Text style={styles.fieldValue}>
-                    {profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}
-                  </Text>
-                  <TouchableOpacity onPress={() => setEditingGender(true)}>
-                    <Text style={styles.editBtn}>Edit</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-
-            {editingProfile && (
+            {editingProfile ? (
               <>
+                {/* Username */}
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>Username</Text>
+                  <TextInput
+                    value={profileForm.username}
+                    onChangeText={(value) => setProfileForm(prev => ({ ...prev, username: value }))}
+                    placeholder="Your name"
+                    style={styles.input}
+                  />
+                </View>
+
+                {/* Gender */}
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>Gender</Text>
+                  <View style={styles.genderOptions}>
+                    {(['male', 'female', 'other'] as const).map((option) => (
+                      <TouchableOpacity
+                        key={option}
+                        style={[
+                          styles.genderChip,
+                          profileForm.username && profile.gender === option && styles.genderChipActive
+                        ]}
+                        onPress={() => {
+                          setProfile({ ...profile, gender: option });
+                        }}
+                      >
+                        <Text style={[
+                          styles.genderChipText,
+                          profile.gender === option && styles.genderChipTextActive
+                        ]}>
+                          {option.charAt(0).toUpperCase() + option.slice(1)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
                 {/* Age */}
                 <View style={styles.field}>
                   <Text style={styles.fieldLabel}>Age</Text>
@@ -304,23 +266,42 @@ export function SettingsScreen() {
                   />
                 </View>
               </>
-            )}
+            ) : (
+              <>
+                {/* Profile Summary */}
+                <View style={styles.profileSummary}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Username:</Text>
+                    <Text style={styles.summaryValue}>{profile.username}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Gender:</Text>
+                    <Text style={styles.summaryValue}>
+                      {profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Age:</Text>
+                    <Text style={styles.summaryValue}>{profile.age} years</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Height:</Text>
+                    <Text style={styles.summaryValue}>{profile.height_cm} cm</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Weight:</Text>
+                    <Text style={styles.summaryValue}>{profile.weight_kg} kg</Text>
+                  </View>
+                </View>
 
-            {!editingProfile && !editingGender && (
-              <View style={styles.profileSummary}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Age:</Text>
-                  <Text style={styles.summaryValue}>{profile.age} years</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Height:</Text>
-                  <Text style={styles.summaryValue}>{profile.height_cm} cm</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Weight:</Text>
-                  <Text style={styles.summaryValue}>{profile.weight_kg} kg</Text>
-                </View>
-              </View>
+                {/* Edit Button */}
+                <TouchableOpacity
+                  style={styles.editProfileButton}
+                  onPress={() => setEditingProfile(true)}
+                >
+                  <Text style={styles.editProfileButtonText}>Edit Profile</Text>
+                </TouchableOpacity>
+              </>
             )}
           </Card>
         </View>
@@ -412,29 +393,6 @@ export function SettingsScreen() {
         <CaloriesSettingsSection />
         {/* ABC Settings — always shown so user can enable it later */}
         <AbcSettingsSection />
-        
-        {/* Debug Section (DEV only) */}
-        {__DEV__ && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>🔧 Debug Tools</Text>
-            </View>
-            <Card style={styles.card}>
-              <TouchableOpacity
-                style={styles.debugButton}
-                onPress={() => {
-                  // @ts-ignore
-                  navigation.navigate('DebugScreenTime');
-                }}
-              >
-                <Text style={styles.debugButtonText}>Screen Time Debug Harness</Text>
-                <Text style={styles.debugButtonDesc}>
-                  Test and validate screen time accuracy
-                </Text>
-              </TouchableOpacity>
-            </Card>
-          </View>
-        )}
         
         {/* Data Management Section */}
         <View style={styles.section}>
@@ -860,22 +818,19 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.weight.semibold,
     color: COLORS.error,
   },
-  debugButton: {
+  editProfileButton: {
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.glassHighlight,
     borderWidth: 1,
-    borderColor: '#FFA500',
-    gap: SPACING.xs,
+    borderColor: COLORS.steps,
+    backgroundColor: `${COLORS.steps}10`,
+    alignItems: 'center',
+    marginTop: SPACING.sm,
   },
-  debugButtonText: {
-    fontSize: TYPOGRAPHY.size.md,
+  editProfileButtonText: {
+    fontSize: TYPOGRAPHY.size.sm,
     fontWeight: TYPOGRAPHY.weight.semibold,
-    color: '#FFA500',
-  },
-  debugButtonDesc: {
-    fontSize: TYPOGRAPHY.size.xs,
-    color: COLORS.textMuted,
+    color: COLORS.steps,
   },
 });
