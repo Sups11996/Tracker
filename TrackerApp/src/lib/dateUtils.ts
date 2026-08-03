@@ -62,3 +62,34 @@ export function isToday(dateStr: string): boolean {
 export function isYesterday(dateStr: string): boolean {
   return dateStr === getYesterdayLocal();
 }
+
+/**
+ * Store and check for date changes using AsyncStorage.
+ * Returns true if the date has changed since last check.
+ */
+const LAST_KNOWN_DATE_KEY = 'app_last_known_date';
+
+export async function checkDateChanged(): Promise<boolean> {
+  try {
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+    const today = getTodayLocal();
+    const lastKnownDate = await AsyncStorage.getItem(LAST_KNOWN_DATE_KEY);
+    
+    if (lastKnownDate === null) {
+      // First launch - store current date
+      await AsyncStorage.setItem(LAST_KNOWN_DATE_KEY, today);
+      return false;
+    }
+    
+    if (lastKnownDate !== today) {
+      // Date changed - update stored date
+      await AsyncStorage.setItem(LAST_KNOWN_DATE_KEY, today);
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Failed to check date change:', error);
+    return false;
+  }
+}
