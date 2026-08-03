@@ -44,7 +44,8 @@ import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 export function SettingsScreen() {
   const db = useSQLiteContext();
   const { profile, setProfile } = useUserStore();
-  const { showSuccess, showError } = useCustomAlert();
+  const { showSuccess, showError, showConfirm } = useCustomAlert();
+  const tabBarHeight = useBottomTabBarHeight();
 
   // Profile editing state
   const [editingProfile, setEditingProfile] = useState(false);
@@ -119,151 +120,282 @@ export function SettingsScreen() {
 
   return (
     <ScreenWrapper padded={false}>
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scroll} 
+        contentContainerStyle={[styles.container, { paddingBottom: tabBarHeight + SPACING.lg }]}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.title}>Settings</Text>
         
         {/* Profile Section */}
-        <Card style={styles.card}>
-          {editingProfile ? (
-            <>
-              {/* Username */}
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Username</Text>
-                <TextInput
-                  value={profileForm.username}
-                  onChangeText={(value) => setProfileForm(prev => ({ ...prev, username: value }))}
-                  placeholder="Your name"
-                  style={styles.input}
-                />
-              </View>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Profile</Text>
+          </View>
 
-              {/* Gender */}
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Gender</Text>
-                <View style={styles.genderOptions}>
-                  {(['male', 'female', 'other'] as const).map((option) => (
-                    <TouchableOpacity
-                      key={option}
-                      style={[
-                        styles.genderChip,
-                        profile.gender === option && styles.genderChipActive
-                      ]}
-                      onPress={() => {
-                        setProfile({ ...profile, gender: option });
-                      }}
-                    >
-                      <Text style={[
-                        styles.genderChipText,
-                        profile.gender === option && styles.genderChipTextActive
-                      ]}>
-                        {option.charAt(0).toUpperCase() + option.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+          <Card style={styles.card}>
+            {editingProfile ? (
+              <>
+                {/* Username */}
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>Username</Text>
+                  <TextInput
+                    value={profileForm.username}
+                    onChangeText={(value) => setProfileForm(prev => ({ ...prev, username: value }))}
+                    placeholder="Your name"
+                    style={styles.input}
+                  />
                 </View>
-              </View>
 
-              {/* Age */}
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Age</Text>
-                <TextInput
-                  value={profileForm.age}
-                  onChangeText={(value) => setProfileForm(prev => ({ ...prev, age: value }))}
-                  placeholder="25"
-                  keyboardType="number-pad"
-                  style={styles.input}
-                />
-              </View>
+                {/* Gender */}
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>Gender</Text>
+                  <View style={styles.genderOptions}>
+                    {(['male', 'female', 'other'] as const).map((option) => (
+                      <TouchableOpacity
+                        key={option}
+                        style={[
+                          styles.genderChip,
+                          profile.gender === option && styles.genderChipActive
+                        ]}
+                        onPress={() => {
+                          setProfile({ ...profile, gender: option });
+                        }}
+                      >
+                        <Text style={[
+                          styles.genderChipText,
+                          profile.gender === option && styles.genderChipTextActive
+                        ]}>
+                          {option.charAt(0).toUpperCase() + option.slice(1)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
 
-              {/* Height */}
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Height (cm)</Text>
-                <TextInput
-                  value={profileForm.height_cm}
-                  onChangeText={(value) => setProfileForm(prev => ({ ...prev, height_cm: value }))}
-                  placeholder="170"
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              </View>
+                {/* Age */}
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>Age</Text>
+                  <TextInput
+                    value={profileForm.age}
+                    onChangeText={(value) => setProfileForm(prev => ({ ...prev, age: value }))}
+                    placeholder="25"
+                    keyboardType="number-pad"
+                    style={styles.input}
+                  />
+                </View>
 
-              {/* Weight */}
-              <View style={styles.field}>
-                <Text style={styles.fieldLabel}>Weight (kg)</Text>
-                <TextInput
-                  value={profileForm.weight_kg}
-                  onChangeText={(value) => setProfileForm(prev => ({ ...prev, weight_kg: value }))}
-                  placeholder="70"
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              </View>
+                {/* Height */}
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>Height (cm)</Text>
+                  <TextInput
+                    value={profileForm.height_cm}
+                    onChangeText={(value) => setProfileForm(prev => ({ ...prev, height_cm: value }))}
+                    placeholder="170"
+                    keyboardType="numeric"
+                    style={styles.input}
+                  />
+                </View>
 
-              {/* Action buttons */}
-              <View style={styles.editActions}>
-                <Button
-                  label="Save Changes"
-                  onPress={handleUpdateProfile}
-                  variant="primary"
-                  accentColor={COLORS.steps}
-                  size="sm"
-                />
-                <Button
-                  label="Cancel"
-                  onPress={resetProfileForm}
-                  variant="ghost"
-                  size="sm"
-                />
-              </View>
-            </>
-          ) : (
-            <>
-              {/* Profile Summary */}
-              <View style={styles.profileSummary}>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Username:</Text>
-                  <Text style={styles.summaryValue}>{profile.username}</Text>
+                {/* Weight */}
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>Weight (kg)</Text>
+                  <TextInput
+                    value={profileForm.weight_kg}
+                    onChangeText={(value) => setProfileForm(prev => ({ ...prev, weight_kg: value }))}
+                    placeholder="70"
+                    keyboardType="numeric"
+                    style={styles.input}
+                  />
                 </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Gender:</Text>
-                  <Text style={styles.summaryValue}>
-                    {profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}
-                  </Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Age:</Text>
-                  <Text style={styles.summaryValue}>{profile.age} years</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Height:</Text>
-                  <Text style={styles.summaryValue}>{profile.height_cm} cm</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Weight:</Text>
-                  <Text style={styles.summaryValue}>{profile.weight_kg} kg</Text>
-                </View>
-              </View>
 
-              {/* Edit Button */}
-              <TouchableOpacity
-                style={styles.editProfileButton}
-                onPress={() => setEditingProfile(true)}
-              >
-                <Text style={styles.editProfileButtonText}>Edit Profile</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </Card>
+                {/* Action buttons */}
+                <View style={styles.editActions}>
+                  <Button
+                    label="Save Changes"
+                    onPress={handleUpdateProfile}
+                    variant="primary"
+                    accentColor={COLORS.steps}
+                    size="sm"
+                  />
+                  <Button
+                    label="Cancel"
+                    onPress={resetProfileForm}
+                    variant="ghost"
+                    size="sm"
+                  />
+                </View>
+              </>
+            ) : (
+              <>
+                {/* Profile Summary */}
+                <View style={styles.profileSummary}>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Username:</Text>
+                    <Text style={styles.summaryValue}>{profile.username}</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Gender:</Text>
+                    <Text style={styles.summaryValue}>
+                      {profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)}
+                    </Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Age:</Text>
+                    <Text style={styles.summaryValue}>{profile.age} years</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Height:</Text>
+                    <Text style={styles.summaryValue}>{profile.height_cm} cm</Text>
+                  </View>
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Weight:</Text>
+                    <Text style={styles.summaryValue}>{profile.weight_kg} kg</Text>
+                  </View>
+                </View>
+
+                {/* Edit Button */}
+                <TouchableOpacity
+                  style={styles.editProfileButton}
+                  onPress={() => setEditingProfile(true)}
+                >
+                  <Text style={styles.editProfileButtonText}>Edit Profile</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </Card>
+        </View>
         
         {/* Settings Sections */}
-        <SleepSettingsSection />
         <StepSettingsSection />
+        <SleepSettingsSection />
         <WaterSettingsSection />
         <CaloriesSettingsSection />
         <AbcSettingsSection />
+
+        {/* Data Management Section */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Data Management</Text>
+          </View>
+
+          <Card style={styles.card}>
+            <Text style={styles.dataSubtitle}>
+              Clear historical data for each feature. Your current day data will be preserved.
+            </Text>
+
+            <View style={styles.dataList}>
+              <DataClearButton
+                db={db}
+                label="Steps History"
+                description="Clears all step records except today"
+                color={COLORS.steps}
+                onClear={async () => {
+                  const today = getTodayLocal();
+                  await db.runAsync('DELETE FROM daily_steps WHERE date < ?', [today]);
+                  await hydrateStepStore(db);
+                }}
+              />
+
+              <DataClearButton
+                db={db}
+                label="Sleep History"
+                description="Clears all sleep sessions except active"
+                color={COLORS.sleep}
+                onClear={async () => {
+                  await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0');
+                  await hydrateSleepStore(db);
+                }}
+              />
+
+              <DataClearButton
+                db={db}
+                label="Water History"
+                description="Clears all water logs except today"
+                color={COLORS.water}
+                onClear={async () => {
+                  const today = getTodayLocal();
+                  await db.runAsync('DELETE FROM water_logs WHERE date < ?', [today]);
+                  await db.runAsync('DELETE FROM water_daily_summary WHERE date < ?', [today]);
+                  await hydrateWaterStore(db);
+                }}
+              />
+
+              <DataClearButton
+                db={db}
+                label="Calories History"
+                description="Clears all workout logs except today"
+                color={COLORS.calories}
+                onClear={async () => {
+                  const today = getTodayLocal();
+                  await db.runAsync('DELETE FROM workout_logs WHERE date < ?', [today]);
+                  await db.runAsync('DELETE FROM calories_daily_summary WHERE date < ?', [today]);
+                  await hydrateCaloriesStore(db);
+                }}
+              />
+
+              <DataClearButton
+                db={db}
+                label="ABC History"
+                description="Clears all ABC logs except today"
+                color={COLORS.abc}
+                onClear={async () => {
+                  const today = getTodayLocal();
+                  await db.runAsync('DELETE FROM abc_logs WHERE date < ?', [today]);
+                  await db.runAsync('DELETE FROM abc_daily_summary WHERE date < ?', [today]);
+                  await hydrateAbcStore(db);
+                }}
+              />
+            </View>
+
+            <View style={styles.dangerZone}>
+              <Text style={styles.dangerTitle}>Danger Zone</Text>
+              <TouchableOpacity
+                style={styles.dangerBtn}
+                onPress={() => handleClearAllData()}
+              >
+                <Text style={styles.dangerBtnText}>Clear All Data</Text>
+              </TouchableOpacity>
+            </View>
+          </Card>
+        </View>
       </ScrollView>
     </ScreenWrapper>
   );
+
+  async function handleClearAllData() {
+    showConfirm(
+      'Clear All Data',
+      'This will delete ALL historical data across all features. This action cannot be undone. Are you sure?',
+      async () => {
+        try {
+          const today = getTodayLocal();
+          
+          await db.runAsync('DELETE FROM daily_steps WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0');
+          await db.runAsync('DELETE FROM water_logs WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM water_daily_summary WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM workout_logs WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM calories_daily_summary WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM abc_logs WHERE date < ?', [today]);
+          await db.runAsync('DELETE FROM abc_daily_summary WHERE date < ?', [today]);
+
+          await hydrateStepStore(db);
+          await hydrateSleepStore(db);
+          await hydrateWaterStore(db);
+          await hydrateCaloriesStore(db);
+          await hydrateAbcStore(db);
+
+          showSuccess('Success', 'All historical data has been cleared.');
+        } catch (error) {
+          console.error('Failed to clear data:', error);
+          showError('Error', 'Failed to clear data. Please try again.');
+        }
+      },
+      'Clear All',
+      true
+    );
+  }
 }
 
 interface DataClearButtonProps {
