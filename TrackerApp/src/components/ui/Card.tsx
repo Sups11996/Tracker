@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, View, type ViewProps } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { GLASS, SPACING } from '../../constants';
+import { GLASS, SPACING, COLORS } from '../../constants';
 
 interface CardProps extends ViewProps {
   children: React.ReactNode;
@@ -63,7 +63,7 @@ export function Card({
     <BlurView
       intensity={GLASS.blurCard}
       tint="dark"
-      style={styles.shell}
+      style={[styles.shell, { backgroundColor: COLORS.background }]} // Match app background
     >
       {inner}
     </BlurView>
@@ -82,12 +82,13 @@ const styles = StyleSheet.create({
   },
   /** Fallback shell when noBlur=true */
   noBlurShell: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: COLORS.background, // Match app background
   },
-  /** Content container - no background, just padding */
+  /** Semi-transparent white tint on top of the blur */
   tint: {
-    backgroundColor: 'transparent', // Removed white tint
+    backgroundColor: 'transparent', // Removed white tint overlay
     padding: SPACING.xl,
+    // No border here — border lives on the shell (BlurView)
     overflow: 'hidden',
   },
 });
