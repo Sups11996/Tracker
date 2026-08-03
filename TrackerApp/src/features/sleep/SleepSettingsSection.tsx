@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Switch } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, Switch, Modal, Platform } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
-import { Moon } from 'lucide-react-native';
+import { Moon, Clock } from 'lucide-react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Card } from '../../components/ui/Card';
 import { TextInput } from '../../components/ui/TextInput';
 import { Button } from '../../components/ui/Button';
 import { useSleepStore } from '../../stores/sleepStore';
-import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
+import {
+  loadSleepReminderSettings,
+  saveSleepReminderSettings,
+  applySleepReminderSettings,
+  type SleepReminderSettings,
+} from '../../lib/sleepReminders';
+import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 export function SleepSettingsSection() {
   const db = useSQLiteContext();
@@ -17,8 +24,16 @@ export function SleepSettingsSection() {
 
   const [goalInput, setGoalInput] = useState(goalHours.toString());
   const [isEditing, setIsEditing] = useState(false);
-  const [bedtimeReminder, setBedtimeReminder] = useState(false);
-  const [wakeReminder, setWakeReminder] = useState(false);
+  
+  // Reminder settings
+  const [reminderSettings, setReminderSettings] = useState<SleepReminderSettings | null>(null);
+  const [showBedtimePicker, setShowBedtimePicker] = useState(false);
+  const [showWakePicker, setShowWakePicker] = useState(false);
+  
+  // Load reminder settings on mount
+  useEffect(() => {
+    loadSleepReminderSettings(db).then(setReminderSettings);
+  }, [db]);
 
   async function handleSaveGoal() {
     const hours = parseFloat(goalInput);
@@ -45,6 +60,93 @@ export function SleepSettingsSection() {
   function handleCancelEdit() {
     setGoalInput(goalHours.toString());
     setIsEditing(false);
+  }
+
+  async function handleToggleBedtimeReminder(enabled: boolean) {
+    if (!reminderSettings) return;
+    
+    const updated = { ...reminderSettings, bedtimeEnabled: enabled };
+    setReminderSettings(updated);
+    
+    try {
+      await saveSleepReminderSettings(db, updated);
+      await applySleepReminderSettings(updated);
+    } catch (error) {
+      console.error('Failed to update bedtime reminder:', error);
+    }
+  }
+
+  async function handleToggleWakeReminder(enabled: boolean) {
+    if (!reminderSettings) return;
+    
+    const updated = { ...reminderSettings, wakeEnabled: enabled };
+    setReminderSettings(updated);
+    
+    try {
+      await saveSleepReminderSettings(db, updated);
+      await applySleepReminderSettings(updated);
+    } catch (error) {
+      console.error('Failed to update wake reminder:', error);
+    }
+  }
+
+  async function handleBedtimeTimeChange(event: any, selectedDate?: Date) {
+    if (Platform.OS === 'android') {
+      setShowBedtimePicker(false);
+    }
+    
+    if (!reminderSettings || !selectedDate) return;
+    
+    const updated = {
+      ...reminderSettings,
+      bedtimeHour: selectedDate.getHours(),
+      bedtimeMinute: selectedDate.getMinutes(),
+    };
+    setReminderSettings(updated);
+    
+    try {
+      await saveSleepReminderSettings(db, updated);
+      if (updated.bedtimeEnabled) {
+        await applySleepReminderSettings(updated);
+      }
+    } catch (error) {
+      console.error('Failed to update bedtime time:', error);
+    }
+  }
+
+  async function handleWakeTimeChange(event: any, selectedDate?: Date) {
+    if (Platform.OS === 'android') {
+      setShowWakePicker(false);
+    }
+    
+    if (!reminderSettings || !selectedDate) return;
+    
+    const updated = {
+      ...reminderSettings,
+      wakeHour: selectedDate.getHours(),
+      wakeMinute: selectedDate.getMinutes(),
+    };
+    setReminderSettings(updated);
+    
+    try {
+      await saveSleepReminderSettings(db, updated);
+      if (updated.wakeEnabled) {
+        await applySleepReminderSettings(updated);
+      }
+    } catch (error) {
+      console.error('Failed to update wake time:', error);
+    }
+  }
+
+  function formatTime(hour: number, minute: number): string {
+    const h = hour % 12 || 12;
+    const m = minute.toString().padStart(2, '0');
+    const period = hour >= 12 ? 'PM' : 'AM';
+    return `${h}:${m} ${period}`;
+  }
+
+  if (!reminderSettings) {
+    return null; // Loading
   }
 
   return (
@@ -108,12 +210,24 @@ export function SleepSettingsSection() {
               </Text>
             </View>
             <Switch
-              value={bedtimeReminder}
-              onValueChange={setBedtimeReminder}
+              value={reminderSettings.bedtimeEnabled}
+              onValueChange={handleToggleBedtimeReminder}
               trackColor={{ false: COLORS.glassHighlight, true: COLORS.sleep }}
               thumbColor={COLORS.textPrimary}
             />
           </View>
+          
+          {reminderSettings.bedtimeEnabled && (
+            <TouchableOpacity
+              style={styles.timeButton}
+              onPress={() => setShowBedtimePicker(true)}
+            >
+              <Clock size={16} color={COLORS.sleep} />
+              <Text style={styles.timeButtonText}>
+                {formatTime(reminderSettings.bedtimeHour, reminderSettings.bedtimeMinute)}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Wake Reminder */}
@@ -126,17 +240,50 @@ export function SleepSettingsSection() {
               </Text>
             </View>
             <Switch
-              value={wakeReminder}
-              onValueChange={setWakeReminder}
+              value={reminderSettings.wakeEnabled}
+              onValueChange={handleToggleWakeReminder}
               trackColor={{ false: COLORS.glassHighlight, true: COLORS.sleep }}
               thumbColor={COLORS.textPrimary}
             />
           </View>
+          
+          {reminderSettings.wakeEnabled && (
+            <TouchableOpacity
+              style={styles.timeButton}
+              onPress={() => setShowWakePicker(true)}
+            >
+              <Clock size={16} color={COLORS.sleep} />
+              <Text style={styles.timeButtonText}>
+                {formatTime(reminderSettings.wakeHour, reminderSettings.wakeMinute)}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </Card>
 
+      {/* Time Pickers */}
+      {showBedtimePicker && (
+        <DateTimePicker
+          value={new Date(0, 0, 0, reminderSettings.bedtimeHour, reminderSettings.bedtimeMinute)}
+          mode="time"
+          is24Hour={false}
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleBedtimeTimeChange}
+        />
+      )}
+
+      {showWakePicker && (
+        <DateTimePicker
+          value={new Date(0, 0, 0, reminderSettings.wakeHour, reminderSettings.wakeMinute)}
+          mode="time"
+          is24Hour={false}
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleWakeTimeChange}
+        />
+      )}
+
       <Text style={styles.note}>
-        Reminder times can be configured after enabling.
+        Notifications will be sent daily at the configured times.
       </Text>
     </View>
   );
@@ -214,5 +361,23 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     textAlign: 'center',
     marginTop: SPACING.sm,
+  },
+  timeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.sleep,
+    backgroundColor: `${COLORS.sleep}10`,
+    alignSelf: 'flex-start',
+    marginTop: SPACING.xs,
+  },
+  timeButtonText: {
+    fontSize: TYPOGRAPHY.size.sm,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    color: COLORS.sleep,
   },
 });
