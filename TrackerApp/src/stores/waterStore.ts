@@ -20,6 +20,7 @@ interface UndoEntry {
   logId: number;
   amount: number;
   previousTotal: number;
+  timestamp: number;
 }
 
 interface WaterState {
@@ -27,12 +28,12 @@ interface WaterState {
   dailyGoal: number;
   containers: WaterContainer[];
   logs: WaterLog[];
-  undoEntry: UndoEntry | null;
+  undoStack: UndoEntry[];
   undoTimer: ReturnType<typeof setTimeout> | null;
   setTodayTotal: (total: number) => void;
   setContainers: (containers: WaterContainer[]) => void;
   setLogs: (logs: WaterLog[]) => void;
-  setUndoEntry: (entry: UndoEntry | null) => void;
+  setUndoStack: (stack: UndoEntry[]) => void;
   setUndoTimer: (timer: ReturnType<typeof setTimeout> | null) => void;
 }
 
@@ -41,12 +42,12 @@ export const useWaterStore = create<WaterState>((set) => ({
   dailyGoal: 2400,
   containers: [],
   logs: [],
-  undoEntry: null,
+  undoStack: [],
   undoTimer: null,
   setTodayTotal: (total) => set({ todayTotal: total }),
   setContainers: (containers) => set({ containers }),
   setLogs: (logs) => set({ logs }),
-  setUndoEntry: (entry) => set({ undoEntry: entry }),
+  setUndoStack: (stack) => set({ undoStack: stack }),
   setUndoTimer: (timer) => set({ undoTimer: timer }),
 }));
 
@@ -114,24 +115,33 @@ export async function logWater(
       running_total: newTotal,
     };
 
+    // Add to undo stack (keep last 10 entries)
+    const newUndoEntry: UndoEntry = {
+      logId: result.lastInsertRowId,
+      amount: container.capacity_ml,
+      previousTotal: state.todayTotal,
+      timestamp: now,
+    };
+
+    const newStack = [...state.undoStack, newUndoEntry].slice(-10); // Keep max 10
+
     // Clear existing undo timer
     const { undoTimer } = state;
     if (undoTimer) clearTimeout(undoTimer);
 
-    // Set undo entry — expires after 5 seconds
+    // Set timer to clear old entries (older than 30 seconds)
     const timer = setTimeout(() => {
-      useWaterStore.getState().setUndoEntry(null);
-      useWaterStore.getState().setUndoTimer(null);
-    }, 5000);
+      const currentTime = Date.now();
+      const filteredStack = useWaterStore.getState().undoStack.filter(
+        (entry) => currentTime - entry.timestamp < 30000
+      );
+      useWaterStore.setState({ undoStack: filteredStack, undoTimer: null });
+    }, 30000);
 
     useWaterStore.setState({
       todayTotal: newTotal,
       logs: [...state.logs, newLog],
-      undoEntry: {
-        logId: result.lastInsertRowId,
-        amount: container.capacity_ml,
-        previousTotal: state.todayTotal,
-      },
+      undoStack: newStack,
       undoTimer: timer,
     });
   } catch (error) {
@@ -141,23 +151,26 @@ export async function logWater(
 }
 
 /**
- * Undo the last water log entry within the 5-second window.
+ * Undo the last water log entry within the 30-second window.
  */
 export async function undoLastLog(db: SQLiteDatabase): Promise<void> {
   const state = useWaterStore.getState();
-  const { undoEntry, undoTimer } = state;
+  const { undoStack } = state;
+  
+  // Get the most recent undo entry
+  const undoEntry = undoStack[undoStack.length - 1];
   if (!undoEntry) return;
 
   try {
     await db.runAsync('DELETE FROM water_logs WHERE id = ?', [undoEntry.logId]);
 
-    if (undoTimer) clearTimeout(undoTimer);
+    // Remove from stack
+    const newStack = undoStack.slice(0, -1);
 
     useWaterStore.setState({
       todayTotal: undoEntry.previousTotal,
       logs: state.logs.filter((l) => l.id !== undoEntry.logId),
-      undoEntry: null,
-      undoTimer: null,
+      undoStack: newStack,
     });
   } catch (error) {
     console.error('Failed to undo water log:', error);

@@ -23,7 +23,7 @@ interface WaterHomeCardProps {
 
 export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   const db = useSQLiteContext();
-  const { todayTotal, dailyGoal, containers, undoEntry } = useWaterStore();
+  const { todayTotal, dailyGoal, containers, undoStack } = useWaterStore();
 
   const toastAnim = useRef(new Animated.Value(0)).current;
   const toastVisible = useRef(false);
@@ -32,16 +32,17 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
     hydrateWaterStore(db);
   }, []);
 
-  // Animate toast in/out when undoEntry changes
+  // Animate toast in/out when undoStack changes
+  const hasUndo = undoStack.length > 0;
   useEffect(() => {
-    if (undoEntry && !toastVisible.current) {
+    if (hasUndo && !toastVisible.current) {
       toastVisible.current = true;
       Animated.timing(toastAnim, {
         toValue: 1,
         duration: 250,
         useNativeDriver: true,
       }).start();
-    } else if (!undoEntry && toastVisible.current) {
+    } else if (!hasUndo && toastVisible.current) {
       Animated.timing(toastAnim, {
         toValue: 0,
         duration: 200,
@@ -50,7 +51,7 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
         toastVisible.current = false;
       });
     }
-  }, [undoEntry]);
+  }, [hasUndo]);
 
   async function handleLog(container: typeof containers[0]) {
     try {
@@ -135,9 +136,13 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
               ],
             },
           ]}
-          pointerEvents={undoEntry ? 'auto' : 'none'}
+          pointerEvents={hasUndo ? 'auto' : 'none'}
         >
-          <Text style={styles.toastText}>Water logged</Text>
+          <Text style={styles.toastText}>
+            {undoStack.length === 1 
+              ? 'Water logged' 
+              : `${undoStack.length} logs (${undoStack.reduce((sum, e) => sum + e.amount, 0)}ml)`}
+          </Text>
           <TouchableOpacity onPress={handleUndo} hitSlop={8}>
             <Text style={styles.toastUndo}>Undo</Text>
           </TouchableOpacity>
