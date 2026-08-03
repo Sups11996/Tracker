@@ -108,6 +108,7 @@ export async function scheduleBedtimeReminder(
         sound: true,
       },
       trigger: {
+        type: 'calendar',
         hour,
         minute,
         repeats: true,
@@ -141,6 +142,7 @@ export async function scheduleWakeReminder(
         sound: true,
       },
       trigger: {
+        type: 'calendar',
         hour,
         minute,
         repeats: true,
