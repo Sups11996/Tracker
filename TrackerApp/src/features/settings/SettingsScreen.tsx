@@ -196,7 +196,7 @@ export function SettingsScreen() {
                         key={option}
                         style={[
                           styles.genderChip,
-                          profileForm.username && profile.gender === option && styles.genderChipActive
+                          profile.gender === option && styles.genderChipActive
                         ]}
                         onPress={() => {
                           setProfile({ ...profile, gender: option });
