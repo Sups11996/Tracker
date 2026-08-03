@@ -84,11 +84,10 @@ const styles = StyleSheet.create({
   noBlurShell: {
     backgroundColor: 'rgba(255,255,255,0.07)',
   },
-  /** Semi-transparent white tint on top of the blur */
+  /** Content container - no background, just padding */
   tint: {
-    backgroundColor: GLASS.cardBg,
+    backgroundColor: 'transparent', // Removed white tint
     padding: SPACING.xl,
-    // No border here — border lives on the shell (BlurView)
     overflow: 'hidden',
   },
 });
