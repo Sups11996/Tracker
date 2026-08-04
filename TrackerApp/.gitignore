@@ -37,6 +37,11 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# temporary/build folders
+temp_build/
+build/
+dist/
+
 # internal
 BUILDPLAN.md
 
