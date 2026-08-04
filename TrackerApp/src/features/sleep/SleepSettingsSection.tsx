@@ -295,7 +295,7 @@ export function SleepSettingsSection() {
           mode="time"
           is24Hour={false}
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleBedtimeTimeChange}
+          onValueChange={handleBedtimeTimeChange}
         />
       )}
 
@@ -305,7 +305,7 @@ export function SleepSettingsSection() {
           mode="time"
           is24Hour={false}
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={handleWakeTimeChange}
+          onValueChange={handleWakeTimeChange}
         />
       )}
 
