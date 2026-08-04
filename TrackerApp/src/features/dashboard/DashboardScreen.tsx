@@ -14,6 +14,7 @@ import { SleepDashboard } from '../sleep/SleepDashboard';
 import { WaterDashboard } from '../water/WaterDashboard';
 import { CaloriesDashboard } from '../calories/CaloriesDashboard';
 import { AbcDashboard } from '../abc/AbcDashboard';
+import { SkeletonCard } from '../../components/ui/SkeletonCard';
 import { useUserStore } from '../../stores';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../constants';
 import type { MainTabParamList, DashboardTab } from '../../types/navigation';
@@ -33,6 +34,9 @@ export function DashboardScreen() {
   const isFocused = useIsFocused();
   const { profile } = useUserStore();
   const tabBarHeight = useBottomTabBarHeight();
+  
+  // Loading state for smooth transitions
+  const [isLoading, setIsLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<Tab>(route.params?.tab ?? 'steps');
 
@@ -42,6 +46,15 @@ export function DashboardScreen() {
       setActiveTab(route.params.tab);
     }
   }, [isFocused, route.params?.tab]);
+
+  // Simulate loading delay for smooth skeleton transition
+  useEffect(() => {
+    if (isFocused) {
+      setIsLoading(true);
+      const timer = setTimeout(() => setIsLoading(false), 100); // Reduced from 150ms
+      return () => clearTimeout(timer);
+    }
+  }, [isFocused, activeTab]);
 
   // Hide ABC tab if not enabled, hide Calories if gym off
   const visibleTabs = ALL_TABS.filter(t => {
@@ -85,11 +98,21 @@ export function DashboardScreen() {
       <View style={[styles.activeBar, { backgroundColor: activeColor }]} />
 
       {/* Dashboard content */}
-      {activeTab === 'steps'    && <StepDashboard />}
-      {activeTab === 'sleep'    && <SleepDashboard />}
-      {activeTab === 'water'    && <WaterDashboard />}
-      {activeTab === 'calories' && <CaloriesDashboard />}
-      {activeTab === 'abc'      && <AbcDashboard />}
+      {isLoading ? (
+        <View style={{ flex: 1, padding: SPACING.xl, gap: SPACING.lg }}>
+          <SkeletonCard lines={4} height={200} />
+          <SkeletonCard lines={3} height={150} />
+          <SkeletonCard lines={2} height={100} />
+        </View>
+      ) : (
+        <>
+          {activeTab === 'steps'    && <StepDashboard />}
+          {activeTab === 'sleep'    && <SleepDashboard />}
+          {activeTab === 'water'    && <WaterDashboard />}
+          {activeTab === 'calories' && <CaloriesDashboard />}
+          {activeTab === 'abc'      && <AbcDashboard />}
+        </>
+      )}
     </SafeAreaView>
   );
 }

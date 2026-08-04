@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
+import { useIsFocused } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useUserStore } from '../../stores';
 import { hydrateStepStore } from '../../stores/stepStore';
@@ -41,7 +42,20 @@ export function HomeScreen() {
   const db = useSQLiteContext();
   const [refreshing, setRefreshing] = useState(false);
   const isReady = useAppReady();
+  const isFocused = useIsFocused();
   const tabBarHeight = useBottomTabBarHeight();
+  
+  // Loading state for smooth transitions (similar to Dashboard/Settings)
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Show skeleton when first mounting or when returning to tab
+  useEffect(() => {
+    if (isFocused) {
+      setIsLoading(true);
+      const timer = setTimeout(() => setIsLoading(false), 100); // Reduced from 150ms
+      return () => clearTimeout(timer);
+    }
+  }, [isFocused]);
 
   // Start step tracking service on mount (Android only)
   useEffect(() => {
@@ -123,7 +137,8 @@ export function HomeScreen() {
         </View>
 
         {/* Feature cards — each taps to its dashboard tab */}
-        {!isReady ? (
+        {/* Show skeleton shimmer cards while hydrating OR during tab transitions */}
+        {(!isReady || isLoading) ? (
           // Show skeleton shimmer cards while hydrating
           <>
             <SkeletonCard lines={4} height={160} />

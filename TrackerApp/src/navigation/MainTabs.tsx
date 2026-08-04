@@ -1,8 +1,9 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { BlurView } from 'expo-blur';
 import { BarChart2, Home, Settings } from 'lucide-react-native';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { HomeScreen } from '../features/home/HomeScreen';
 import { DashboardScreen } from '../features/dashboard/DashboardScreen';
 import { SettingsScreen } from '../features/settings/SettingsScreen';
@@ -22,10 +23,97 @@ const ICON_SIZE = 22;
  */
 function TabBarBackground() {
   return (
-    <BlurView intensity={GLASS.blurNav} tint="dark" style={StyleSheet.absoluteFill}>
+    <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill}>
       {/* Tint layer — mirrors Card's tint */}
       <View style={styles.tabBarTint} />
     </BlurView>
+  );
+}
+
+/**
+ * Custom tab bar with instant color switching on tap
+ */
+function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  // Local state for instant visual feedback on press
+  const [pressedIndex, setPressedIndex] = useState<number | null>(null);
+
+  // Clear pressed state when navigation state actually changes
+  useEffect(() => {
+    setPressedIndex(null);
+  }, [state.index]);
+
+  return (
+    <View style={styles.tabBarContainer}>
+      <TabBarBackground />
+      <View style={styles.tabBarContent}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const isFocused = state.index === index;
+          
+          // Show active ONLY if pressed (instant) or focused (after nav completes)
+          // NOT both at once - this ensures previous tab turns gray instantly
+          const isActive = pressedIndex !== null 
+            ? pressedIndex === index  // During press, only pressed tab is active
+            : isFocused;               // After press, only focused tab is active
+
+          const onPressIn = () => {
+            // INSTANT visual feedback - clear previous and set new
+            setPressedIndex(index);
+          };
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+            // No timeout needed - useEffect handles clearing pressed state
+          };
+
+          // Get icon and label
+          let icon = null;
+          let label = route.name;
+          
+          if (route.name === 'Home') {
+            icon = <Home size={ICON_SIZE} color={isActive ? COLORS.white : COLORS.textMuted} strokeWidth={isActive ? 2.2 : 1.6} />;
+            label = 'Home';
+          } else if (route.name === 'Dashboard') {
+            icon = <BarChart2 size={ICON_SIZE} color={isActive ? COLORS.white : COLORS.textMuted} strokeWidth={isActive ? 2.2 : 1.6} />;
+            label = 'Dashboard';
+          } else if (route.name === 'Settings') {
+            icon = <Settings size={ICON_SIZE} color={isActive ? COLORS.white : COLORS.textMuted} strokeWidth={isActive ? 2.2 : 1.6} />;
+            label = 'Settings';
+          }
+
+          return (
+            <TouchableOpacity
+              key={route.key}
+              accessibilityRole="button"
+              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityLabel={options.tabBarAccessibilityLabel}
+              testID={options.tabBarTestID}
+              onPressIn={onPressIn}
+              onPress={onPress}
+              style={styles.tabButton}
+              activeOpacity={1}
+              delayPressIn={0}
+            >
+              <View style={styles.iconWrap}>{icon}</View>
+              <Text style={[
+                styles.tabLabel,
+                { color: isActive ? COLORS.white : COLORS.textMuted }
+              ]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -35,73 +123,26 @@ export function MainTabs() {
   return (
     <AppReadyProvider isReady={isReady}>
       <Tab.Navigator
+        tabBar={props => <CustomTabBar {...props} />}
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: COLORS.textPrimary,
-          tabBarInactiveTintColor: COLORS.textMuted,
-          tabBarBackground: () => <TabBarBackground />,
-          tabBarStyle: {
-            position: 'absolute',
-            // Fully transparent — blur + tint layer do all the work
-            backgroundColor: 'transparent',
-            borderTopColor: GLASS.border,
-            borderTopWidth: 1,
-            height: 64,
-            paddingBottom: 10,
-            paddingTop: 8,
-            elevation: 0,
-          },
-          tabBarLabelStyle: {
-            fontSize: TYPOGRAPHY.size.xs,
-            fontWeight: TYPOGRAPHY.weight.semibold,
-            letterSpacing: 0.2,
-          },
+          // Performance optimizations for instant tab switching
+          lazy: true, // Use lazy loading with skeleton states
+          tabBarHideOnKeyboard: true,
+          unmountOnBlur: false, // Keep screens mounted for faster switching
+          freezeOnBlur: true, // Freeze background screens to save resources
         }}
       >
-        <Tab.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{
-            tabBarLabel: 'Home',
-            tabBarIcon: ({ color, focused }) => (
-              <TabIcon focused={focused} color={color}>
-                <Home size={ICON_SIZE} color={color} strokeWidth={focused ? 2.2 : 1.6} />
-              </TabIcon>
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Dashboard"
-          component={DashboardScreen}
-          options={{
-            tabBarLabel: 'Dashboard',
-            tabBarIcon: ({ color, focused }) => (
-              <TabIcon focused={focused} color={color}>
-                <BarChart2 size={ICON_SIZE} color={color} strokeWidth={focused ? 2.2 : 1.6} />
-              </TabIcon>
-            ),
-          }}
-        />
-        <Tab.Screen
-          name="Settings"
-          component={SettingsScreen}
-          options={{
-            tabBarLabel: 'Settings',
-            tabBarIcon: ({ color, focused }) => (
-              <TabIcon focused={focused} color={color}>
-                <Settings size={ICON_SIZE} color={color} strokeWidth={focused ? 2.2 : 1.6} />
-              </TabIcon>
-            ),
-          }}
-        />
+        <Tab.Screen name="Home" component={HomeScreen} />
+        <Tab.Screen name="Dashboard" component={DashboardScreen} />
+        <Tab.Screen name="Settings" component={SettingsScreen} />
       </Tab.Navigator>
     </AppReadyProvider>
   );
 }
 
 /**
- * Icon wrapper — adds a pill highlight behind the active icon.
- * The pill is a small glass surface itself: subtle bg + the accent of the icon colour.
+ * Icon wrapper — simplified, no background needed
  */
 function TabIcon({
   children,
@@ -112,22 +153,36 @@ function TabIcon({
   focused: boolean;
   color: string;
 }) {
-  if (!focused) return <View style={styles.iconWrap}>{children}</View>;
-
-  return (
-    <View
-      style={[
-        styles.iconWrap,
-        styles.iconWrapActive,
-        { backgroundColor: `${color}18`, borderColor: `${color}30` },
-      ]}
-    >
-      {children}
-    </View>
-  );
+  return <View style={styles.iconWrap}>{children}</View>;
 }
 
 const styles = StyleSheet.create({
+  tabBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 64,
+    borderTopWidth: 1,
+    borderTopColor: GLASS.border,
+  },
+  tabBarContent: {
+    flex: 1,
+    flexDirection: 'row',
+    paddingBottom: 10,
+    paddingTop: 8,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  tabLabel: {
+    fontSize: TYPOGRAPHY.size.xs,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    letterSpacing: 0.2,
+  },
   tabBarTint: {
     position: 'absolute',
     top: 0, left: 0, right: 0, bottom: 0,
@@ -139,8 +194,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 14,
-  },
-  iconWrapActive: {
-    borderWidth: 1,
   },
 });

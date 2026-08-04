@@ -13,6 +13,7 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useIsFocused } from '@react-navigation/native';
 import { ScreenWrapper } from '../../components/ui/ScreenWrapper';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -32,6 +33,7 @@ import { SleepSettingsSection } from '../sleep/SleepSettingsSection';
 import { WaterSettingsSection } from '../water/WaterSettingsSection';
 import { CaloriesSettingsSection } from '../calories/CaloriesSettingsSection';
 import { AbcSettingsSection } from '../abc/AbcSettingsSection';
+import { SkeletonCard } from '../../components/ui/SkeletonCard';
 import {
   hydrateStepStore,
   hydrateSleepStore,
@@ -46,6 +48,19 @@ export function SettingsScreen() {
   const { profile, setProfile } = useUserStore();
   const { showSuccess, showError, showConfirm } = useCustomAlert();
   const tabBarHeight = useBottomTabBarHeight();
+  const isFocused = useIsFocused();
+  
+  // Loading state for smooth transitions
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Simulate loading delay for smooth skeleton transition
+  useEffect(() => {
+    if (isFocused) {
+      setIsLoading(true);
+      const timer = setTimeout(() => setIsLoading(false), 100); // Reduced from 120ms
+      return () => clearTimeout(timer);
+    }
+  }, [isFocused]);
 
   // Profile editing state
   const [editingProfile, setEditingProfile] = useState(false);
@@ -127,11 +142,21 @@ export function SettingsScreen() {
       >
         <Text style={styles.title}>Settings</Text>
         
-        {/* Profile Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Profile</Text>
+        {isLoading ? (
+          <View style={styles.section}>
+            <SkeletonCard lines={2} height={80} />
+            <SkeletonCard lines={4} height={160} />
+            <SkeletonCard lines={3} height={120} />
+            <SkeletonCard lines={3} height={120} />
+            <SkeletonCard lines={2} height={80} />
           </View>
+        ) : (
+          <>
+            {/* Profile Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Profile</Text>
+              </View>
 
           <Card style={styles.card}>
             {editingProfile ? (
@@ -359,6 +384,8 @@ export function SettingsScreen() {
             </View>
           </Card>
         </View>
+          </>
+        )}
       </ScrollView>
     </ScreenWrapper>
   );
