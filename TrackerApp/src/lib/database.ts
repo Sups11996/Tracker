@@ -151,36 +151,6 @@ export async function initDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
     );
   `);
 
-  // ── Screen Time (Disabled - feature not implemented) ───────────────────────
-  // Uncomment if you want to implement screen time tracking in the future
-  /*
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS app_usage_sessions (
-      id           INTEGER PRIMARY KEY AUTOINCREMENT,
-      date         TEXT NOT NULL,
-      package_name TEXT NOT NULL,
-      app_name     TEXT NOT NULL,
-      start_time   INTEGER NOT NULL,
-      end_time     INTEGER NOT NULL,
-      duration_ms  INTEGER NOT NULL,
-      created_at   INTEGER NOT NULL
-    );
-  `);
-
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS screen_time_daily_summary (
-      id               INTEGER PRIMARY KEY AUTOINCREMENT,
-      date             TEXT NOT NULL UNIQUE,
-      total_screen_ms  INTEGER NOT NULL DEFAULT 0,
-      unlock_count     INTEGER NOT NULL DEFAULT 0,
-      top_app_package  TEXT,
-      top_app_name     TEXT,
-      top_app_duration INTEGER NOT NULL DEFAULT 0,
-      created_at       INTEGER NOT NULL,
-      updated_at       INTEGER NOT NULL
-    );
-  `);
-  */
   // ── ABC ─────────────────────────────────────────────────────────────────────
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS abc_logs (
