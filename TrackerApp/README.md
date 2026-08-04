@@ -2,25 +2,25 @@
 
 A beautiful, privacy-focused Android app that tracks your daily health metrics **completely offline** - no accounts, no servers, no data collection.
 
-## 🎯 The Problem with Other Apps
+## The Problem with Other Apps
 
 Most health tracking apps force you to:
-- ❌ Create accounts and share personal data
-- ❌ Pay for basic features via subscriptions
-- ❌ Deal with ads and tracking
-- ❌ Use separate apps for each metric (steps, water, sleep, etc.)
-- ❌ Sync data to cloud servers you don't control
-- ❌ Accept slow, cluttered interfaces
+- Create accounts and share personal data
+- Pay for basic features via subscriptions
+- Deal with ads and tracking
+- Use separate apps for each metric (steps, water, sleep, etc.)
+- Sync data to cloud servers you don't control
+- Accept slow, cluttered interfaces
 
-## ✨ What Makes Tracker Different
+## What Makes Tracker Different
 
-### 🔐 **100% Private & Offline**
+### 100% Private & Offline
 - No account required - your data never leaves your phone
 - No internet permission - completely offline
 - No tracking, no analytics, no data collection
 - All data stored locally in SQLite database
 
-### 📊 **All-in-One Tracking**
+### All-in-One Tracking
 Track everything in one beautiful app:
 - **Steps** - Background step counting with foreground service
 - **Sleep** - Track sleep sessions with quality and latency metrics
@@ -28,26 +28,26 @@ Track everything in one beautiful app:
 - **Calories** - Track workouts and calorie burn
 - **ABC Tracking** - Custom activity/behavior/condition logging
 
-### ⚡ **Blazing Fast Performance**
+### Blazing Fast Performance
 - Instant tab switching with smooth skeleton loading
 - Custom-built tab bar for zero-lag UI responses
 - Optimized rendering with glass morphism design
 - Near-instant screen transitions (100ms)
 
-### 🎨 **Beautiful Dark Theme**
+### Beautiful Dark Theme
 - Modern glass morphism UI design
 - Smooth animations and transitions
 - Clean, minimalist interface
 - No clutter, no ads, no distractions
 
-### 🎯 **Smart Features**
+### Smart Features
 - **Background step tracking** - Counts steps even when app is closed
 - **Custom water containers** - Add your bottle/cup sizes for quick logging
 - **Sleep reminders** - Optional bedtime and wake-up notifications
 - **ABC system** - Track personal habits/activities with customizable logging
 - **Data export** - Your data, your control
 
-## 📱 Installation
+## Installation
 
 ### Option 1: Download Pre-built APK (Easiest)
 1. Go to [Releases](https://github.com/Sups11996/Tracker/releases)
@@ -83,7 +83,7 @@ bash build-apk.sh
 - Cloud: Upload to Google Drive/Dropbox and download on phone
 - Messaging: Send via WhatsApp/Telegram to yourself
 
-## 🚀 Features
+## Features
 
 ### Step Tracking
 - Real-time step counting with foreground service
@@ -119,7 +119,7 @@ bash build-apk.sh
 - Daily tracking with timestamps
 - Weekly pattern visualization
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Framework:** React Native + Expo
 - **Database:** SQLite (expo-sqlite)
@@ -129,7 +129,7 @@ bash build-apk.sh
 - **Native:** Android foreground service for step tracking
 - **Language:** TypeScript
 
-## 📊 Data & Privacy
+## Data & Privacy
 
 - **100% Local Storage** - All data stored in device SQLite database
 - **No Internet Required** - App works completely offline
@@ -137,14 +137,14 @@ bash build-apk.sh
 - **Your Data** - Export/import functionality for full control
 - **Open Source** - Code is public, verify for yourself
 
-## ⚙️ Permissions Required
+## Permissions Required
 
 - **Activity Recognition** - Count steps in background
 - **Foreground Service** - Keep step counter running
 - **Notifications** - Display step count in notification
 - **Battery Optimization** - Optional, for consistent step tracking
 
-## 🎯 Roadmap
+## Roadmap
 
 - [ ] Data export (CSV/JSON)
 - [ ] Data import/restore
@@ -154,7 +154,7 @@ bash build-apk.sh
 - [ ] Custom themes
 - [ ] iOS support
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Feel free to:
 - Report bugs via [Issues](https://github.com/Sups11996/Tracker/issues)
@@ -162,11 +162,11 @@ Contributions are welcome! Feel free to:
 - Submit pull requests
 - Improve documentation
 
-## 📄 License
+## License
 
 This project is open source and available under the [MIT License](LICENSE).
 
-## 💡 Why I Built This
+## Why I Built This
 
 Tired of subscription-based health apps that track you more than your health? I wanted:
 - A simple, all-in-one tracker
@@ -176,12 +176,12 @@ Tired of subscription-based health apps that track you more than your health? I 
 
 So I built it. Now it's yours to use, free forever.
 
-## 📧 Support
+## Support
 
 Found a bug? Have a feature request?
 - Open an [Issue](https://github.com/Sups11996/Tracker/issues)
-- Star ⭐ the repo if you find it useful!
+- Star the repo if you find it useful!
 
 ---
 
-**Made with ❤️ for privacy-conscious health enthusiasts**
+**Made with care for privacy-conscious health enthusiasts**
