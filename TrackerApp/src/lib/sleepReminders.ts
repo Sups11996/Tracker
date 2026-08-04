@@ -124,8 +124,6 @@ export async function scheduleBedtimeReminder(
         repeats: true,
       },
     });
-
-    console.log(`✅ Bedtime reminder scheduled for ${hour}:${minute.toString().padStart(2, '0')}`);
   } catch (error) {
     throw error;
   }
@@ -167,8 +165,6 @@ export async function scheduleWakeReminder(
         repeats: true,
       },
     });
-
-    console.log(`✅ Wake reminder scheduled for ${hour}:${minute.toString().padStart(2, '0')}`);
   } catch (error) {
     throw error;
   }
