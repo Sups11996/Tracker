@@ -151,7 +151,9 @@ export async function initDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
     );
   `);
 
-  // ── Screen Time ─────────────────────────────────────────────────────────────
+  // ── Screen Time (Disabled - feature not implemented) ───────────────────────
+  // Uncomment if you want to implement screen time tracking in the future
+  /*
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS app_usage_sessions (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -178,7 +180,7 @@ export async function initDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
       updated_at       INTEGER NOT NULL
     );
   `);
-
+  */
   // ── ABC ─────────────────────────────────────────────────────────────────────
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS abc_logs (

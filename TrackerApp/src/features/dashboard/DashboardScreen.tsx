@@ -89,7 +89,6 @@ export function DashboardScreen() {
       {activeTab === 'sleep'    && <SleepDashboard />}
       {activeTab === 'water'    && <WaterDashboard />}
       {activeTab === 'calories' && <CaloriesDashboard />}
-      {activeTab === 'screen'   && <ScreenTimeDashboard />}
       {activeTab === 'abc'      && <AbcDashboard />}
     </SafeAreaView>
   );

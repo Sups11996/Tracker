@@ -24,7 +24,6 @@ export const COLORS = {
   sleep:      '#7B6FA0',   // dusty lavender
   water:      '#5B7FA6',   // slate blue
   calories:   '#A08050',   // muted amber
-  screenTime: '#5C6B9E',   // soft indigo
   abc:        '#A06070',   // muted rose
 
   // Status
