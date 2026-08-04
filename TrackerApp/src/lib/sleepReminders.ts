@@ -127,7 +127,6 @@ export async function scheduleBedtimeReminder(
 
     console.log(`✅ Bedtime reminder scheduled for ${hour}:${minute.toString().padStart(2, '0')}`);
   } catch (error) {
-    console.error('Failed to schedule bedtime reminder:', error);
     throw error;
   }
 }
@@ -171,7 +170,6 @@ export async function scheduleWakeReminder(
 
     console.log(`✅ Wake reminder scheduled for ${hour}:${minute.toString().padStart(2, '0')}`);
   } catch (error) {
-    console.error('Failed to schedule wake reminder:', error);
     throw error;
   }
 }
@@ -182,7 +180,6 @@ export async function scheduleWakeReminder(
 export async function cancelBedtimeReminder(): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(BEDTIME_NOTIFICATION_ID);
-    console.log('❌ Bedtime reminder cancelled');
   } catch (error) {
     console.error('Failed to cancel bedtime reminder:', error);
   }
@@ -194,7 +191,6 @@ export async function cancelBedtimeReminder(): Promise<void> {
 export async function cancelWakeReminder(): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(WAKE_NOTIFICATION_ID);
-    console.log('❌ Wake reminder cancelled');
   } catch (error) {
     console.error('Failed to cancel wake reminder:', error);
   }

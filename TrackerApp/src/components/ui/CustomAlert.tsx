@@ -9,7 +9,7 @@ import {
   Animated,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { CheckCircle2, AlertTriangle, X } from 'lucide-react-native';
+import { CheckCircle2, AlertTriangle } from 'lucide-react-native';
 import { COLORS, GLASS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 interface AlertAction {

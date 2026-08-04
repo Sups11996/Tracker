@@ -32,20 +32,18 @@ export function useAppHydration(): { isReady: boolean } {
   async function handleDateChangeIfNeeded() {
     const dateChanged = await checkDateChanged(db);
     if (dateChanged) {
-      console.log('📅 Date changed detected - resetting daily counters');
-      
       // Reset step counter in store
       useStepStore.setState({ todaySteps: 0, todayDistance: 0, todayCalories: 0 });
-      
+
       // Reset water in store
       useWaterStore.setState({ todayTotal: 0, logs: [], undoStack: [] });
-      
+
       // Tell native step service to reset
       if (StepServiceModule) {
         try {
           await StepServiceModule.sendAction('reset');
         } catch (error) {
-          console.warn('Failed to reset step service:', error);
+          // Silent fail - non-critical
         }
       }
       
@@ -64,7 +62,7 @@ export function useAppHydration(): { isReady: boolean } {
         profile?.uses_abc ? hydrateAbcStore(db) : Promise.resolve(),
       ]);
     } catch (e) {
-      console.warn('[useAppHydration] hydration error:', e);
+      // Silent fail - app will retry on next focus
     }
   }
 

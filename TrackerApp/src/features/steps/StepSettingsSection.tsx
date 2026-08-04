@@ -44,27 +44,19 @@ export function StepSettingsSection() {
 
   async function handleToggleTracking(enabled: boolean) {
     setTrackingEnabled(enabled);
-    
-    if (Platform.OS !== 'android' || !StepServiceModule) {
-      console.warn('Step service not available on this platform');
-      return;
-    }
+
+    if (Platform.OS !== 'android' || !StepServiceModule) return;
 
     try {
       if (enabled) {
-        // Start the service
         await StepServiceModule.startService();
         useStepStore.getState().setStatus('tracking');
-        console.log('✅ Step tracking started');
       } else {
-        // Stop the service completely
         await StepServiceModule.stopService();
         useStepStore.getState().setStatus('unavailable');
-        console.log('🛑 Step tracking stopped');
       }
     } catch (error) {
       console.error('Failed to toggle step tracking:', error);
-      // Revert UI state on error
       setTrackingEnabled(!enabled);
     }
   }

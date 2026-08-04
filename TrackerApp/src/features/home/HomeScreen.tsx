@@ -46,43 +46,25 @@ export function HomeScreen() {
   // Start step tracking service on mount (Android only)
   useEffect(() => {
     async function startTracking() {
-      console.log('🔍 Platform:', Platform.OS);
-      console.log('🔍 StepServiceModule:', StepServiceModule);
-      
-      if (Platform.OS !== 'android') {
-        console.log('❌ Not Android, skipping service start');
-        return;
-      }
-      
-      if (!StepServiceModule) {
-        console.error('❌ StepServiceModule is null/undefined!');
-        return;
-      }
-      
+      if (Platform.OS !== 'android') return;
+      if (!StepServiceModule) return;
+
       try {
-        // Wait a bit for database initialization to complete
+        // Wait for database initialization to complete
         await new Promise(resolve => setTimeout(resolve, 1500));
-        
+
         // Check if notification permission granted (required for foreground service)
         const Notifications = require('expo-notifications');
         const { status } = await Notifications.getPermissionsAsync();
-        
-        console.log('🔍 Notification permission status:', status);
-        
-        if (status !== 'granted') {
-          console.log('❌ Notification permission not granted, cannot start foreground service');
-          return;
-        }
-        
-        console.log('✅ Starting step tracking service...');
+
+        if (status !== 'granted') return;
+
         await StepServiceModule.startService();
-        console.log('✅ Step tracking service started successfully');
       } catch (error) {
-        console.error('❌ Failed to start step service:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
+        // Step service failed to start - silently continue
       }
     }
-    
+
     startTracking();
   }, []);
 
