@@ -14,8 +14,9 @@ export function AbcSettingsSection() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   async function handleAbcToggle(enabled: boolean) {
-    // Optimistically update UI first
+    // Optimistically update UI first — cascade summary off if abc goes off
     setAbcEnabled(enabled);
+    if (!enabled) setNotificationsEnabled(false);
     
     try {
       await db.runAsync(
@@ -30,6 +31,7 @@ export function AbcSettingsSection() {
       console.error('Failed to update ABC setting:', e);
       // Revert on error
       setAbcEnabled(!enabled);
+      if (!enabled) setNotificationsEnabled(true);
     }
   }
 

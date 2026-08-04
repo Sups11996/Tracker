@@ -25,18 +25,20 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   const db = useSQLiteContext();
   const { todayTotal, dailyGoal, containers, undoStack } = useWaterStore();
 
-  const toastAnim = useRef(new Animated.Value(0)).current;
-  const toastVisible = useRef(false);
-
   useEffect(() => {
     hydrateWaterStore(db);
   }, []);
+
+  const toastAnim = useRef(new Animated.Value(0)).current;
+  const toastVisible = useRef(false);
+  const [toastMounted, setToastMounted] = React.useState(false);
 
   // Animate toast in/out when undoStack changes
   const hasUndo = undoStack.length > 0;
   useEffect(() => {
     if (hasUndo && !toastVisible.current) {
       toastVisible.current = true;
+      setToastMounted(true);
       Animated.timing(toastAnim, {
         toValue: 1,
         duration: 250,
@@ -49,6 +51,7 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
         useNativeDriver: true,
       }).start(() => {
         toastVisible.current = false;
+        setToastMounted(false);
       });
     }
   }, [hasUndo]);
@@ -120,33 +123,35 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
           </Text>
         )}
 
-        {/* Undo toast */}
-        <Animated.View
-          style={[
-            styles.toast,
-            {
-              opacity: toastAnim,
-              transform: [
-                {
-                  translateY: toastAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [10, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-          pointerEvents={hasUndo ? 'auto' : 'none'}
-        >
-          <Text style={styles.toastText}>
-            {undoStack.length === 1 
-              ? 'Water logged' 
-              : `${undoStack.length} logs (${undoStack.reduce((sum, e) => sum + e.amount, 0)}ml)`}
-          </Text>
-          <TouchableOpacity onPress={handleUndo} hitSlop={8}>
-            <Text style={styles.toastUndo}>Undo</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        {/* Undo toast — only mounted when there's something to undo */}
+        {toastMounted && (
+          <Animated.View
+            style={[
+              styles.toast,
+              {
+                opacity: toastAnim,
+                transform: [
+                  {
+                    translateY: toastAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [10, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            pointerEvents={hasUndo ? 'auto' : 'none'}
+          >
+            <Text style={styles.toastText}>
+              {undoStack.length === 1
+                ? 'Water logged'
+                : `${undoStack.length} logs (${undoStack.reduce((sum, e) => sum + e.amount, 0)}ml)`}
+            </Text>
+            <TouchableOpacity onPress={handleUndo} hitSlop={8}>
+              <Text style={styles.toastUndo}>Undo</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
       </Card>
     </TouchableOpacity>
   );

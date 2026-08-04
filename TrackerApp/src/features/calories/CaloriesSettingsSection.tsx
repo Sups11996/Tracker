@@ -14,8 +14,9 @@ export function CaloriesSettingsSection() {
   const [reminderEnabled, setReminderEnabled] = useState(false);
 
   async function handleGymToggle(enabled: boolean) {
-    // Optimistically update UI first
+    // Optimistically update UI first — cascade reminder off if gym goes off
     setGymEnabled(enabled);
+    if (!enabled) setReminderEnabled(false);
     
     try {
       await db.runAsync(
@@ -30,6 +31,7 @@ export function CaloriesSettingsSection() {
       console.error('Failed to update gym setting:', e);
       // Revert on error
       setGymEnabled(!enabled);
+      if (!enabled) setReminderEnabled(true);
     }
   }
 

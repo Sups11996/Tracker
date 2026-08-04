@@ -22,9 +22,6 @@ const DEFAULT_SETTINGS: SleepReminderSettings = {
 const BEDTIME_NOTIFICATION_ID = 'sleep_bedtime_reminder';
 const WAKE_NOTIFICATION_ID = 'sleep_wake_reminder';
 
-/**
- * Load sleep reminder settings from database
- */
 export async function loadSleepReminderSettings(
   db: SQLite.SQLiteDatabase
 ): Promise<SleepReminderSettings> {
@@ -65,23 +62,36 @@ export async function loadSleepReminderSettings(
   }
 }
 
-/**
- * Save sleep reminder settings to database
- */
 export async function saveSleepReminderSettings(
   db: SQLite.SQLiteDatabase,
   settings: SleepReminderSettings
 ): Promise<void> {
   try {
-    await db.execAsync(`
-      INSERT OR REPLACE INTO kv_store (key, value) VALUES
-        ('sleep_reminder_bedtime_enabled', '${settings.bedtimeEnabled ? '1' : '0'}'),
-        ('sleep_reminder_bedtime_hour', '${settings.bedtimeHour}'),
-        ('sleep_reminder_bedtime_minute', '${settings.bedtimeMinute}'),
-        ('sleep_reminder_wake_enabled', '${settings.wakeEnabled ? '1' : '0'}'),
-        ('sleep_reminder_wake_hour', '${settings.wakeHour}'),
-        ('sleep_reminder_wake_minute', '${settings.wakeMinute}');
-    `);
+    // Use individual INSERT statements instead of execAsync to ensure proper persistence
+    await db.runAsync(
+      'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+      ['sleep_reminder_bedtime_enabled', settings.bedtimeEnabled ? '1' : '0']
+    );
+    await db.runAsync(
+      'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+      ['sleep_reminder_bedtime_hour', settings.bedtimeHour.toString()]
+    );
+    await db.runAsync(
+      'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+      ['sleep_reminder_bedtime_minute', settings.bedtimeMinute.toString()]
+    );
+    await db.runAsync(
+      'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+      ['sleep_reminder_wake_enabled', settings.wakeEnabled ? '1' : '0']
+    );
+    await db.runAsync(
+      'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+      ['sleep_reminder_wake_hour', settings.wakeHour.toString()]
+    );
+    await db.runAsync(
+      'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+      ['sleep_reminder_wake_minute', settings.wakeMinute.toString()]
+    );
   } catch (error) {
     console.error('Failed to save sleep reminder settings:', error);
     throw error;

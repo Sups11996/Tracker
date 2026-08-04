@@ -27,6 +27,7 @@ export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
 
   const toastAnim = useRef(new Animated.Value(0)).current;
   const toastVisible = useRef(false);
+  const [toastMounted, setToastMounted] = React.useState(false);
 
   useEffect(() => {
     hydrateAbcStore(db);
@@ -36,6 +37,7 @@ export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
   useEffect(() => {
     if (undoEntry && !toastVisible.current) {
       toastVisible.current = true;
+      setToastMounted(true);
       Animated.timing(toastAnim, {
         toValue: 1,
         duration: 250,
@@ -48,6 +50,7 @@ export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
         useNativeDriver: true,
       }).start(() => {
         toastVisible.current = false;
+        setToastMounted(false);
       });
     }
   }, [undoEntry]);
@@ -107,31 +110,33 @@ export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
           <Text style={styles.addBtnText}>Add ABC</Text>
         </TouchableOpacity>
 
-        {/* Undo toast */}
-        <Animated.View
-          style={[
-            styles.toast,
-            {
-              opacity: toastAnim,
-              transform: [
-                {
-                  translateY: toastAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [10, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-          pointerEvents={undoEntry ? 'auto' : 'none'}
-        >
-          <Text style={styles.toastText}>
-            {undoStack.length > 1 ? `${undoStack.length} logged` : 'ABC Logged'}
-          </Text>
-          <TouchableOpacity onPress={handleUndo} hitSlop={8}>
-            <Text style={styles.toastUndo}>Undo</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        {/* Undo toast — only mounted when there's something to undo */}
+        {toastMounted && (
+          <Animated.View
+            style={[
+              styles.toast,
+              {
+                opacity: toastAnim,
+                transform: [
+                  {
+                    translateY: toastAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [10, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+            pointerEvents={undoEntry ? 'auto' : 'none'}
+          >
+            <Text style={styles.toastText}>
+              {undoStack.length > 1 ? `${undoStack.length} logged` : 'ABC Logged'}
+            </Text>
+            <TouchableOpacity onPress={handleUndo} hitSlop={8}>
+              <Text style={styles.toastUndo}>Undo</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
       </Card>
     </TouchableOpacity>
   );

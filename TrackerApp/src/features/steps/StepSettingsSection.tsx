@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, Switch, Platform, NativeModules } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Footprints } from 'lucide-react-native';
@@ -17,6 +17,39 @@ export function StepSettingsSection() {
   const [goalInput, setGoalInput] = useState(dailyGoal.toString());
   const [isEditing, setIsEditing] = useState(false);
   const [trackingEnabled, setTrackingEnabled] = useState(status !== 'unavailable');
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  // Sync trackingEnabled with store status whenever status changes
+  useEffect(() => {
+    setTrackingEnabled(status !== 'unavailable');
+  }, [status]);
+
+  // Load tracking state from DB on mount ONLY
+  useEffect(() => {
+    if (hasLoaded) return; // Only run once
+    
+    async function loadTrackingState() {
+      try {
+        const result = await db.getFirstAsync<{ is_tracking: number }>(
+          'SELECT is_tracking FROM step_tracking_state WHERE id = 1'
+        );
+        if (result) {
+          const isTracking = result.is_tracking === 1;
+          setTrackingEnabled(isTracking);
+          if (isTracking) {
+            useStepStore.getState().setStatus('tracking');
+          } else {
+            useStepStore.getState().setStatus('unavailable');
+          }
+        }
+        setHasLoaded(true);
+      } catch (error) {
+        console.error('Failed to load step tracking state:', error);
+        setHasLoaded(true);
+      }
+    }
+    loadTrackingState();
+  }, [db, hasLoaded]);
 
   async function handleSaveGoal() {
     const newGoal = parseInt(goalInput, 10);
@@ -51,9 +84,19 @@ export function StepSettingsSection() {
       if (enabled) {
         await StepServiceModule.startService();
         useStepStore.getState().setStatus('tracking');
+        // Persist to DB
+        await db.runAsync(
+          'INSERT OR REPLACE INTO step_tracking_state (id, is_tracking, updated_at) VALUES (1, ?, ?)',
+          [1, new Date().toISOString()]
+        );
       } else {
         await StepServiceModule.stopService();
         useStepStore.getState().setStatus('unavailable');
+        // Persist to DB
+        await db.runAsync(
+          'INSERT OR REPLACE INTO step_tracking_state (id, is_tracking, updated_at) VALUES (1, ?, ?)',
+          [0, new Date().toISOString()]
+        );
       }
     } catch (error) {
       console.error('Failed to toggle step tracking:', error);

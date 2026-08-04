@@ -101,10 +101,11 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
 
     // Tracking state
     const state = await db.getFirstAsync<{
-      is_paused: number; is_vehicle_mode: number; daily_goal: number;
+      is_tracking: number; is_paused: number; is_vehicle_mode: number; daily_goal: number;
     }>('SELECT * FROM step_tracking_state WHERE id = 1');
     if (state) {
       const status: TrackingStatus =
+        state.is_tracking === 0 ? 'unavailable' :
         state.is_vehicle_mode ? 'vehicle' :
         state.is_paused       ? 'paused'  : 'tracking';
       useStepStore.getState().setStatus(status);

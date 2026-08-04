@@ -1,0 +1,8 @@
+# Ignore files that are not needed for the build
+node_modules
+.git
+.expo
+android
+ios
+*.log
+.DS_Store
