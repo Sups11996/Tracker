@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Switch } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Switch, Platform, NativeModules } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { Footprints } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
@@ -7,6 +7,8 @@ import { TextInput } from '../../components/ui/TextInput';
 import { Button } from '../../components/ui/Button';
 import { useStepStore } from '../../stores/stepStore';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
+
+const StepServiceModule = Platform.OS === 'android' ? NativeModules.StepServiceModule : null;
 
 export function StepSettingsSection() {
   const db = useSQLiteContext();
@@ -42,8 +44,29 @@ export function StepSettingsSection() {
 
   async function handleToggleTracking(enabled: boolean) {
     setTrackingEnabled(enabled);
-    // TODO: Start/stop service based on enabled flag
-    // For now just update state
+    
+    if (Platform.OS !== 'android' || !StepServiceModule) {
+      console.warn('Step service not available on this platform');
+      return;
+    }
+
+    try {
+      if (enabled) {
+        // Start the service
+        await StepServiceModule.startService();
+        useStepStore.getState().setStatus('tracking');
+        console.log('✅ Step tracking started');
+      } else {
+        // Stop the service completely
+        await StepServiceModule.stopService();
+        useStepStore.getState().setStatus('unavailable');
+        console.log('🛑 Step tracking stopped');
+      }
+    } catch (error) {
+      console.error('Failed to toggle step tracking:', error);
+      // Revert UI state on error
+      setTrackingEnabled(!enabled);
+    }
   }
 
   return (
