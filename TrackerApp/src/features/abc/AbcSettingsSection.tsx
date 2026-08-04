@@ -14,17 +14,22 @@ export function AbcSettingsSection() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   async function handleAbcToggle(enabled: boolean) {
+    // Optimistically update UI first
+    setAbcEnabled(enabled);
+    
     try {
       await db.runAsync(
         'UPDATE user_profile SET uses_abc = ?, updated_at = ? WHERE id = 1',
         [enabled ? 1 : 0, new Date().toISOString()]
       );
-      setAbcEnabled(enabled);
+      
       if (profile) {
         useUserStore.getState().setProfile({ ...profile, uses_abc: enabled });
       }
     } catch (e) {
       console.error('Failed to update ABC setting:', e);
+      // Revert on error
+      setAbcEnabled(!enabled);
     }
   }
 

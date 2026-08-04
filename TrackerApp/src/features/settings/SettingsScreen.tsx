@@ -536,9 +536,6 @@ const styles = StyleSheet.create({
   },
   profileSummary: {
     gap: SPACING.sm,
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.glassBorder,
   },
   summaryRow: {
     flexDirection: 'row',

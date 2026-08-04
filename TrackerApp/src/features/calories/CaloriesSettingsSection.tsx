@@ -14,17 +14,22 @@ export function CaloriesSettingsSection() {
   const [reminderEnabled, setReminderEnabled] = useState(false);
 
   async function handleGymToggle(enabled: boolean) {
+    // Optimistically update UI first
+    setGymEnabled(enabled);
+    
     try {
       await db.runAsync(
         'UPDATE user_profile SET uses_gym = ?, updated_at = ? WHERE id = 1',
         [enabled ? 1 : 0, new Date().toISOString()]
       );
-      setGymEnabled(enabled);
+      
       if (profile) {
         useUserStore.getState().setProfile({ ...profile, uses_gym: enabled });
       }
     } catch (e) {
       console.error('Failed to update gym setting:', e);
+      // Revert on error
+      setGymEnabled(!enabled);
     }
   }
 
