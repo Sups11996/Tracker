@@ -31,10 +31,19 @@ interface AlertContextType {
 const AlertContext = createContext<AlertContextType | null>(null);
 
 export function AlertProvider({ children }: { children: ReactNode }) {
-  const [alert, setAlert] = useState<(AlertOptions & { visible: boolean }) | null>(null);
+  // Start with dummy data so Modal is pre-rendered
+  const [alert, setAlert] = useState<AlertOptions>({
+    title: '',
+    message: '',
+    type: 'info',
+    actions: [],
+  });
+  const [visible, setVisible] = useState(false);
 
   const showAlert = (options: AlertOptions) => {
-    setAlert({ ...options, visible: true });
+    // Instant replace: update content immediately without hiding
+    setAlert(options);
+    setVisible(true);
   };
 
   const showSuccess = (title: string, message?: string) => {
@@ -42,7 +51,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
       title,
       message,
       type: 'success',
-      actions: [{ text: 'OK' }],
+      actions: [{ text: 'OK', onPress: hideAlert }],
     });
   };
 
@@ -51,7 +60,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
       title,
       message,
       type: 'error',
-      actions: [{ text: 'OK' }],
+      actions: [{ text: 'OK', onPress: hideAlert }],
     });
   };
 
@@ -60,7 +69,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
       title,
       message,
       type: 'warning',
-      actions: [{ text: 'OK' }],
+      actions: [{ text: 'OK', onPress: hideAlert }],
     });
   };
 
@@ -87,22 +96,21 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   };
 
   const hideAlert = () => {
-    setAlert(null);
+    setVisible(false);
   };
 
   return (
     <AlertContext.Provider value={{ showAlert, showSuccess, showError, showWarning, showConfirm }}>
       {children}
-      {alert && (
-        <CustomAlert
-          visible={alert.visible}
-          title={alert.title}
-          message={alert.message}
-          type={alert.type}
-          actions={alert.actions}
-          onDismiss={hideAlert}
-        />
-      )}
+      {/* Modal always mounted with pre-rendered content */}
+      <CustomAlert
+        visible={visible}
+        title={alert.title}
+        message={alert.message}
+        type={alert.type}
+        actions={alert.actions}
+        onDismiss={hideAlert}
+      />
     </AlertContext.Provider>
   );
 }

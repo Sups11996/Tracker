@@ -414,17 +414,20 @@ function DataClearButton({ db, label, description, color, onClear }: DataClearBu
     showConfirm(
       `Clear ${label}`,
       `${description}. This cannot be undone. Continue?`,
-      async () => {
+      () => {
+        // Show success immediately for instant feedback
+        showSuccess('Success', `${label} cleared successfully.`);
+        
+        // Clear in background without blocking
         setClearing(true);
-        try {
-          await onClear();
-          showSuccess('Success', `${label} cleared successfully.`);
-        } catch (error) {
-          console.error(`Failed to clear ${label}:`, error);
-          showError('Error', `Failed to clear ${label}. Please try again.`);
-        } finally {
-          setClearing(false);
-        }
+        onClear()
+          .catch((error) => {
+            console.error(`Failed to clear ${label}:`, error);
+            showError('Error', `Failed to clear ${label}. Please try again.`);
+          })
+          .finally(() => {
+            setClearing(false);
+          });
       },
       'Clear',
       true

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Modal,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
   Pressable,
+  Animated,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { CheckCircle2, AlertTriangle, X } from 'lucide-react-native';
@@ -34,6 +35,39 @@ export function CustomAlert({
   actions = [{ text: 'OK' }],
   onDismiss,
 }: CustomAlertProps) {
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const previousTitle = useRef(title);
+
+  useEffect(() => {
+    if (visible) {
+      // If title changed (content swap like confirm → success), update instantly
+      if (previousTitle.current !== title && previousTitle.current !== '') {
+        scaleAnim.setValue(1);
+        opacityAnim.setValue(1);
+      } else {
+        Animated.parallel([
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+      previousTitle.current = title;
+    } else {
+      // Reset for next time
+      scaleAnim.setValue(0.95);
+      opacityAnim.setValue(0);
+      previousTitle.current = '';
+    }
+  }, [visible, title]);
+
   const getIcon = () => {
     switch (type) {
       case 'success':
@@ -47,8 +81,14 @@ export function CustomAlert({
   };
 
   const handleActionPress = (action: AlertAction) => {
-    action.onPress?.();
-    onDismiss?.();
+    // If action has onPress, call it but don't auto-dismiss
+    // Let the action handler decide when to show next alert or dismiss
+    if (action.onPress) {
+      action.onPress();
+    } else {
+      // No handler means just dismiss (like default OK button)
+      onDismiss?.();
+    }
   };
 
   const handleBackdropPress = () => {
@@ -63,61 +103,76 @@ export function CustomAlert({
     <Modal
       transparent
       visible={visible}
-      animationType="fade"
+      animationType="none"
       onRequestClose={onDismiss}
+      statusBarTranslucent
+      hardwareAccelerated
     >
-      <Pressable style={styles.overlay} onPress={handleBackdropPress}>
-        <BlurView intensity={90} tint="dark" style={styles.backdrop}>
-          <View style={styles.container}>
-            <Pressable style={styles.modal} onPress={(e) => e.stopPropagation()}>
-              <BlurView intensity={GLASS.blurModal} style={styles.modalBlur}>
-                <View style={styles.content}>
-                  {/* Header with icon and title */}
-                  <View style={styles.header}>
-                    {getIcon()}
-                    <View style={styles.headerText}>
-                      <Text style={styles.title}>{title}</Text>
-                      {message && <Text style={styles.message}>{message}</Text>}
+      <View style={styles.overlay}>
+        <Pressable style={styles.overlayPressable} onPress={handleBackdropPress}>
+          <View style={[styles.backdrop, { backgroundColor: 'rgba(0,0,0,0.85)' }]}>
+            <Animated.View 
+              style={[
+                styles.container,
+                {
+                  transform: [{ scale: scaleAnim }],
+                  opacity: opacityAnim,
+                }
+              ]}
+            >
+              <Pressable style={styles.modal} onPress={(e) => e.stopPropagation()}>
+                <View style={[styles.modalBlur, { backgroundColor: GLASS.modalBg }]}>
+                  <View style={styles.content}>
+                    {/* Header with icon and title */}
+                    <View style={styles.header}>
+                      {getIcon()}
+                      <View style={styles.headerText}>
+                        <Text style={styles.title}>{title}</Text>
+                        {message && <Text style={styles.message}>{message}</Text>}
+                      </View>
+                    </View>
+
+                    {/* Actions */}
+                    <View style={styles.actions}>
+                      {actions.map((action, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={[
+                            styles.actionButton,
+                            action.style === 'destructive' && styles.destructiveButton,
+                            action.style === 'cancel' && styles.cancelButton,
+                          ]}
+                          onPress={() => handleActionPress(action)}
+                          activeOpacity={0.8}
+                        >
+                          <Text
+                            style={[
+                              styles.actionText,
+                              action.style === 'destructive' && styles.destructiveText,
+                              action.style === 'cancel' && styles.cancelText,
+                            ]}
+                          >
+                            {action.text}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
                     </View>
                   </View>
-
-                  {/* Actions */}
-                  <View style={styles.actions}>
-                    {actions.map((action, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={[
-                          styles.actionButton,
-                          action.style === 'destructive' && styles.destructiveButton,
-                          action.style === 'cancel' && styles.cancelButton,
-                        ]}
-                        onPress={() => handleActionPress(action)}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={[
-                            styles.actionText,
-                            action.style === 'destructive' && styles.destructiveText,
-                            action.style === 'cancel' && styles.cancelText,
-                          ]}
-                        >
-                          {action.text}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
                 </View>
-              </BlurView>
-            </Pressable>
+              </Pressable>
+            </Animated.View>
           </View>
-        </BlurView>
-      </Pressable>
+        </Pressable>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
+    flex: 1,
+  },
+  overlayPressable: {
     flex: 1,
   },
   backdrop: {
