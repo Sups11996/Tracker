@@ -48,3 +48,6 @@ BUILDPLAN.md
 # generated native folders
 /ios
 /android
+
+# APK files — distribute via GitHub Releases instead
+*.apk
