@@ -4,7 +4,7 @@
     "slug": "TrackerApp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/android-icon-background.png",
+    "icon": "./assets/logo.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": false
@@ -13,9 +13,9 @@
       "package": "com.trackerapp.personal",
       "adaptiveIcon": {
         "backgroundColor": "#12141C",
-        "foregroundImage": "./assets/android-icon-background.png",
+        "foregroundImage": "./assets/logo.png",
         "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-background.png"
+        "monochromeImage": "./assets/logo.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
