@@ -91,11 +91,9 @@ export function CaloriesDashboard() {
       await deleteWorkout(db, id);
       setAllWorkouts(prev => prev.filter(w => w.id !== id));
     } catch (e) {
-      console.error(e);
+      // silent fail — UI reverts on next hydration
     }
-  }
-
-  const chartData = last7.map(d => ({
+  } = last7.map(d => ({
     label: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' }),
     value: d.total,
   }));

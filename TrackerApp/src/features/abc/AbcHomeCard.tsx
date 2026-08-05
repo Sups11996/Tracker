@@ -59,7 +59,7 @@ export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
     try {
       await logAbc(db);
     } catch (e) {
-      console.error(e);
+      // silent fail — UI already updated optimistically
     }
   }
 
@@ -67,7 +67,7 @@ export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
     try {
       await undoLastAbc(db);
     } catch (e) {
-      console.error(e);
+      // silent fail
     }
   }
 
