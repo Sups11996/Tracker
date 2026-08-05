@@ -57,9 +57,9 @@ export function HomeScreen() {
     }
   }, [isFocused]);
 
-  // Start step tracking service on mount (Android only)
+  // Start step tracking service on mount (Android only) — only if tracking is enabled in DB
   useEffect(() => {
-    async function startTracking() {
+    async function startTrackingIfEnabled() {
       if (Platform.OS !== 'android') return;
       if (!StepServiceModule) return;
 
@@ -67,10 +67,15 @@ export function HomeScreen() {
         // Wait for database initialization to complete
         await new Promise(resolve => setTimeout(resolve, 1500));
 
+        // Check if tracking is enabled in DB
+        const state = await db.getFirstAsync<{ is_tracking: number }>(
+          'SELECT is_tracking FROM step_tracking_state WHERE id = 1'
+        );
+        if (!state || state.is_tracking !== 1) return;
+
         // Check if notification permission granted (required for foreground service)
         const Notifications = require('expo-notifications');
         const { status } = await Notifications.getPermissionsAsync();
-
         if (status !== 'granted') return;
 
         await StepServiceModule.startService();
@@ -79,8 +84,8 @@ export function HomeScreen() {
       }
     }
 
-    startTracking();
-  }, []);
+    startTrackingIfEnabled();
+  }, [db]);
 
   const hour = new Date().getHours();
   const greeting =

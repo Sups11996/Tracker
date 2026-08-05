@@ -5,6 +5,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
+  PermissionsAndroid,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import * as Notifications from 'expo-notifications';
@@ -292,6 +294,7 @@ export function SettingsScreen() {
         </View>
         
         {/* Settings Sections */}
+        <PermissionsSection />
         <StepSettingsSection />
         <SleepSettingsSection />
         <WaterSettingsSection />
@@ -734,6 +737,185 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   editProfileButtonText: {
+    fontSize: TYPOGRAPHY.size.sm,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    color: COLORS.steps,
+  },
+});
+
+// ── Permissions Section ───────────────────────────────────────────────────────
+
+function PermissionsSection() {
+  const [activityStatus, setActivityStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
+  const [notifStatus, setNotifStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
+  const [batteryStatus, setBatteryStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
+
+  useEffect(() => {
+    async function checkPermissions() {
+      // Activity Recognition
+      if (Platform.OS === 'android') {
+        try {
+          const result = await PermissionsAndroid.check(
+            PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION
+          );
+          setActivityStatus(result ? 'granted' : 'denied');
+        } catch {
+          setActivityStatus('denied');
+        }
+      }
+
+      // Notifications
+      try {
+        const { status } = await Notifications.getPermissionsAsync();
+        setNotifStatus(status === 'granted' ? 'granted' : 'denied');
+      } catch {
+        setNotifStatus('denied');
+      }
+
+      // Battery optimization
+      try {
+        const ignored = await isBatteryOptimizationIgnored();
+        setBatteryStatus(ignored ? 'granted' : 'denied');
+      } catch {
+        setBatteryStatus('denied');
+      }
+    }
+    checkPermissions();
+  }, []);
+
+  async function handleRequestActivity() {
+    if (Platform.OS !== 'android') return;
+    try {
+      const result = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION,
+        {
+          title: 'Physical Activity Permission',
+          message: 'Tracker needs access to count your steps.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+      setActivityStatus(result === PermissionsAndroid.RESULTS.GRANTED ? 'granted' : 'denied');
+    } catch {
+      setActivityStatus('denied');
+    }
+  }
+
+  async function handleRequestNotifications() {
+    const { status } = await Notifications.requestPermissionsAsync();
+    setNotifStatus(status === 'granted' ? 'granted' : 'denied');
+  }
+
+  function handleRequestBattery() {
+    requestIgnoreBatteryOptimizations();
+    setBatteryStatus('granted');
+  }
+
+  return (
+    <View style={permStyles.container}>
+      <View style={permStyles.header}>
+        <Text style={permStyles.title}>Permissions</Text>
+      </View>
+      <Card style={permStyles.card}>
+        <PermRow
+          label="Physical Activity"
+          description="Required for step counting"
+          status={activityStatus}
+          onPress={handleRequestActivity}
+        />
+        <PermRow
+          label="Notifications"
+          description="For step tracking and reminders"
+          status={notifStatus}
+          onPress={handleRequestNotifications}
+        />
+        <PermRow
+          label="Battery Optimization"
+          description="Keeps step tracking running in background"
+          status={batteryStatus}
+          onPress={handleRequestBattery}
+          actionLabel="Open Settings"
+        />
+      </Card>
+    </View>
+  );
+}
+
+function PermRow({
+  label,
+  description,
+  status,
+  onPress,
+  actionLabel = 'Allow',
+}: {
+  label: string;
+  description: string;
+  status: 'unknown' | 'granted' | 'denied';
+  onPress: () => void;
+  actionLabel?: string;
+}) {
+  return (
+    <View style={permStyles.row}>
+      <View style={permStyles.info}>
+        <Text style={permStyles.label}>{label}</Text>
+        <Text style={permStyles.desc}>{description}</Text>
+      </View>
+      {status === 'granted' ? (
+        <Text style={permStyles.granted}>Granted</Text>
+      ) : (
+        <TouchableOpacity
+          style={permStyles.allowBtn}
+          onPress={onPress}
+          activeOpacity={0.8}
+        >
+          <Text style={permStyles.allowText}>
+            {status === 'denied' ? 'Retry' : actionLabel}
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+const permStyles = StyleSheet.create({
+  container: { gap: SPACING.md },
+  header: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  title: {
+    fontSize: TYPOGRAPHY.size.lg,
+    fontWeight: TYPOGRAPHY.weight.bold,
+    color: COLORS.textPrimary,
+  },
+  card: { gap: SPACING.md },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.md,
+  },
+  info: { flex: 1, gap: 2 },
+  label: {
+    fontSize: TYPOGRAPHY.size.md,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    color: COLORS.textPrimary,
+  },
+  desc: {
+    fontSize: TYPOGRAPHY.size.sm,
+    color: COLORS.textMuted,
+  },
+  granted: {
+    fontSize: TYPOGRAPHY.size.sm,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    color: COLORS.success,
+  },
+  allowBtn: {
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.steps,
+  },
+  allowText: {
     fontSize: TYPOGRAPHY.size.sm,
     fontWeight: TYPOGRAPHY.weight.semibold,
     color: COLORS.steps,
