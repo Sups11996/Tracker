@@ -1,6 +1,5 @@
 {
   "expo": {
-    "newArchEnabled": true,
     "name": "Tracker",
     "slug": "TrackerApp",
     "version": "1.0.0",
