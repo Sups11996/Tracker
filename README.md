@@ -49,14 +49,15 @@ Track everything in one beautiful app:
 
 ## Installation
 
-### Option 1: Download Pre-built APK (Easiest)
-1. Go to [Releases](https://github.com/Sups11996/Tracker/releases)
-2. Download the latest `app-release.apk`
-3. Enable "Install from Unknown Sources" in your Android settings
-4. Install the APK
-5. Done! 🎉
+### Download APK (Easiest)
+1. [**Download APK**](./TrackerApp/assets/tracker.apk) — click here to download directly
+2. Enable "Install from Unknown Sources" in your Android settings
+3. Install the APK
+4. Done!
 
-### Option 2: Build from Source
+> Place the APK file at `TrackerApp/assets/tracker.apk` to activate the download link above.
+
+### Build from Source
 **Prerequisites:**
 - [Node.js](https://nodejs.org/) (v18 or higher)
 - [Android Studio](https://developer.android.com/studio) with Android SDK
