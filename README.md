@@ -71,10 +71,14 @@ cd Tracker/TrackerApp
 # 2. Install dependencies
 npm install
 
-# 3. Build the APK
-bash build-apk.sh
+# 3. Run prebuild to generate native files
+npx expo prebuild --platform android
 
-# 4. Find your APK at:
+# 4. Build the APK
+cd android
+./gradlew assembleRelease
+
+# 5. Find your APK at:
 # android/app/build/outputs/apk/release/app-release.apk
 ```
 
