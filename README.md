@@ -50,12 +50,10 @@ Track everything in one beautiful app:
 ## Installation
 
 ### Download APK (Easiest)
-1. [**Download APK**](./TrackerApp/assets/tracker.apk) — click here to download directly
+1. [**Download Latest APK**](https://github.com/Sups11996/Tracker/releases/latest/download/tracker.apk) — click to download directly
 2. Enable "Install from Unknown Sources" in your Android settings
 3. Install the APK
 4. Done!
-
-> Place the APK file at `TrackerApp/assets/tracker.apk` to activate the download link above.
 
 ### Build from Source
 **Prerequisites:**
