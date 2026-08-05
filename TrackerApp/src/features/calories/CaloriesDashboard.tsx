@@ -93,7 +93,9 @@ export function CaloriesDashboard() {
     } catch (e) {
       // silent fail — UI reverts on next hydration
     }
-  } = last7.map(d => ({
+  }
+
+  const chartData = last7.map(d => ({
     label: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' }),
     value: d.total,
   }));
