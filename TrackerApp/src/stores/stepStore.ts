@@ -148,14 +148,6 @@ export async function saveStepData(db: SQLite.SQLiteDatabase): Promise<void> {
     const today = getTodayLocal();
     const goalMet = state.todaySteps >= state.dailyGoal ? 1 : 0;
     const now = Date.now();
-    
-      date: today,
-      steps: state.todaySteps,
-      distance: state.todayDistance,
-      calories: state.todayCalories,
-      goal: state.dailyGoal,
-      goalMet,
-    });
 
     await db.runAsync(
       `INSERT OR REPLACE INTO daily_steps (date, steps, distance_m, calories, goal, goal_met, created_at, updated_at)

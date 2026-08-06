@@ -25,7 +25,6 @@ import { useUserStore } from '../../stores/userStore';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { getTodayLocal } from '../../lib/dateUtils';
-import { seedTestData } from '../../lib/seedData';
 import {
   requestIgnoreBatteryOptimizations,
   openUsageAccessSettings,
@@ -157,33 +156,6 @@ export function SettingsScreen() {
     });
     setEditingProfile(false);
   }, [profile]);
-
-  async function handleSeedTestData() {
-    showConfirm(
-      'Seed Test Data',
-      'This will add 14 days of sample data for all features. This is for testing purposes only.',
-      async () => {
-        try {
-          await seedTestData(db);
-          
-          // Reload all stores to show new data
-          await hydrateStepStore(db);
-          await hydrateSleepStore(db);
-          await hydrateWaterStore(db);
-          await hydrateCaloriesStore(db);
-          if (profile?.uses_abc) {
-            await hydrateAbcStore(db);
-          }
-          
-          showSuccess('Done', 'Test data added! Check your dashboards.');
-        } catch (error) {
-          showError('Error', 'Failed to seed test data. Check console for details.');
-        }
-      },
-      'Seed Data',
-      false
-    );
-  }
 
   if (!profile) {
     return (

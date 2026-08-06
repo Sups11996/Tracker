@@ -280,11 +280,6 @@ function getCurrentMonthData(monthlyData: any[], todayRecord: any) {
     return recordDate.getMonth() === month && recordDate.getFullYear() === year;
   });
   
-    totalRecords: monthlyData.length,
-    filteredRecords: currentMonthOnly.length,
-    dates: currentMonthOnly.map(d => d.date),
-  });
-  
   const monthData = [];
   
   // Build array from day 1 to today
@@ -359,11 +354,6 @@ function getWeeksInCurrentMonth(monthData: any[]) {
     const endDate = new Date(endYear, endMonth - 1, endDay);
     
     const dateRange = `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-    
-      firstDate,
-      lastDate,
-      dateRange,
-    });
     
     weeks.push({
       data: weekData,
