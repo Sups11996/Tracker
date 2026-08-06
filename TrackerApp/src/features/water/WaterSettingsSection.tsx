@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Keyboard,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -31,6 +32,7 @@ export function WaterSettingsSection() {
   const [addingContainer, setAddingContainer] = useState(false);
 
   async function handleSaveGoal() {
+    Keyboard.dismiss();
     const val = parseInt(goalInput, 10);
     if (isNaN(val) || val < 500 || val > 10000) {
       setGoalInput(dailyGoal.toString());
@@ -45,7 +47,6 @@ export function WaterSettingsSection() {
       useWaterStore.setState({ dailyGoal: val });
       setEditingGoal(false);
     } catch (e) {
-      console.error('Failed to save water goal:', e);
     }
   }
 
@@ -66,7 +67,6 @@ export function WaterSettingsSection() {
       setAddingContainer(false);
       await hydrateWaterStore(db);
     } catch (e) {
-      console.error('Failed to add container:', e);
     }
   }
 
@@ -82,7 +82,6 @@ export function WaterSettingsSection() {
           );
           await hydrateWaterStore(db);
         } catch (e) {
-          console.error('Failed to delete container:', e);
         }
       },
       'Remove',

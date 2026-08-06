@@ -60,7 +60,6 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
     try {
       await logWater(db, container);
     } catch (e) {
-      console.error(e);
     }
   }
 
@@ -68,7 +67,6 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
     try {
       await undoLastLog(db);
     } catch (e) {
-      console.error(e);
     }
   }
 

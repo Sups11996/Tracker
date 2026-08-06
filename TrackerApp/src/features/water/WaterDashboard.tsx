@@ -72,7 +72,6 @@ export function WaterDashboard() {
       }
       setCurrentMonthData(month);
     } catch (e) {
-      console.error('Failed to load water week/month:', e);
     }
   }
 
@@ -100,7 +99,6 @@ export function WaterDashboard() {
       }
       setSelectedMonthData(data);
     } catch (e) {
-      console.error('Failed to load selected month water:', e);
     }
   }
 
