@@ -57,7 +57,6 @@ export async function loadSleepReminderSettings(
 
     return settings;
   } catch (error) {
-    console.error('Failed to load sleep reminder settings:', error);
     return DEFAULT_SETTINGS;
   }
 }
@@ -93,7 +92,6 @@ export async function saveSleepReminderSettings(
       ['sleep_reminder_wake_minute', settings.wakeMinute.toString()]
     );
   } catch (error) {
-    console.error('Failed to save sleep reminder settings:', error);
     throw error;
   }
 }
@@ -126,6 +124,7 @@ export async function scheduleBedtimeReminder(
         title: '🌙 Time for bed',
         body: 'Start tracking your sleep to maintain healthy sleep habits.',
         sound: true,
+        android: { channelId: 'default', smallIcon: 'ic_notification' },
       },
       trigger: {
         type: 'daily',
@@ -167,6 +166,7 @@ export async function scheduleWakeReminder(
         title: '☀️ Good morning!',
         body: 'Don\'t forget to log your sleep to track your rest.',
         sound: true,
+        android: { channelId: 'default', smallIcon: 'ic_notification' },
       },
       trigger: {
         type: 'daily',
@@ -187,7 +187,6 @@ export async function cancelBedtimeReminder(): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(BEDTIME_NOTIFICATION_ID);
   } catch (error) {
-    console.error('Failed to cancel bedtime reminder:', error);
   }
 }
 
@@ -198,7 +197,6 @@ export async function cancelWakeReminder(): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(WAKE_NOTIFICATION_ID);
   } catch (error) {
-    console.error('Failed to cancel wake reminder:', error);
   }
 }
 
