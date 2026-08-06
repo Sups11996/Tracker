@@ -80,7 +80,6 @@ export async function hydrateAbcStore(db: SQLiteDatabase): Promise<void> {
       undoEntry: null,
     });
   } catch (error) {
-    console.error('Failed to hydrate ABC store:', error);
   }
 }
 
@@ -140,7 +139,6 @@ export async function logAbc(db: SQLiteDatabase): Promise<void> {
       [today, newCount, now, now, newCount, now]
     );
   } catch (error) {
-    console.error('Failed to log ABC:', error);
     throw error;
   }
 }
@@ -208,7 +206,6 @@ export async function undoLastAbc(db: SQLiteDatabase): Promise<void> {
       );
     }
   } catch (error) {
-    console.error('Failed to undo ABC:', error);
     throw error;
   }
 }

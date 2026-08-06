@@ -85,7 +85,6 @@ export async function hydrateWaterStore(db: SQLiteDatabase): Promise<void> {
       dailyGoal: profile?.water_goal_ml ?? 2400,
     });
   } catch (error) {
-    console.error('Failed to hydrate water store:', error);
   }
 }
 
@@ -146,7 +145,6 @@ export async function logWater(
       undoTimer: timer,
     });
   } catch (error) {
-    console.error('Failed to log water:', error);
     throw error;
   }
 }
@@ -174,7 +172,6 @@ export async function undoLastLog(db: SQLiteDatabase): Promise<void> {
       undoStack: newStack,
     });
   } catch (error) {
-    console.error('Failed to undo water log:', error);
     throw error;
   }
 }

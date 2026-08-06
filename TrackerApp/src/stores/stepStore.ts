@@ -135,7 +135,6 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
     useStepStore.getState().setMonthlyData(monthly);
 
   } catch (e) {
-    console.error('[hydrateStepStore]', e);
   }
 }
 
@@ -150,7 +149,6 @@ export async function saveStepData(db: SQLite.SQLiteDatabase): Promise<void> {
     const goalMet = state.todaySteps >= state.dailyGoal ? 1 : 0;
     const now = Date.now();
     
-    console.log('💾 Saving step data to DB:', {
       date: today,
       steps: state.todaySteps,
       distance: state.todayDistance,
@@ -167,7 +165,6 @@ export async function saveStepData(db: SQLite.SQLiteDatabase): Promise<void> {
       [today, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, today, now, now]
     );
 
-    console.log('✅ Step data saved successfully');
     
     // Only refresh weekly/monthly historical data, don't reload today's data
     // (today's data comes from the native service in real-time)
@@ -187,6 +184,5 @@ export async function saveStepData(db: SQLite.SQLiteDatabase): Promise<void> {
     useStepStore.getState().setMonthlyData(monthly);
     
   } catch (error) {
-    console.error('❌ Failed to save step data:', error);
   }
 }

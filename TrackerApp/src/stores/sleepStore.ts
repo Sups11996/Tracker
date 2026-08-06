@@ -147,7 +147,6 @@ export async function hydrateSleepStore(db: SQLiteDatabase): Promise<void> {
     }
     
   } catch (error) {
-    console.error('Failed to hydrate sleep store:', error);
   }
 }
 
@@ -176,7 +175,6 @@ export async function startSleepSession(db: SQLiteDatabase): Promise<void> {
     }
     
   } catch (error) {
-    console.error('Failed to start sleep session:', error);
     throw error;
   }
 }
@@ -221,7 +219,6 @@ export async function endSleepSession(
     }
     
   } catch (error) {
-    console.error('Failed to end sleep session:', error);
     throw error;
   }
 }

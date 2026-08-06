@@ -95,7 +95,6 @@ export async function hydrateCaloriesStore(db: SQLiteDatabase): Promise<void> {
       workoutLogs: logs,
     });
   } catch (error) {
-    console.error('Failed to hydrate calories store:', error);
   }
 }
 
@@ -141,7 +140,6 @@ export async function logWorkout(
       totalCalories: Math.round(state.walkingCalories + workoutCal),
     });
   } catch (error) {
-    console.error('Failed to log workout:', error);
     throw error;
   }
 }
@@ -166,7 +164,6 @@ export async function deleteWorkout(
       totalCalories: Math.round(state.walkingCalories + workoutCal),
     });
   } catch (error) {
-    console.error('Failed to delete workout:', error);
     throw error;
   }
 }
