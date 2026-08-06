@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Switch, Platform } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Switch, Platform, Keyboard } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useIsFocused } from '@react-navigation/native';
 import { Moon, Clock } from 'lucide-react-native';
@@ -24,7 +24,8 @@ export function SleepSettingsSection() {
   const goalHours = Math.floor(goalMinutes / 60);
   const goalMins = goalMinutes % 60;
 
-  const [goalInput, setGoalInput] = useState(goalHours.toString());
+  const [goalHoursInput, setGoalHoursInput] = useState(goalHours.toString());
+  const [goalMinsInput, setGoalMinsInput] = useState(goalMins.toString());
   const [isEditing, setIsEditing] = useState(false);
   
   // Reminder settings
@@ -50,7 +51,6 @@ export function SleepSettingsSection() {
         setReminderSettings(settings);
         setIsInitialized(true);
       } catch (error) {
-        console.error('Failed to load sleep reminder settings:', error);
         setIsInitialized(true);
       }
     }
@@ -58,29 +58,32 @@ export function SleepSettingsSection() {
   }, [isFocused, db]);
 
   async function handleSaveGoal() {
-    const hours = parseFloat(goalInput);
-    if (isNaN(hours) || hours < 1 || hours > 14) {
-      setGoalInput(goalHours.toString());
+    Keyboard.dismiss();
+    const hours = parseInt(goalHoursInput, 10) || 0;
+    const mins = parseInt(goalMinsInput, 10) || 0;
+    const totalMins = hours * 60 + mins;
+
+    if (totalMins < 60 || totalMins > 840) {
+      setGoalHoursInput(goalHours.toString());
+      setGoalMinsInput(goalMins.toString());
       setIsEditing(false);
       return;
     }
 
-    const newGoalMins = Math.round(hours * 60);
-
     try {
       await db.runAsync(
         `INSERT OR REPLACE INTO kv_store (key, value) VALUES ('sleep_goal_mins', ?)`,
-        [newGoalMins.toString()]
+        [totalMins.toString()]
       );
-      useSleepStore.setState({ goalMinutes: newGoalMins });
+      useSleepStore.setState({ goalMinutes: totalMins });
       setIsEditing(false);
     } catch (error) {
-      console.error('Failed to save sleep goal:', error);
     }
   }
 
   function handleCancelEdit() {
-    setGoalInput(goalHours.toString());
+    setGoalHoursInput(goalHours.toString());
+    setGoalMinsInput(goalMins.toString());
     setIsEditing(false);
   }
 
@@ -92,7 +95,6 @@ export function SleepSettingsSection() {
       await saveSleepReminderSettings(db, updated);
       await applySleepReminderSettings(updated);
     } catch (error) {
-      console.error('Failed to update bedtime reminder:', error);
       setReminderSettings(reminderSettings);
     }
   }
@@ -105,7 +107,6 @@ export function SleepSettingsSection() {
       await saveSleepReminderSettings(db, updated);
       await applySleepReminderSettings(updated);
     } catch (error) {
-      console.error('Failed to update wake reminder:', error);
       setReminderSettings(reminderSettings);
     }
   }
@@ -134,7 +135,6 @@ export function SleepSettingsSection() {
         await applySleepReminderSettings(updated);
       }
     } catch (error) {
-      console.error('Failed to update bedtime time:', error);
     }
   }
 
@@ -162,7 +162,6 @@ export function SleepSettingsSection() {
         await applySleepReminderSettings(updated);
       }
     } catch (error) {
-      console.error('Failed to update wake time:', error);
     }
   }
 
@@ -189,16 +188,30 @@ export function SleepSettingsSection() {
           <Text style={styles.sectionTitle}>Sleep Goal</Text>
 
           {isEditing ? (
-            <View style={styles.editRow}>
-              <TextInput
-                value={goalInput}
-                onChangeText={setGoalInput}
-                keyboardType="decimal-pad"
-                placeholder="e.g. 8"
-                style={styles.input}
-                autoFocus
-              />
-              <Text style={styles.unit}>hours</Text>
+            <View style={styles.editCol}>
+              <View style={styles.editRow}>
+                <View style={styles.timeInputGroup}>
+                  <TextInput
+                    value={goalHoursInput}
+                    onChangeText={setGoalHoursInput}
+                    keyboardType="number-pad"
+                    placeholder="7"
+                    style={styles.timeInput}
+                    autoFocus
+                  />
+                  <Text style={styles.unit}>h</Text>
+                </View>
+                <View style={styles.timeInputGroup}>
+                  <TextInput
+                    value={goalMinsInput}
+                    onChangeText={setGoalMinsInput}
+                    keyboardType="number-pad"
+                    placeholder="30"
+                    style={styles.timeInput}
+                  />
+                  <Text style={styles.unit}>m</Text>
+                </View>
+              </View>
               <View style={styles.editActions}>
                 <Button
                   label="Save"
@@ -378,8 +391,19 @@ const styles = StyleSheet.create({
   editRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    gap: 14,   
     flexWrap: 'wrap',
+  },
+  editCol: {
+    gap: SPACING.sm,
+  },
+  timeInputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  timeInput: {
+    width: 70,
   },
   input: {
     flex: 1,

@@ -56,7 +56,6 @@ export function SleepHomeCard({ onPress }: SleepHomeCardProps) {
     try {
       await startSleepSession(db);
     } catch (error) {
-      console.error('Failed to start sleep session:', error);
     }
   }
 
@@ -70,7 +69,6 @@ export function SleepHomeCard({ onPress }: SleepHomeCardProps) {
       setShowLatencyPrompt(false);
       await hydrateSleepStore(db); // Refresh to show last night stats
     } catch (error) {
-      console.error('Failed to end sleep session:', error);
     }
   }
 

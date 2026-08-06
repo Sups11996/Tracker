@@ -68,7 +68,6 @@ export function SleepDashboard() {
       }
       setCurrentMonthData(month);
     } catch (e) {
-      console.error('Failed to load sleep week/month:', e);
     }
   }
 
@@ -89,7 +88,6 @@ export function SleepDashboard() {
       }
       setSelectedMonthData(data);
     } catch (e) {
-      console.error('Failed to load selected month sleep:', e);
     }
   }
 
