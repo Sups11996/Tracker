@@ -68,7 +68,6 @@ export function CaloriesDashboard() {
       }
       setCurrentMonthData(month);
     } catch (e) {
-      console.error('Failed to load calories week/month:', e);
     }
   }
 
@@ -89,7 +88,6 @@ export function CaloriesDashboard() {
       }
       setSelectedMonthData(data);
     } catch (e) {
-      console.error('Failed to load selected month calories:', e);
     }
   }
 
@@ -103,7 +101,6 @@ export function CaloriesDashboard() {
       );
       setRecentWorkouts(workouts);
     } catch (e) {
-      console.error('Failed to load recent workouts:', e);
     }
   }
 
@@ -112,7 +109,6 @@ export function CaloriesDashboard() {
       await deleteWorkout(db, id);
       setRecentWorkouts(prev => prev.filter(w => w.id !== id));
     } catch (e) {
-      console.error('Failed to delete workout:', e);
     }
   }
 

@@ -47,7 +47,6 @@ export function CaloriesHomeCard({ onPress }: CaloriesHomeCardProps) {
       await logWorkout(db, durationMins, intensity, profile?.weight_kg ?? 70, note);
       setShowModal(false);
     } catch (e) {
-      console.error(e);
     }
   }
 
