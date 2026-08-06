@@ -45,15 +45,12 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
 
     async function reloadTrackingState() {
       try {
-        console.log('🏠 [StepHomeCard] Screen focused, reloading tracking state from DB...');
         const result = await db.getFirstAsync<{ is_tracking: number }>(
           'SELECT is_tracking FROM step_tracking_state WHERE id = 1'
         );
-        console.log('🏠 [StepHomeCard] DB result:', result);
         
         if (result) {
           const isTracking = result.is_tracking === 1;
-          console.log('🏠 [StepHomeCard] Setting status:', { isTracking, willSetStatus: isTracking ? 'tracking' : 'paused' });
           if (isTracking) {
             useStepStore.getState().setStatus('tracking');
           } else {
@@ -61,7 +58,6 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
           }
         }
       } catch (error) {
-        console.error('❌ [StepHomeCard] Failed to reload step tracking state:', error);
       }
     }
 
@@ -84,24 +80,19 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
     status === 'paused'   ? 'Paused' : 'Unavailable';
 
   function sendServiceAction(action: string) {
-    console.log('🎬 [StepHomeCard] sendServiceAction called:', { action, status });
     
     try {
       // Optimistically update status so UI responds immediately
       if (action === 'pause') {
-        console.log('⏸️ [StepHomeCard] Setting status to paused');
         useStepStore.getState().setStatus('paused');
       } else if (action === 'resume') {
-        console.log('▶️ [StepHomeCard] Setting status to tracking');
         useStepStore.getState().setStatus('tracking');
       }
       
       // Try to send action to native module if available
       if (Platform.OS === 'android' && StepServiceModule) {
         StepServiceModule.sendAction(action);
-        console.log('✅ [StepHomeCard] Action sent to service:', action);
       } else {
-        console.log('⚠️ [StepHomeCard] StepServiceModule not available (debug build)');
       }
       
       // Update DB to persist the state
@@ -110,13 +101,10 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
         'UPDATE step_tracking_state SET is_tracking = ?, updated_at = ? WHERE id = 1',
         [isTracking, new Date().toISOString()]
       ).then(() => {
-        console.log('✅ [StepHomeCard] DB updated with is_tracking:', isTracking);
       }).catch((error) => {
-        console.error('❌ [StepHomeCard] Failed to update DB:', error);
       });
       
     } catch (error) {
-      console.error('❌ [StepHomeCard] Failed to send action to step service:', error);
     }
   }
 

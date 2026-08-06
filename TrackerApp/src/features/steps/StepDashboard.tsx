@@ -62,7 +62,6 @@ export function StepDashboard() {
       
       setSelectedMonthData(data || []);
     } catch (error) {
-      console.error('Failed to load month data:', error);
       setSelectedMonthData([]);
     }
   }
@@ -281,7 +280,6 @@ function getCurrentMonthData(monthlyData: any[], todayRecord: any) {
     return recordDate.getMonth() === month && recordDate.getFullYear() === year;
   });
   
-  console.log('📅 Current month data:', {
     totalRecords: monthlyData.length,
     filteredRecords: currentMonthOnly.length,
     dates: currentMonthOnly.map(d => d.date),
@@ -294,7 +292,6 @@ function getCurrentMonthData(monthlyData: any[], todayRecord: any) {
     // Create date string manually to avoid timezone issues
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     
-    console.log(`Creating date for day ${day}:`, { dateStr });
     
     // Only find data that matches this exact date
     let dayData = currentMonthOnly.find(d => d.date === dateStr);
@@ -314,7 +311,6 @@ function getCurrentMonthData(monthlyData: any[], todayRecord: any) {
     monthData.push(dayData);
   }
   
-  console.log('📊 Final monthData dates:', monthData.map(d => d.date));
   
   return monthData;
 }
@@ -364,7 +360,6 @@ function getWeeksInCurrentMonth(monthData: any[]) {
     
     const dateRange = `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
     
-    console.log(`Week ${weekNumber}:`, {
       firstDate,
       lastDate,
       dateRange,
