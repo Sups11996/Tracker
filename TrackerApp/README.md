@@ -8,11 +8,11 @@ A personal health tracking app for Android. Tracks steps, sleep, water intake, a
 
 | Feature | Details |
 |---|---|
-| 👣 **Steps** | Real-time step counting via background service, daily goal, weekly & monthly graphs |
-| 😴 **Sleep** | Session-based sleep tracking, bedtime & wake reminders, goal tracking |
-| 💧 **Water** | Glass-based logging with custom containers, daily goal progress |
-| 🔥 **Calories** | Walking calories from steps + manual workout logging |
-| 📊 **Dashboards** | Weekly bar charts, monthly breakdown by week, month selector with stats |
+| **Steps** | Real-time step counting via background service, daily goal, weekly & monthly graphs |
+| **Sleep** | Session-based sleep tracking, bedtime & wake reminders, goal tracking |
+| **Water** | Glass-based logging with custom containers, daily goal progress |
+| **Calories** | Walking calories from steps + manual workout logging |
+| **Dashboards** | Weekly bar charts, monthly breakdown by week, month selector with stats |
 
 <br/>
 
