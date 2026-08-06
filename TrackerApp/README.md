@@ -1,114 +1,96 @@
 # Tracker
 
-A personal health tracking app built with React Native (Expo) for Android. Tracks steps, sleep, water intake, and calories — all stored locally on the device.
+A personal health tracking app for Android. Tracks steps, sleep, water intake, and calories — all stored locally on your device. No account required, no data leaves your phone.
+
+<br/>
 
 ## Features
 
-- **Steps** — Real-time step counting via Android foreground service, daily goal tracking, weekly and monthly graphs
-- **Sleep** — Session-based sleep tracking with bedtime/wake reminders, goal tracking
-- **Water** — Glass-based water intake logging with custom containers, daily goal
-- **Calories** — Walking calories (from steps) + manual workout logging
-- **ABC** — Custom daily counter with optional daily summary notification
-- **Dashboards** — Weekly bar charts, monthly week-by-week breakdown, month selector with stats
+| Feature | Details |
+|---|---|
+| 👣 **Steps** | Real-time step counting via background service, daily goal, weekly & monthly graphs |
+| 😴 **Sleep** | Session-based sleep tracking, bedtime & wake reminders, goal tracking |
+| 💧 **Water** | Glass-based logging with custom containers, daily goal progress |
+| 🔥 **Calories** | Walking calories from steps + manual workout logging |
+| 📊 **Dashboards** | Weekly bar charts, monthly breakdown by week, month selector with stats |
+
+<br/>
+
+## Screenshots
+
+> Coming soon
+
+<br/>
+
+## Download
+
+Grab the latest APK from the [Releases](../../releases) page. Enable **Install unknown apps** on your Android device and install directly — no Play Store needed.
+
+<br/>
 
 ## Tech Stack
 
-- React Native + Expo (bare workflow)
-- TypeScript
-- Zustand (state management)
-- expo-sqlite (local database)
-- expo-notifications (reminders)
-- Custom Android native module for step counting (`StepCounterService.kt`)
+- **React Native** + **Expo** (bare workflow)
+- **TypeScript**
+- **Zustand** — state management
+- **expo-sqlite** — local database
+- **expo-notifications** — reminders
+- **Custom Android native module** — background step counting via `StepCounterService.kt`
 
-## Prerequisites
+<br/>
+
+## Building Locally
+
+### Prerequisites
 
 - Node.js 18+
 - Android Studio + Android SDK
 - Java 17
-- A physical Android device (step counter requires real hardware sensor)
+- Physical Android device (step counter requires real hardware sensor)
 
-## Setup
+### Setup
 
 ```bash
-# Install dependencies
+git clone https://github.com/Sups11996/Tracker.git
+cd Tracker/TrackerApp
 npm install
-
-# Start Metro bundler
-npx expo start
 ```
 
-## Building
+### Debug build
 
-### Debug build (development)
 ```bash
 npx expo run:android
 ```
 
-### Release build (unsigned)
+### Release APK
+
 ```bash
 cd android
 ./gradlew assembleRelease
 ```
 
-Output: `android/app/build/outputs/apk/release/app-release-unsigned.apk`
+Output: `android/app/build/outputs/apk/release/app-release.apk`
 
-Install on device:
 ```bash
-adb install android/app/build/outputs/apk/release/app-release-unsigned.apk
+adb install app/build/outputs/apk/release/app-release.apk
 ```
 
-### Release build (signed)
+<br/>
 
-1. Generate a keystore:
-```bash
-keytool -genkeypair -v -storetype PKCS12 -keystore my-release-key.keystore -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000
-```
+## Permissions
 
-2. Add to `android/app/build.gradle` under `signingConfigs`:
-```gradle
-signingConfigs {
-    release {
-        storeFile file('../../my-release-key.keystore')
-        storePassword 'your-password'
-        keyAlias 'my-key-alias'
-        keyPassword 'your-password'
-    }
-}
-```
+| Permission | Purpose |
+|---|---|
+| `ACTIVITY_RECOGNITION` | Step counting |
+| `FOREGROUND_SERVICE` | Background step tracking |
+| `POST_NOTIFICATIONS` | Step count notification + reminders |
+| `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` | Keep step service alive |
+| `RECEIVE_BOOT_COMPLETED` | Resume tracking after reboot |
 
-3. Build:
-```bash
-cd android
-./gradlew assembleRelease
-```
-
-## Project Structure
-
-```
-src/
-  features/        # Feature screens and components (steps, sleep, water, calories, abc)
-  stores/          # Zustand stores for each feature
-  hooks/           # App-level hooks (hydration, app state)
-  lib/             # Utilities (database, permissions, reminders, dateUtils)
-  navigation/      # Root navigator
-  components/      # Shared UI components
-  constants/       # Colors, spacing, typography
-android/
-  app/src/main/java/com/trackerapp/personal/
-    StepCounterService.kt   # Android foreground service for step counting
-    StepServiceModule.kt    # React Native bridge for step service
-```
-
-## Permissions Required
-
-- `ACTIVITY_RECOGNITION` — Step counting
-- `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_HEALTH` — Background step tracking
-- `POST_NOTIFICATIONS` — Reminders and step count notification
-- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` — Keep step service running
-- `RECEIVE_BOOT_COMPLETED` — Resume tracking after device restart
+<br/>
 
 ## Notes
 
-- All data is stored locally using SQLite — no server, no account required
-- Step counting works on physical Android devices only (no emulator)
-- For treadmill use: keep the phone on your body (pocket/hand) for accurate counting
+- All data is stored locally using SQLite — no server, no account, no internet required
+- Step counting works on physical Android devices only (not emulator)
+- Works on treadmills — keep the phone on your body for accurate counting
