@@ -6,16 +6,18 @@
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#000000"
+    },
     "ios": {
       "supportsTablet": false
     },
     "android": {
       "package": "com.trackerapp.personal",
+      "icon": "./assets/logo.png",
       "adaptiveIcon": {
         "backgroundColor": "#12141C",
-        "foregroundImage": "./assets/logo.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/logo.png"
+        "foregroundImage": "./assets/logo.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [

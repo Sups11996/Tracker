@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import { useIsFocused } from '@react-navigation/native';
 import { Footprints, PauseCircle, PlayCircle } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { ProgressRing } from '../../components/ui/ProgressRing';
@@ -28,13 +29,44 @@ interface StepHomeCardProps {
 
 export function StepHomeCard({ onPress }: StepHomeCardProps) {
   const db = useSQLiteContext();
+  const isFocused = useIsFocused();
   const { todaySteps, todayDistance, todayCalories, dailyGoal, status } = useStepStore();
 
+  // Initial hydration
   useEffect(() => {
     hydrateStepStore(db);
     subscribeToStepEvents();
     return () => unsubscribeFromStepEvents();
   }, []);
+
+  // Re-check tracking state from DB when screen is focused
+  useEffect(() => {
+    if (!isFocused) return;
+
+    async function reloadTrackingState() {
+      try {
+        console.log('🏠 [StepHomeCard] Screen focused, reloading tracking state from DB...');
+        const result = await db.getFirstAsync<{ is_tracking: number }>(
+          'SELECT is_tracking FROM step_tracking_state WHERE id = 1'
+        );
+        console.log('🏠 [StepHomeCard] DB result:', result);
+        
+        if (result) {
+          const isTracking = result.is_tracking === 1;
+          console.log('🏠 [StepHomeCard] Setting status:', { isTracking, willSetStatus: isTracking ? 'tracking' : 'paused' });
+          if (isTracking) {
+            useStepStore.getState().setStatus('tracking');
+          } else {
+            useStepStore.getState().setStatus('paused');
+          }
+        }
+      } catch (error) {
+        console.error('❌ [StepHomeCard] Failed to reload step tracking state:', error);
+      }
+    }
+
+    reloadTrackingState();
+  }, [isFocused, db]);
 
   const progress  = dailyGoal > 0 ? todaySteps / dailyGoal : 0;
   const remaining = Math.max(0, dailyGoal - todaySteps);
@@ -52,14 +84,39 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
     status === 'paused'   ? 'Paused' : 'Unavailable';
 
   function sendServiceAction(action: string) {
-    if (Platform.OS !== 'android' || !StepServiceModule) return;
+    console.log('🎬 [StepHomeCard] sendServiceAction called:', { action, status });
+    
     try {
       // Optimistically update status so UI responds immediately
-      if (action === 'pause') useStepStore.getState().setStatus('paused');
-      else if (action === 'resume') useStepStore.getState().setStatus('tracking');
-      StepServiceModule.sendAction(action);
+      if (action === 'pause') {
+        console.log('⏸️ [StepHomeCard] Setting status to paused');
+        useStepStore.getState().setStatus('paused');
+      } else if (action === 'resume') {
+        console.log('▶️ [StepHomeCard] Setting status to tracking');
+        useStepStore.getState().setStatus('tracking');
+      }
+      
+      // Try to send action to native module if available
+      if (Platform.OS === 'android' && StepServiceModule) {
+        StepServiceModule.sendAction(action);
+        console.log('✅ [StepHomeCard] Action sent to service:', action);
+      } else {
+        console.log('⚠️ [StepHomeCard] StepServiceModule not available (debug build)');
+      }
+      
+      // Update DB to persist the state
+      const isTracking = action === 'resume' ? 1 : 0;
+      db.runAsync(
+        'UPDATE step_tracking_state SET is_tracking = ?, updated_at = ? WHERE id = 1',
+        [isTracking, new Date().toISOString()]
+      ).then(() => {
+        console.log('✅ [StepHomeCard] DB updated with is_tracking:', isTracking);
+      }).catch((error) => {
+        console.error('❌ [StepHomeCard] Failed to update DB:', error);
+      });
+      
     } catch (error) {
-      console.error('Failed to send action to step service:', error);
+      console.error('❌ [StepHomeCard] Failed to send action to step service:', error);
     }
   }
 
@@ -98,19 +155,21 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
         </View>
 
         {/* Quick actions */}
-        <View style={styles.actions}>
-          <ActionBtn
-            icon={status === 'paused'
-              ? <PlayCircle  size={16} color={COLORS.steps} />
-              : <PauseCircle size={16} color={COLORS.textMuted} />
-            }
-            label={status === 'paused' ? 'Resume' : 'Pause'}
-            color={status === 'paused' ? COLORS.steps : COLORS.textMuted}
-            onPress={() => sendServiceAction(
-              status === 'paused' ? 'resume' : 'pause'
-            )}
-          />
-        </View>
+        {(status === 'tracking' || status === 'paused') && (
+          <View style={styles.actions}>
+            <ActionBtn
+              icon={status === 'paused'
+                ? <PlayCircle  size={16} color={COLORS.steps} />
+                : <PauseCircle size={16} color={COLORS.textMuted} />
+              }
+              label={status === 'paused' ? 'Resume' : 'Pause'}
+              color={status === 'paused' ? COLORS.steps : COLORS.textMuted}
+              onPress={() => sendServiceAction(
+                status === 'paused' ? 'resume' : 'pause'
+              )}
+            />
+          </View>
+        )}
       </Card>
     </TouchableOpacity>
   );

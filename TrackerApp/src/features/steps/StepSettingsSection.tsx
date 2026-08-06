@@ -21,7 +21,9 @@ export function StepSettingsSection() {
 
   // Sync trackingEnabled with store status whenever status changes
   useEffect(() => {
-    setTrackingEnabled(status !== 'unavailable');
+    const isTracking = status === 'tracking';
+    console.log('🔄 [StepSettings] Status changed:', { status, trackingEnabled: isTracking });
+    setTrackingEnabled(isTracking);
   }, [status]);
 
   // Load tracking state from DB on mount ONLY
@@ -30,21 +32,25 @@ export function StepSettingsSection() {
     
     async function loadTrackingState() {
       try {
+        console.log('📂 [StepSettings] Loading tracking state from DB...');
         const result = await db.getFirstAsync<{ is_tracking: number }>(
           'SELECT is_tracking FROM step_tracking_state WHERE id = 1'
         );
+        console.log('📂 [StepSettings] DB result:', result);
+        
         if (result) {
           const isTracking = result.is_tracking === 1;
+          console.log('📂 [StepSettings] Setting tracking state:', { isTracking, willSetStatus: isTracking ? 'tracking' : 'paused' });
           setTrackingEnabled(isTracking);
           if (isTracking) {
             useStepStore.getState().setStatus('tracking');
           } else {
-            useStepStore.getState().setStatus('unavailable');
+            useStepStore.getState().setStatus('paused');
           }
         }
         setHasLoaded(true);
       } catch (error) {
-        console.error('Failed to load step tracking state:', error);
+        console.error('❌ [StepSettings] Failed to load step tracking state:', error);
         setHasLoaded(true);
       }
     }
@@ -60,8 +66,8 @@ export function StepSettingsSection() {
 
     try {
       await db.runAsync(
-        'INSERT OR REPLACE INTO step_tracking_state (id, daily_goal) VALUES (1, ?)',
-        [newGoal]
+        'UPDATE step_tracking_state SET daily_goal = ?, updated_at = ? WHERE id = 1',
+        [newGoal, new Date().toISOString()]
       );
       useStepStore.setState({ dailyGoal: newGoal });
       setIsEditing(false);
@@ -76,30 +82,58 @@ export function StepSettingsSection() {
   }
 
   async function handleToggleTracking(enabled: boolean) {
+    console.log('🔀 [StepSettings] Toggle tracking called:', { enabled, currentState: trackingEnabled });
     setTrackingEnabled(enabled);
 
-    if (Platform.OS !== 'android' || !StepServiceModule) return;
-
     try {
+      console.log('💾 [StepSettings] Updating DB with is_tracking:', enabled ? 1 : 0);
+      
       if (enabled) {
-        await StepServiceModule.startService();
+        // Try to start service if available
+        if (Platform.OS === 'android' && StepServiceModule) {
+          await StepServiceModule.startService();
+          console.log('✅ [StepSettings] Service started');
+        } else {
+          console.log('⚠️ [StepSettings] StepServiceModule not available (debug build)');
+        }
+        
+        console.log('✅ [StepSettings] Setting status to tracking');
         useStepStore.getState().setStatus('tracking');
-        // Persist to DB
+        
+        // Update only is_tracking field in DB
         await db.runAsync(
-          'INSERT OR REPLACE INTO step_tracking_state (id, is_tracking, updated_at) VALUES (1, ?, ?)',
+          'UPDATE step_tracking_state SET is_tracking = ?, updated_at = ? WHERE id = 1',
           [1, new Date().toISOString()]
         );
+        console.log('✅ [StepSettings] DB updated with is_tracking = 1');
       } else {
-        await StepServiceModule.stopService();
-        useStepStore.getState().setStatus('unavailable');
-        // Persist to DB
+        // Try to stop service if available
+        if (Platform.OS === 'android' && StepServiceModule) {
+          await StepServiceModule.stopService();
+          console.log('⏸️ [StepSettings] Service stopped');
+        } else {
+          console.log('⚠️ [StepSettings] StepServiceModule not available (debug build)');
+        }
+        
+        console.log('⏸️ [StepSettings] Setting status to paused');
+        useStepStore.getState().setStatus('paused');
+        
+        // Update only is_tracking field in DB
         await db.runAsync(
-          'INSERT OR REPLACE INTO step_tracking_state (id, is_tracking, updated_at) VALUES (1, ?, ?)',
+          'UPDATE step_tracking_state SET is_tracking = ?, updated_at = ? WHERE id = 1',
           [0, new Date().toISOString()]
         );
+        console.log('✅ [StepSettings] DB updated with is_tracking = 0');
       }
+      
+      // Verify the DB update
+      const verify = await db.getFirstAsync<{ is_tracking: number }>(
+        'SELECT is_tracking FROM step_tracking_state WHERE id = 1'
+      );
+      console.log('🔍 [StepSettings] Verified DB state after update:', verify);
+      
     } catch (error) {
-      console.error('Failed to toggle step tracking:', error);
+      console.error('❌ [StepSettings] Failed to toggle step tracking:', error);
       setTrackingEnabled(!enabled);
     }
   }

@@ -117,7 +117,7 @@ export function PermissionsScreen() {
         status={batteryStatus}
         accentColor={COLORS.calories}
         onPress={requestBatteryOptimization}
-        actionLabel="Open Settings"
+        actionLabel="Allow"
       />
 
       <View style={styles.footer}>

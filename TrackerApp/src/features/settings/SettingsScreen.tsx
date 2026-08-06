@@ -294,13 +294,13 @@ export function SettingsScreen() {
         </View>
         
         {/* Settings Sections */}
-        <PermissionsSection />
         <StepSettingsSection />
         <SleepSettingsSection />
         <WaterSettingsSection />
         <CaloriesSettingsSection />
         <AbcSettingsSection />
-
+        <PermissionsSection />
+        
         {/* Data Management Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -746,6 +746,7 @@ const styles = StyleSheet.create({
 // ── Permissions Section ───────────────────────────────────────────────────────
 
 function PermissionsSection() {
+  const isFocused = useIsFocused();
   const [activityStatus, setActivityStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
   const [notifStatus, setNotifStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
   const [batteryStatus, setBatteryStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
@@ -758,30 +759,35 @@ function PermissionsSection() {
           const result = await PermissionsAndroid.check(
             PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION
           );
-          setActivityStatus(result ? 'granted' : 'denied');
+          // If denied, check if it was ever requested (use unknown if never requested)
+          setActivityStatus(result ? 'granted' : 'unknown');
         } catch {
-          setActivityStatus('denied');
+          setActivityStatus('unknown');
         }
       }
 
       // Notifications
       try {
         const { status } = await Notifications.getPermissionsAsync();
-        setNotifStatus(status === 'granted' ? 'granted' : 'denied');
+        setNotifStatus(status === 'granted' ? 'granted' : 'unknown');
       } catch {
-        setNotifStatus('denied');
+        setNotifStatus('unknown');
       }
 
       // Battery optimization
       try {
         const ignored = await isBatteryOptimizationIgnored();
-        setBatteryStatus(ignored ? 'granted' : 'denied');
+        setBatteryStatus(ignored ? 'granted' : 'unknown');
       } catch {
-        setBatteryStatus('denied');
+        setBatteryStatus('unknown');
       }
     }
-    checkPermissions();
-  }, []);
+    
+    // Re-check permissions whenever screen is focused
+    if (isFocused) {
+      checkPermissions();
+    }
+  }, [isFocused]);
 
   async function handleRequestActivity() {
     if (Platform.OS !== 'android') return;
@@ -796,7 +802,9 @@ function PermissionsSection() {
           buttonPositive: 'OK',
         }
       );
-      setActivityStatus(result === PermissionsAndroid.RESULTS.GRANTED ? 'granted' : 'denied');
+      const granted = result === PermissionsAndroid.RESULTS.GRANTED;
+      // If not granted after asking, set to 'denied' (user explicitly refused)
+      setActivityStatus(granted ? 'granted' : 'denied');
     } catch {
       setActivityStatus('denied');
     }
@@ -804,12 +812,13 @@ function PermissionsSection() {
 
   async function handleRequestNotifications() {
     const { status } = await Notifications.requestPermissionsAsync();
+    // If not granted after asking, set to 'denied'
     setNotifStatus(status === 'granted' ? 'granted' : 'denied');
   }
 
   function handleRequestBattery() {
     requestIgnoreBatteryOptimizations();
-    setBatteryStatus('granted');
+    // Don't optimistically set status - let the focus re-check handle it
   }
 
   return (
@@ -835,7 +844,7 @@ function PermissionsSection() {
           description="Keeps step tracking running in background"
           status={batteryStatus}
           onPress={handleRequestBattery}
-          actionLabel="Open Settings"
+          actionLabel="Allow"
         />
       </Card>
     </View>
@@ -855,6 +864,11 @@ function PermRow({
   onPress: () => void;
   actionLabel?: string;
 }) {
+  // Show actionLabel for both 'unknown' and 'denied' when permission is not granted
+  const buttonText = status === 'granted' ? null : (
+    status === 'unknown' ? actionLabel : 'Retry'
+  );
+  
   return (
     <View style={permStyles.row}>
       <View style={permStyles.info}>
@@ -870,7 +884,7 @@ function PermRow({
           activeOpacity={0.8}
         >
           <Text style={permStyles.allowText}>
-            {status === 'denied' ? 'Retry' : actionLabel}
+            {buttonText}
           </Text>
         </TouchableOpacity>
       )}
