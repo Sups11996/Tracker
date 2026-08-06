@@ -116,7 +116,6 @@ export function WaterContainersScreen() {
         setProfile({ ...saved, onboarding_complete: true, uses_gym: saved.uses_gym === 1, uses_abc: saved.uses_abc === 1 });
       }
     } catch (e) {
-      console.error('[WaterContainersScreen]', e);
       showError('Error', 'Could not save. Please try again.');
       setSaving(false);
     }

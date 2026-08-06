@@ -90,7 +90,6 @@ export function AbcDashboard() {
       setTimeBreakdown(breakdown);
 
     } catch (error) {
-      console.error('Failed to load ABC dashboard:', error);
     }
   }
 

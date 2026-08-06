@@ -81,14 +81,11 @@ export function CustomAlert({
   };
 
   const handleActionPress = (action: AlertAction) => {
-    // If action has onPress, call it but don't auto-dismiss
-    // Let the action handler decide when to show next alert or dismiss
     if (action.onPress) {
       action.onPress();
-    } else {
-      // No handler means just dismiss (like default OK button)
-      onDismiss?.();
     }
+    // Always dismiss after any action press
+    onDismiss?.();
   };
 
   const handleBackdropPress = () => {

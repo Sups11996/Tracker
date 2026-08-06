@@ -109,7 +109,6 @@ export function HomeScreen() {
         profile?.uses_abc ? hydrateAbcStore(db) : Promise.resolve(),
       ]);
     } catch (e) {
-      console.error('Refresh failed:', e);
     } finally {
       setRefreshing(false);
     }

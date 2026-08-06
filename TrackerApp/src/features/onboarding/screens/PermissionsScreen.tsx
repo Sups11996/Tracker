@@ -52,7 +52,6 @@ export function PermissionsScreen() {
           setActivityStatus('denied');
         }
       } catch (err) {
-        console.error('Failed to request activity permission:', err);
         setActivityStatus('denied');
       }
     } else {
