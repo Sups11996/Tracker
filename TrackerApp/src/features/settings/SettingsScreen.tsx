@@ -7,6 +7,7 @@ import {
   View,
   Platform,
   PermissionsAndroid,
+  NativeModules,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import * as Notifications from 'expo-notifications';
@@ -24,6 +25,7 @@ import { useUserStore } from '../../stores/userStore';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { getTodayLocal } from '../../lib/dateUtils';
+import { seedTestData } from '../../lib/seedData';
 import {
   requestIgnoreBatteryOptimizations,
   openUsageAccessSettings,
@@ -43,12 +45,45 @@ import {
   hydrateCaloriesStore,
   hydrateAbcStore,
 } from '../../stores';
+import { useStepStore } from '../../stores/stepStore';
+import { useWaterStore } from '../../stores/waterStore';
+import { useSleepStore } from '../../stores/sleepStore';
+import { useCaloriesStore } from '../../stores/caloriesStore';
+import { useAbcStore } from '../../stores/abcStore';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
+
+// Convert cm to ft.in display string (e.g. 175 → "5.9")
+function cmToFtIn(cm: number): string {
+  if (!cm) return '';
+  const totalInches = cm / 2.54;
+  const feet = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches % 12);
+  return `${feet}.${inches}`;
+}
+
+// Display cm as 5'9" format
+function cmToFtInDisplay(cm: number): string {
+  if (!cm) return '';
+  const totalInches = cm / 2.54;
+  const feet = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches % 12);
+  return `${feet}'${inches}"`;
+}
+
+// Convert ft.in string (e.g. "5.9") to cm
+function ftInToCm(ftIn: string): number {
+  const parsed = parseFloat(ftIn);
+  if (isNaN(parsed)) return NaN;
+  const feet = Math.floor(parsed);
+  const inches = Math.round((parsed - feet) * 10);
+  if (inches > 11) return NaN;
+  return Math.round(feet * 30.48 + inches * 2.54);
+}
 
 export function SettingsScreen() {
   const db = useSQLiteContext();
   const { profile, setProfile } = useUserStore();
-  const { showSuccess, showError, showConfirm } = useCustomAlert();
+  const { showSuccess, showError, showConfirm, showAlert } = useCustomAlert();
   const tabBarHeight = useBottomTabBarHeight();
   const isFocused = useIsFocused();
   
@@ -69,7 +104,7 @@ export function SettingsScreen() {
   const [profileForm, setProfileForm] = useState({
     username: profile?.username || '',
     age: profile?.age?.toString() || '',
-    height_cm: profile?.height_cm?.toString() || '',
+    height_ft_in: cmToFtIn(profile?.height_cm || 0),
     weight_kg: profile?.weight_kg?.toString() || '',
   });
 
@@ -77,7 +112,7 @@ export function SettingsScreen() {
     if (!profile) return;
 
     const age = parseInt(profileForm.age, 10);
-    const height = parseFloat(profileForm.height_cm);
+    const height = ftInToCm(profileForm.height_ft_in);
     const weight = parseFloat(profileForm.weight_kg);
 
     if (
@@ -86,7 +121,7 @@ export function SettingsScreen() {
       isNaN(height) || height < 100 || height > 250 ||
       isNaN(weight) || weight < 30 || weight > 300
     ) {
-      showError('Invalid input', 'Please check all fields are valid.');
+      showError('Invalid input', 'Enter height as ft.in (e.g. 5.9 for 5\'9\")');
       return;
     }
 
@@ -118,11 +153,39 @@ export function SettingsScreen() {
     setProfileForm({
       username: profile?.username || '',
       age: profile?.age?.toString() || '',
-      height_cm: profile?.height_cm?.toString() || '',
+      height_ft_in: cmToFtIn(profile?.height_cm || 0),
       weight_kg: profile?.weight_kg?.toString() || '',
     });
     setEditingProfile(false);
   }, [profile]);
+
+  async function handleSeedTestData() {
+    showConfirm(
+      'Seed Test Data',
+      'This will add 14 days of sample data for all features. This is for testing purposes only.',
+      async () => {
+        try {
+          await seedTestData(db);
+          
+          // Reload all stores to show new data
+          await hydrateStepStore(db);
+          await hydrateSleepStore(db);
+          await hydrateWaterStore(db);
+          await hydrateCaloriesStore(db);
+          if (profile?.uses_abc) {
+            await hydrateAbcStore(db);
+          }
+          
+          showSuccess('Done', 'Test data added! Check your dashboards.');
+        } catch (error) {
+          console.error('Failed to seed test data:', error);
+          showError('Error', 'Failed to seed test data. Check console for details.');
+        }
+      },
+      'Seed Data',
+      false
+    );
+  }
 
   if (!profile) {
     return (
@@ -141,6 +204,7 @@ export function SettingsScreen() {
         style={styles.scroll} 
         contentContainerStyle={[styles.container, { paddingBottom: tabBarHeight + SPACING.lg }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.title}>Settings</Text>
         
@@ -214,12 +278,12 @@ export function SettingsScreen() {
 
                 {/* Height */}
                 <View style={styles.field}>
-                  <Text style={styles.fieldLabel}>Height (cm)</Text>
+                  <Text style={styles.fieldLabel}>Height (ft.in)</Text>
                   <TextInput
-                    value={profileForm.height_cm}
-                    onChangeText={(value) => setProfileForm(prev => ({ ...prev, height_cm: value }))}
-                    placeholder="170"
-                    keyboardType="numeric"
+                    value={profileForm.height_ft_in}
+                    onChangeText={(value) => setProfileForm(prev => ({ ...prev, height_ft_in: value }))}
+                    placeholder="e.g. 5.9"
+                    keyboardType="decimal-pad"
                     style={styles.input}
                   />
                 </View>
@@ -273,7 +337,7 @@ export function SettingsScreen() {
                   </View>
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Height:</Text>
-                    <Text style={styles.summaryValue}>{profile.height_cm} cm</Text>
+                    <Text style={styles.summaryValue}>{cmToFtInDisplay(profile.height_cm)}</Text>
                   </View>
                   <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Weight:</Text>
@@ -309,29 +373,114 @@ export function SettingsScreen() {
 
           <Card style={styles.card}>
             <Text style={styles.dataSubtitle}>
-              Clear historical data for each feature. Your current day data will be preserved.
+              Clear historical data for each feature. Tap an item to choose what to delete.
             </Text>
 
             <View style={styles.dataList}>
               <DataClearButton
                 db={db}
                 label="Steps History"
-                description="Clears all step records except today"
+                description="Step records"
                 color={COLORS.steps}
-                onClear={async () => {
+                onClearToday={async () => {
+                  const today = getTodayLocal();
+                  console.log('🗑️ Deleting steps for today:', today);
+                  
+                  // Check rows before
+                  const before = await db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM daily_steps WHERE date = ?', [today]);
+                  console.log('📊 Steps rows before delete:', before);
+                  
+                  await db.runAsync('DELETE FROM daily_steps WHERE date = ?', [today]);
+                  
+                  // Check rows after
+                  const after = await db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM daily_steps WHERE date = ?', [today]);
+                  console.log('📊 Steps rows after delete:', after);
+                  
+                  // Reset native service counter
+                  if (Platform.OS === 'android' && NativeModules.StepServiceModule) {
+                    try {
+                      console.log('📱 Sending reset action to native service');
+                      await NativeModules.StepServiceModule.sendAction('reset');
+                      console.log('✅ Native service reset completed');
+                    } catch (error) {
+                      console.error('❌ Failed to reset native service:', error);
+                    }
+                  }
+                  
+                  // Reset in-memory store
+                  console.log('🧹 Resetting step store to 0');
+                  useStepStore.setState({ 
+                    todaySteps: 0, 
+                    todayDistance: 0, 
+                    todayCalories: 0,
+                    // Don't clear weekly/monthly - those are historical data
+                  });
+                  
+                  await hydrateStepStore(db);
+                  console.log('✅ hydrateStepStore done');
+                }}
+                onClearExceptToday={async () => {
                   const today = getTodayLocal();
                   await db.runAsync('DELETE FROM daily_steps WHERE date < ?', [today]);
                   await hydrateStepStore(db);
+                }}
+                onClearAll={async () => {
+                  await db.runAsync('DELETE FROM daily_steps');
+                  
+                  // Reset native service counter
+                  if (Platform.OS === 'android' && NativeModules.StepServiceModule) {
+                    try {
+                      console.log('📱 Sending reset action to native service');
+                      await NativeModules.StepServiceModule.sendAction('reset');
+                      console.log('✅ Native service reset completed');
+                    } catch (error) {
+                      console.error('❌ Failed to reset native service:', error);
+                    }
+                  }
+                  
+                  await hydrateStepStore(db);
+                  useStepStore.setState({ 
+                    todaySteps: 0, 
+                    todayDistance: 0, 
+                    todayCalories: 0,
+                    // Don't clear weekly/monthly - those are historical data
+                  });
                 }}
               />
 
               <DataClearButton
                 db={db}
                 label="Sleep History"
-                description="Clears all sleep sessions except active"
+                description="Sleep sessions"
                 color={COLORS.sleep}
-                onClear={async () => {
+                onClearToday={async () => {
+                  const today = getTodayLocal();
+                  await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0 AND date = ?', [today]);
+                  
+                  // Reset store state
+                  useSleepStore.setState({ 
+                    lastNightDuration: null,
+                    lastNightQuality: null,
+                    recentSessions: [] 
+                  });
+                  
+                  await hydrateSleepStore(db);
+                }}
+                onClearExceptToday={async () => {
+                  const today = getTodayLocal();
+                  await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0 AND date < ?', [today]);
+                  await hydrateSleepStore(db);
+                }}
+                onClearAll={async () => {
                   await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0');
+                  
+                  // Reset store state
+                  useSleepStore.setState({ 
+                    lastNightDuration: null,
+                    lastNightQuality: null,
+                    recentSessions: [] 
+                  });
+                  
                   await hydrateSleepStore(db);
                 }}
               />
@@ -339,12 +488,39 @@ export function SettingsScreen() {
               <DataClearButton
                 db={db}
                 label="Water History"
-                description="Clears all water logs except today"
+                description="Water logs"
                 color={COLORS.water}
-                onClear={async () => {
+                onClearToday={async () => {
+                  const today = getTodayLocal();
+                  await db.runAsync('DELETE FROM water_logs WHERE date = ?', [today]);
+                  await db.runAsync('DELETE FROM water_daily_summary WHERE date = ?', [today]);
+                  
+                  // Reset store state
+                  useWaterStore.setState({ 
+                    todayTotal: 0,
+                    logs: [],
+                    undoStack: [],
+                  });
+                  
+                  await hydrateWaterStore(db);
+                }}
+                onClearExceptToday={async () => {
                   const today = getTodayLocal();
                   await db.runAsync('DELETE FROM water_logs WHERE date < ?', [today]);
                   await db.runAsync('DELETE FROM water_daily_summary WHERE date < ?', [today]);
+                  await hydrateWaterStore(db);
+                }}
+                onClearAll={async () => {
+                  await db.runAsync('DELETE FROM water_logs');
+                  await db.runAsync('DELETE FROM water_daily_summary');
+                  
+                  // Reset store state
+                  useWaterStore.setState({ 
+                    todayTotal: 0,
+                    logs: [],
+                    undoStack: [],
+                  });
+                  
                   await hydrateWaterStore(db);
                 }}
               />
@@ -352,12 +528,39 @@ export function SettingsScreen() {
               <DataClearButton
                 db={db}
                 label="Calories History"
-                description="Clears all workout logs except today"
+                description="Workout logs"
                 color={COLORS.calories}
-                onClear={async () => {
+                onClearToday={async () => {
+                  const today = getTodayLocal();
+                  await db.runAsync('DELETE FROM workout_logs WHERE date = ?', [today]);
+                  await db.runAsync('DELETE FROM calories_daily_summary WHERE date = ?', [today]);
+                  
+                  // Reset store state
+                  useCaloriesStore.setState({ 
+                    workoutCalories: 0,
+                    workoutLogs: [],
+                    totalCalories: useCaloriesStore.getState().walkingCalories, // Keep walking calories
+                  });
+                  
+                  await hydrateCaloriesStore(db);
+                }}
+                onClearExceptToday={async () => {
                   const today = getTodayLocal();
                   await db.runAsync('DELETE FROM workout_logs WHERE date < ?', [today]);
                   await db.runAsync('DELETE FROM calories_daily_summary WHERE date < ?', [today]);
+                  await hydrateCaloriesStore(db);
+                }}
+                onClearAll={async () => {
+                  await db.runAsync('DELETE FROM workout_logs');
+                  await db.runAsync('DELETE FROM calories_daily_summary');
+                  
+                  // Reset store state
+                  useCaloriesStore.setState({ 
+                    workoutCalories: 0,
+                    workoutLogs: [],
+                    totalCalories: useCaloriesStore.getState().walkingCalories, // Keep walking calories
+                  });
+                  
                   await hydrateCaloriesStore(db);
                 }}
               />
@@ -365,13 +568,26 @@ export function SettingsScreen() {
               <DataClearButton
                 db={db}
                 label="ABC History"
-                description="Clears all ABC logs except today"
+                description="ABC logs"
                 color={COLORS.abc}
-                onClear={async () => {
+                onClearToday={async () => {
+                  const today = getTodayLocal();
+                  await db.runAsync('DELETE FROM abc_logs WHERE date = ?', [today]);
+                  await db.runAsync('DELETE FROM abc_daily_summary WHERE date = ?', [today]);
+                  await hydrateAbcStore(db);
+                  useAbcStore.getState().setTodayCount(0);
+                }}
+                onClearExceptToday={async () => {
                   const today = getTodayLocal();
                   await db.runAsync('DELETE FROM abc_logs WHERE date < ?', [today]);
                   await db.runAsync('DELETE FROM abc_daily_summary WHERE date < ?', [today]);
                   await hydrateAbcStore(db);
+                }}
+                onClearAll={async () => {
+                  await db.runAsync('DELETE FROM abc_logs');
+                  await db.runAsync('DELETE FROM abc_daily_summary');
+                  await hydrateAbcStore(db);
+                  useAbcStore.getState().setTodayCount(0);
                 }}
               />
             </View>
@@ -396,35 +612,89 @@ export function SettingsScreen() {
   async function handleClearAllData() {
     showConfirm(
       'Clear All Data',
-      'This will delete ALL historical data across all features. This action cannot be undone. Are you sure?',
-      async () => {
-        try {
-          const today = getTodayLocal();
-          
-          await db.runAsync('DELETE FROM daily_steps WHERE date < ?', [today]);
-          await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0');
-          await db.runAsync('DELETE FROM water_logs WHERE date < ?', [today]);
-          await db.runAsync('DELETE FROM water_daily_summary WHERE date < ?', [today]);
-          await db.runAsync('DELETE FROM workout_logs WHERE date < ?', [today]);
-          await db.runAsync('DELETE FROM calories_daily_summary WHERE date < ?', [today]);
-          await db.runAsync('DELETE FROM abc_logs WHERE date < ?', [today]);
-          await db.runAsync('DELETE FROM abc_daily_summary WHERE date < ?', [today]);
-
-          await hydrateStepStore(db);
-          await hydrateSleepStore(db);
-          await hydrateWaterStore(db);
-          await hydrateCaloriesStore(db);
-          await hydrateAbcStore(db);
-
-          showSuccess('Success', 'All historical data has been cleared.');
-        } catch (error) {
-          console.error('Failed to clear data:', error);
-          showError('Error', 'Failed to clear data. Please try again.');
-        }
+      'This will delete ALL historical data across all features. This cannot be undone.',
+      () => {
+        // Ask about today's data
+        setTimeout(() => {
+          showAlert({
+            title: 'Include Today?',
+            message: "Do you also want to delete today's data?",
+            type: 'warning',
+            actions: [
+              {
+                text: 'Keep Today',
+                style: 'default',
+                onPress: () => clearAllData(false),
+              },
+              {
+                text: 'Delete Everything',
+                style: 'destructive',
+                onPress: () => clearAllData(true),
+              },
+            ],
+          });
+        }, 100);
       },
-      'Clear All',
+      'Continue',
       true
     );
+  }
+
+  async function clearAllData(includeToday: boolean) {
+    try {
+      const today = getTodayLocal();
+
+      if (includeToday) {
+        await db.runAsync('DELETE FROM daily_steps');
+        await db.runAsync('DELETE FROM sleep_sessions');
+        await db.runAsync('DELETE FROM water_logs');
+        await db.runAsync('DELETE FROM water_daily_summary');
+        await db.runAsync('DELETE FROM workout_logs');
+        await db.runAsync('DELETE FROM calories_daily_summary');
+        await db.runAsync('DELETE FROM abc_logs');
+        await db.runAsync('DELETE FROM abc_daily_summary');
+
+        // Reset native step service
+        if (Platform.OS === 'android' && NativeModules.StepServiceModule) {
+          try { await NativeModules.StepServiceModule.sendAction('reset'); } catch (_) {}
+        }
+
+        // Reset all in-memory stores
+        useStepStore.setState({ todaySteps: 0, todayDistance: 0, todayCalories: 0, weeklyData: [], monthlyData: [] });
+        useWaterStore.setState({ todayTotal: 0, logs: [], undoStack: [] });
+        useCaloriesStore.setState({ walkingCalories: 0, workoutCalories: 0, totalCalories: 0, workoutLogs: [] });
+        useSleepStore.setState({ lastNightDuration: null, lastNightQuality: null, recentSessions: [], isActive: false, sessionStartTime: null, elapsedMinutes: 0 });
+        useAbcStore.getState().setTodayCount(0);
+
+      } else {
+        await db.runAsync('DELETE FROM daily_steps WHERE date < ?', [today]);
+        await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0');
+        await db.runAsync('DELETE FROM water_logs WHERE date < ?', [today]);
+        await db.runAsync('DELETE FROM water_daily_summary WHERE date < ?', [today]);
+        await db.runAsync('DELETE FROM workout_logs WHERE date < ?', [today]);
+        await db.runAsync('DELETE FROM calories_daily_summary WHERE date < ?', [today]);
+        await db.runAsync('DELETE FROM abc_logs WHERE date < ?', [today]);
+        await db.runAsync('DELETE FROM abc_daily_summary WHERE date < ?', [today]);
+
+        // Reset sleep last night since all sessions were deleted
+        useSleepStore.setState({ lastNightDuration: null, lastNightQuality: null, recentSessions: [] });
+      }
+
+      await hydrateStepStore(db);
+      await hydrateSleepStore(db);
+      await hydrateWaterStore(db);
+      await hydrateCaloriesStore(db);
+      await hydrateAbcStore(db);
+
+      setTimeout(() => {
+        showSuccess('Success', 'All data has been cleared.');
+      }, 100);
+    } catch (error) {
+      console.error('Failed to clear data:', error);
+      setTimeout(() => {
+        showError('Error', 'Failed to clear data. Please try again.');
+      }, 100);
+    }
   }
 }
 
@@ -433,35 +703,82 @@ interface DataClearButtonProps {
   label: string;
   description: string;
   color: string;
-  onClear: () => Promise<void>;
+  onClearToday: () => Promise<void>;
+  onClearExceptToday: () => Promise<void>;
+  onClearAll: () => Promise<void>;
 }
 
-function DataClearButton({ db, label, description, color, onClear }: DataClearButtonProps) {
+function DataClearButton({ db, label, description, color, onClearToday, onClearExceptToday, onClearAll }: DataClearButtonProps) {
   const [clearing, setClearing] = useState(false);
-  const { showSuccess, showError, showConfirm } = useCustomAlert();
+  const { showSuccess, showError, showConfirm, showAlert } = useCustomAlert();
 
-  async function handleClear() {
-    showConfirm(
-      `Clear ${label}`,
-      `${description}. This cannot be undone. Continue?`,
-      () => {
-        // Show success immediately for instant feedback
-        showSuccess('Success', `${label} cleared successfully.`);
-        
-        // Clear in background without blocking
-        setClearing(true);
-        onClear()
-          .catch((error) => {
-            console.error(`Failed to clear ${label}:`, error);
-            showError('Error', `Failed to clear ${label}. Please try again.`);
-          })
-          .finally(() => {
-            setClearing(false);
-          });
-      },
-      'Clear',
-      true
-    );
+  async function runClear(mode: 'today' | 'exceptToday' | 'all') {
+    setClearing(true);
+    try {
+      console.log('🗑️ runClear called with mode:', mode);
+      if (mode === 'today') {
+        await onClearToday();
+      } else if (mode === 'exceptToday') {
+        await onClearExceptToday();
+      } else {
+        await onClearAll();
+      }
+      console.log('✅ runClear completed for mode:', mode);
+      const msg =
+        mode === 'today' ? "Today's data has been cleared." :
+        mode === 'exceptToday' ? 'All history except today has been cleared.' :
+        'All data has been completely cleared.';
+      setTimeout(() => showSuccess('Done', msg), 100);
+    } catch (error) {
+      console.error(`❌ Failed to clear ${label}:`, error);
+      setTimeout(() => showError('Error', `Failed to clear ${label}. Please try again.`), 100);
+    } finally {
+      setClearing(false);
+    }
+  }
+
+  function handleClear() {
+    showAlert({
+      title: `Clear ${label}`,
+      message: 'What would you like to delete?',
+      type: 'warning',
+      actions: [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Today Only',
+          style: 'default',
+          onPress: () => setTimeout(() => showConfirm(
+            `Clear Today's ${label}`,
+            "This will delete only today's data. This cannot be undone.",
+            () => runClear('today'),
+            'Delete',
+            true
+          ), 100),
+        },
+        {
+          text: 'All Data',
+          style: 'destructive',
+          onPress: () => setTimeout(() => showAlert({
+            title: 'Include Today?',
+            message: "Do you also want to delete today's data?",
+            type: 'warning',
+            actions: [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Keep Today',
+                style: 'default',
+                onPress: () => runClear('exceptToday'),
+              },
+              {
+                text: 'Delete Everything',
+                style: 'destructive',
+                onPress: () => runClear('all'),
+              },
+            ],
+          }), 100),
+        },
+      ],
+    });
   }
 
   return (
@@ -725,6 +1042,11 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.size.sm,
     fontWeight: TYPOGRAPHY.weight.semibold,
     color: COLORS.error,
+  },
+  dangerSubtext: {
+    fontSize: TYPOGRAPHY.size.xs,
+    color: COLORS.textMuted,
+    marginTop: SPACING.xs,
   },
   editProfileButton: {
     paddingVertical: SPACING.md,

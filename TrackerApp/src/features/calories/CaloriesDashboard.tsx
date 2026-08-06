@@ -1,167 +1,269 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Flame, Trash2 } from 'lucide-react-native';
+import { Trash2 } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { BarChart } from '../steps/BarChart';
-import {
-  useCaloriesStore,
-  deleteWorkout,
-  type WorkoutLog,
-} from '../../stores/caloriesStore';
+import { useCaloriesStore, deleteWorkout, type WorkoutLog } from '../../stores/caloriesStore';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 interface DayCalories {
   date: string;
   total: number;
+  goal_met: boolean;
 }
 
 export function CaloriesDashboard() {
   const db = useSQLiteContext();
-  const { workoutLogs } = useCaloriesStore();
+  const { totalCalories, workoutLogs } = useCaloriesStore();
   const tabBarHeight = useBottomTabBarHeight();
 
-  const [last7, setLast7] = useState<DayCalories[]>([]);
-  const [allWorkouts, setAllWorkouts] = useState<WorkoutLog[]>([]);
-  const [stats, setStats] = useState({
-    avgTotal: 0,
-    bestDay: 0,
-    totalWorkouts: 0,
-    avgWorkoutCal: 0,
-  });
+  const [thisWeekData, setThisWeekData] = useState<DayCalories[]>([]);
+  const [currentMonthData, setCurrentMonthData] = useState<DayCalories[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [selectedMonthData, setSelectedMonthData] = useState<DayCalories[]>([]);
+  const [recentWorkouts, setRecentWorkouts] = useState<WorkoutLog[]>([]);
 
   useEffect(() => {
-    loadData();
-  }, [workoutLogs]);
+    loadWeekAndMonth();
+    loadRecentWorkouts();
+  }, [totalCalories, workoutLogs, db]);
 
-  async function loadData() {
+  useEffect(() => {
+    loadSelectedMonth(selectedMonth);
+  }, [selectedMonth, db]);
+
+  async function getDayCalories(dateStr: string, todayStr: string): Promise<number> {
+    if (dateStr === todayStr) return totalCalories;
+    const stepRow = await db.getFirstAsync<{ calories: number }>(
+      `SELECT calories FROM daily_steps WHERE date = ?`, [dateStr]
+    );
+    const workoutRow = await db.getFirstAsync<{ total: number }>(
+      `SELECT SUM(calories) as total FROM workout_logs WHERE date = ?`, [dateStr]
+    );
+    return Math.round((stepRow?.calories || 0) + (workoutRow?.total || 0));
+  }
+
+  async function loadWeekAndMonth() {
     try {
-      // 7-day calories (walking + workout combined)
-      const stepRows = await db.getAllAsync<{ date: string; calories: number }>(
-        `SELECT date, calories FROM daily_steps ORDER BY date DESC LIMIT 7`
-      );
-      const workoutRows = await db.getAllAsync<{ date: string; total: number }>(
-        `SELECT date, SUM(calories) as total FROM workout_logs GROUP BY date ORDER BY date DESC LIMIT 7`
-      );
+      const todayStr = getTodayStr();
 
-      // Merge by date
-      const dateMap: Record<string, number> = {};
-      for (const r of stepRows) dateMap[r.date] = (dateMap[r.date] ?? 0) + r.calories;
-      for (const r of workoutRows) dateMap[r.date] = (dateMap[r.date] ?? 0) + r.total;
-
-      const sorted = Object.entries(dateMap)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .slice(-7)
-        .map(([date, total]) => ({ date, total: Math.round(total) }));
-
-      setLast7(sorted);
-
-      // Stats
-      if (sorted.length > 0) {
-        const totals = sorted.map(d => d.total);
-        const avg = Math.round(totals.reduce((a, b) => a + b, 0) / totals.length);
-        const best = Math.max(...totals);
-        setStats(s => ({ ...s, avgTotal: avg, bestDay: best }));
+      // ── This week ────────────────────────────────────────────────────────
+      const weekDates = getThisWeekDates();
+      const week: DayCalories[] = [];
+      for (const dateStr of weekDates) {
+        const total = await getDayCalories(dateStr, todayStr);
+        week.push({ date: dateStr, total, goal_met: total > 0 });
       }
+      setThisWeekData(week);
 
-      // All recent workouts (last 14 days)
+      // ── Current month ────────────────────────────────────────────────────
+      const monthDates = getCurrentMonthDates();
+      const month: DayCalories[] = [];
+      for (const dateStr of monthDates) {
+        const total = await getDayCalories(dateStr, todayStr);
+        month.push({ date: dateStr, total, goal_met: total > 0 });
+      }
+      setCurrentMonthData(month);
+    } catch (e) {
+      console.error('Failed to load calories week/month:', e);
+    }
+  }
+
+  async function loadSelectedMonth(month: Date) {
+    try {
+      const todayStr = getTodayStr();
+      const year = month.getFullYear();
+      const monthIndex = month.getMonth();
+      const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+      const isCurrentMonth = month.getMonth() === new Date().getMonth() && month.getFullYear() === new Date().getFullYear();
+      const lastDay = isCurrentMonth ? new Date().getDate() : daysInMonth;
+
+      const data: DayCalories[] = [];
+      for (let day = 1; day <= lastDay; day++) {
+        const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const total = await getDayCalories(dateStr, todayStr);
+        data.push({ date: dateStr, total, goal_met: total > 0 });
+      }
+      setSelectedMonthData(data);
+    } catch (e) {
+      console.error('Failed to load selected month calories:', e);
+    }
+  }
+
+  async function loadRecentWorkouts() {
+    try {
       const workouts = await db.getAllAsync<WorkoutLog>(
         `SELECT id, date, logged_at, duration_mins, intensity, calories, note
          FROM workout_logs
          ORDER BY logged_at DESC
          LIMIT 20`
       );
-      setAllWorkouts(workouts);
-
-      const totalWorkouts = workouts.length;
-      const avgWoCal = totalWorkouts > 0
-        ? Math.round(workouts.reduce((s, w) => s + w.calories, 0) / totalWorkouts)
-        : 0;
-      setStats(s => ({ ...s, totalWorkouts, avgWorkoutCal: avgWoCal }));
-
-    } catch (error) {
-      console.error('Failed to load calories dashboard:', error);
+      setRecentWorkouts(workouts);
+    } catch (e) {
+      console.error('Failed to load recent workouts:', e);
     }
   }
 
-  async function handleDelete(id: number) {
+  async function handleDeleteWorkout(id: number) {
     try {
       await deleteWorkout(db, id);
-      setAllWorkouts(prev => prev.filter(w => w.id !== id));
+      setRecentWorkouts(prev => prev.filter(w => w.id !== id));
     } catch (e) {
-      // silent fail — UI reverts on next hydration
+      console.error('Failed to delete workout:', e);
     }
   }
 
-  const chartData = last7.map(d => ({
-    label: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' }),
-    value: d.total,
-  }));
+  // ── Derived values ──────────────────────────────────────────────────────────
+  const weeksInMonth = getWeeksInCurrentMonth(currentMonthData);
+  const weeklyTotal = thisWeekData.reduce((s, d) => s + d.total, 0);
+  const allDays = currentMonthData.filter(d => d.total > 0);
+  const highCal = allDays.length ? Math.max(...allDays.map(d => d.total)) : 0;
 
-  const maxVal = chartData.length > 0 ? Math.max(...chartData.map(d => d.value), 500) : 500;
+  const selectedStats = calculateMonthStats(selectedMonthData);
+
+  // Stats card
+  const avgCal = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.total, 0) / allDays.length) : 0;
+  const lowCal = allDays.length ? Math.min(...allDays.map(d => d.total)) : 0;
+  let streak = 0;
+  for (const d of [...allDays].sort((a, b) => b.date.localeCompare(a.date))) {
+    if (d.total > 0) streak++; else break;
+  }
+
+  function goToPreviousMonth() {
+    setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  }
+  function goToNextMonth() {
+    const next = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 1);
+    if (next <= new Date()) setSelectedMonth(next);
+  }
+  const canGoNext = selectedMonth.getMonth() < new Date().getMonth() || selectedMonth.getFullYear() < new Date().getFullYear();
 
   return (
     <ScrollView
-      style={styles.container}
+      style={styles.scroll}
       contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <Flame size={24} color={COLORS.calories} />
-        <Text style={styles.title}>Calories</Text>
-      </View>
-
-      {/* Stats grid */}
-      <View style={styles.grid}>
-        <StatCard label="Daily Avg" value={`${stats.avgTotal}`} sub="kcal" accentColor={COLORS.calories} />
-        <StatCard label="Best Day"  value={`${stats.bestDay}`}  sub="kcal" accentColor={COLORS.success} />
-        <StatCard label="Workouts"  value={`${stats.totalWorkouts}`} sub="logged" accentColor={COLORS.calories} />
-        <StatCard label="Avg Workout" value={`${stats.avgWorkoutCal}`} sub="kcal" accentColor={COLORS.steps} />
-      </View>
-
-      {/* 7-day chart */}
-      <Card style={styles.chartCard}>
-        <Text style={styles.chartTitle}>Last 7 Days (kcal)</Text>
-        {chartData.length > 0 ? (
-          <BarChart
-            data={chartData}
-            height={180}
+      {/* Today */}
+      <Card style={styles.section}>
+        <SectionTitle title="Today" />
+        <View style={styles.statRow}>
+          <StatCard
+            label="Calories"
+            value={`${totalCalories} kcal`}
+            sub={`Walking + Workouts`}
             accentColor={COLORS.calories}
-            maxValue={maxVal}
           />
-        ) : (
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>No data yet</Text>
-          </View>
-        )}
+          <StatCard
+            label="Workouts"
+            value={workoutLogs.length.toString()}
+            sub="today"
+            accentColor={COLORS.calories}
+          />
+        </View>
       </Card>
 
-      {/* Workout history */}
-      <Card style={styles.historyCard}>
-        <Text style={styles.chartTitle}>Recent Workouts</Text>
-        {allWorkouts.length === 0 ? (
+      {/* This week */}
+      <Card style={styles.section}>
+        <SectionTitle title="This Week" sub={`${weeklyTotal} kcal total`} />
+        <BarChart
+          data={thisWeekData.map(d => ({
+            label: formatDay(d.date),
+            topLabel: formatDate(d.date),
+            value: d.total,
+            valueLabel: d.total > 0 ? `${d.total}` : '',
+            goalMet: d.goal_met,
+          }))}
+          maxValue={Math.max(highCal, 500, 1)}
+          accentColor={COLORS.calories}
+        />
+      </Card>
+
+      {/* Weekly graphs for current month */}
+      {weeksInMonth.map((week, index) => (
+        <Card key={index} style={styles.section}>
+          <SectionTitle title={`Week ${index + 1}`} sub={week.dateRange} />
+          <BarChart
+            data={week.data.map((d: DayCalories) => ({
+              label: formatDay(d.date),
+              topLabel: formatDate(d.date),
+              value: d.total,
+              valueLabel: d.total > 0 ? `${d.total}` : '',
+              goalMet: d.goal_met,
+            }))}
+            maxValue={Math.max(highCal, 500, 1)}
+            accentColor={COLORS.calories}
+          />
+        </Card>
+      ))}
+
+      {/* Month selector */}
+      <Card style={styles.section}>
+        <View style={styles.monthSelector}>
+          <TouchableOpacity onPress={goToPreviousMonth} style={styles.monthButton}>
+            <Text style={styles.monthButtonText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.monthTitle}>
+            {selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </Text>
+          <TouchableOpacity
+            onPress={goToNextMonth}
+            style={[styles.monthButton, !canGoNext && styles.monthButtonDisabled]}
+            disabled={!canGoNext}
+          >
+            <Text style={[styles.monthButtonText, !canGoNext && styles.monthButtonTextDisabled]}>→</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.statRow}>
+          <StatCard label="Total" value={`${selectedStats.totalCal} kcal`} accentColor={COLORS.calories} />
+          <StatCard label="Daily Avg" value={`${selectedStats.avgCal} kcal`} accentColor={COLORS.calories} />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard label="Most" value={`${selectedStats.mostCal} kcal`} accentColor={COLORS.success} />
+          <StatCard label="Least" value={selectedStats.leastCal > 0 ? `${selectedStats.leastCal} kcal` : '—'} accentColor={COLORS.textSecondary} />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard label="Active Days" value={`${selectedStats.activeDays} days`} accentColor={COLORS.calories} />
+          <StatCard label="Rest Days" value={`${selectedStats.restDays} days`} accentColor={COLORS.textSecondary} />
+        </View>
+      </Card>
+
+      {/* Stats */}
+      <Card style={styles.section}>
+        <SectionTitle title="Stats" />
+        <View style={styles.statRow}>
+          <StatCard label="Daily Avg" value={`${avgCal} kcal`} accentColor={COLORS.calories} />
+          <StatCard label="Best Day" value={`${highCal} kcal`} accentColor={COLORS.calories} />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard label="Lowest Day" value={lowCal > 0 ? `${lowCal} kcal` : '—'} accentColor={COLORS.textSecondary} />
+          <StatCard label="Active Streak" value={`${streak} days`} accentColor={streak > 0 ? COLORS.success : COLORS.textSecondary} />
+        </View>
+      </Card>
+
+      {/* Recent Workouts */}
+      <Card style={styles.section}>
+        <SectionTitle title="Recent Workouts" />
+        {recentWorkouts.length === 0 ? (
           <Text style={styles.emptyText}>No workouts logged yet</Text>
         ) : (
           <View style={styles.workoutList}>
-            {allWorkouts.map((w) => (
+            {recentWorkouts.map(w => (
               <View key={w.id} style={styles.workoutRow}>
                 <View style={styles.workoutInfo}>
                   <Text style={styles.workoutTitle}>
-                    {w.duration_mins}min · {capitalize(w.intensity)}
-                    {w.note ? ` · ${w.note}` : ''}
+                    {w.duration_mins}min · {capitalize(w.intensity)}{w.note ? ` · ${w.note}` : ''}
                   </Text>
                   <Text style={styles.workoutDate}>
-                    {new Date(w.logged_at).toLocaleDateString('en-US', {
-                      month: 'short', day: 'numeric',
-                    })}
+                    {new Date(w.logged_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   </Text>
                 </View>
                 <View style={styles.workoutRight}>
                   <Text style={styles.workoutCal}>{w.calories} kcal</Text>
-                  <TouchableOpacity onPress={() => handleDelete(w.id)} hitSlop={8}>
+                  <TouchableOpacity onPress={() => handleDeleteWorkout(w.id)} hitSlop={8}>
                     <Trash2 size={16} color={COLORS.textMuted} />
                   </TouchableOpacity>
                 </View>
@@ -174,48 +276,141 @@ export function CaloriesDashboard() {
   );
 }
 
+// ── Helper components ──────────────────────────────────────────────────────────
+
+function SectionTitle({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <View style={{ marginBottom: SPACING.md }}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {sub ? <Text style={styles.sectionSub}>{sub}</Text> : null}
+    </View>
+  );
+}
+
+// ── Helper functions ───────────────────────────────────────────────────────────
+
+function getTodayStr(): string {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+}
+
+function getThisWeekDates(): string[] {
+  const today = new Date();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - today.getDay());
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+}
+
+function getCurrentMonthDates(): string[] {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  return Array.from({ length: today.getDate() }, (_, i) => {
+    const day = i + 1;
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  });
+}
+
+function getWeeksInCurrentMonth(monthData: DayCalories[]) {
+  if (monthData.length === 0) return [];
+  const weeks: any[] = [];
+  for (let i = 0; i < monthData.length; i += 7) {
+    const weekData = monthData.slice(i, i + 7);
+    const [sy, sm, sd] = weekData[0].date.split('-').map(Number);
+    const [ey, em, ed] = weekData[weekData.length - 1].date.split('-').map(Number);
+    const startDate = new Date(sy, sm - 1, sd);
+    const endDate = new Date(ey, em - 1, ed);
+    weeks.push({
+      data: weekData,
+      dateRange: `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+    });
+  }
+  return weeks;
+}
+
+function calculateMonthStats(monthData: DayCalories[]) {
+  const days = monthData.filter(d => d.total > 0);
+  return {
+    totalCal: monthData.reduce((s, d) => s + d.total, 0),
+    avgCal: days.length ? Math.round(monthData.reduce((s, d) => s + d.total, 0) / days.length) : 0,
+    mostCal: days.length ? Math.max(...days.map(d => d.total)) : 0,
+    leastCal: days.length ? Math.min(...days.map(d => d.total)) : 0,
+    activeDays: days.length,
+    restDays: monthData.length - days.length,
+  };
+}
+
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+function formatDay(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(y, m - 1, d).getDay()];
+}
+
+function formatDate(date: string): string {
+  const [, m, d] = date.split('-').map(Number);
+  return `${m}/${d}`;
+}
+
+// ── Styles ─────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: {
-    padding: SPACING.lg,
-    gap: SPACING.lg,
-    paddingBottom: SPACING.xl,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.size.xl,
-    fontWeight: TYPOGRAPHY.weight.bold,
-    color: COLORS.textPrimary,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.md,
-  },
-  chartCard: { gap: SPACING.md },
-  chartTitle: {
+  scroll: { flex: 1 },
+  content: { padding: SPACING.xl, gap: SPACING.lg },
+  section: { gap: SPACING.md },
+  statRow: { flexDirection: 'row', gap: SPACING.sm },
+  sectionTitle: {
     fontSize: TYPOGRAPHY.size.md,
     fontWeight: TYPOGRAPHY.weight.semibold,
     color: COLORS.textPrimary,
   },
-  empty: {
-    height: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
+  sectionSub: {
+    fontSize: TYPOGRAPHY.size.xs,
+    color: COLORS.textMuted,
+    marginTop: 2,
   },
   emptyText: {
     fontSize: TYPOGRAPHY.size.sm,
     color: COLORS.textMuted,
+    textAlign: 'center',
+    paddingVertical: SPACING.md,
   },
-  historyCard: { gap: SPACING.md },
+  monthSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+  },
+  monthTitle: {
+    fontSize: TYPOGRAPHY.size.md,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    color: COLORS.textPrimary,
+  },
+  monthButton: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.calories,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthButtonDisabled: {
+    backgroundColor: COLORS.cardSecondary,
+  },
+  monthButtonText: {
+    fontSize: TYPOGRAPHY.size.xl,
+    color: COLORS.textPrimary,
+    fontWeight: TYPOGRAPHY.weight.bold,
+  },
+  monthButtonTextDisabled: {
+    color: COLORS.textMuted,
+  },
   workoutList: { gap: SPACING.sm },
   workoutRow: {
     flexDirection: 'row',

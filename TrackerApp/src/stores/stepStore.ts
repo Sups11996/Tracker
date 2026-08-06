@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
+import { getTodayLocal } from '../lib/dateUtils';
 
 export type TrackingStatus = 'tracking' | 'paused' | 'vehicle' | 'unavailable';
 
@@ -89,14 +90,18 @@ export function unsubscribeFromStepEvents() {
 
 export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
   try {
-    const today = getTodayDate();
+    const today = getTodayLocal();
 
-    // Today's row
-    const row = await db.getFirstAsync<DayStepRecord>(
-      'SELECT * FROM daily_steps WHERE date = ?', [today]
-    );
-    if (row) {
-      useStepStore.getState().setToday(row.steps, row.distance_m, row.calories);
+    // DON'T load today's steps from DB - they come from native service in real-time
+    // Only load if today's steps are currently 0 (app just started)
+    const currentSteps = useStepStore.getState().todaySteps;
+    if (currentSteps === 0) {
+      const row = await db.getFirstAsync<DayStepRecord>(
+        'SELECT * FROM daily_steps WHERE date = ?', [today]
+      );
+      if (row) {
+        useStepStore.getState().setToday(row.steps, row.distance_m, row.calories);
+      }
     }
 
     // Tracking state
@@ -120,10 +125,11 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
     );
     useStepStore.getState().setWeeklyData(weekly);
 
-    // Monthly data (last 30 days)
+    // Monthly data (current month only - from 1st to today)
     const monthly = await db.getAllAsync<DayStepRecord>(
       `SELECT * FROM daily_steps
-       WHERE date >= date('now','-29 days')
+       WHERE date >= date('now','start of month')
+       AND date <= date('now')
        ORDER BY date ASC`
     );
     useStepStore.getState().setMonthlyData(monthly);
@@ -133,6 +139,54 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
   }
 }
 
-function getTodayDate(): string {
-  return new Date().toISOString().split('T')[0];
+/**
+ * Save current step data to the database.
+ * Uses INSERT OR REPLACE to update today's record or create if it doesn't exist.
+ */
+export async function saveStepData(db: SQLite.SQLiteDatabase): Promise<void> {
+  try {
+    const state = useStepStore.getState();
+    const today = getTodayLocal();
+    const goalMet = state.todaySteps >= state.dailyGoal ? 1 : 0;
+    const now = Date.now();
+    
+    console.log('💾 Saving step data to DB:', {
+      date: today,
+      steps: state.todaySteps,
+      distance: state.todayDistance,
+      calories: state.todayCalories,
+      goal: state.dailyGoal,
+      goalMet,
+    });
+
+    await db.runAsync(
+      `INSERT OR REPLACE INTO daily_steps (date, steps, distance_m, calories, goal, goal_met, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 
+         COALESCE((SELECT created_at FROM daily_steps WHERE date = ?), ?),
+         ?)`,
+      [today, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, today, now, now]
+    );
+
+    console.log('✅ Step data saved successfully');
+    
+    // Only refresh weekly/monthly historical data, don't reload today's data
+    // (today's data comes from the native service in real-time)
+    const weekly = await db.getAllAsync<DayStepRecord>(
+      `SELECT * FROM daily_steps
+       WHERE date >= date('now','-6 days')
+       ORDER BY date ASC`
+    );
+    useStepStore.getState().setWeeklyData(weekly);
+
+    const monthly = await db.getAllAsync<DayStepRecord>(
+      `SELECT * FROM daily_steps
+       WHERE date >= date('now','start of month')
+       AND date <= date('now')
+       ORDER BY date ASC`
+    );
+    useStepStore.getState().setMonthlyData(monthly);
+    
+  } catch (error) {
+    console.error('❌ Failed to save step data:', error);
+  }
 }

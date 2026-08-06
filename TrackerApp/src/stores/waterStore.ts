@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { SQLiteDatabase } from 'expo-sqlite';
+import { getTodayLocal } from '../lib/dateUtils';
 
 export interface WaterContainer {
   id: number;
@@ -56,7 +57,7 @@ export const useWaterStore = create<WaterState>((set) => ({
  */
 export async function hydrateWaterStore(db: SQLiteDatabase): Promise<void> {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocal();
 
     // Load containers
     const containers = await db.getAllAsync<WaterContainer>(
@@ -96,7 +97,7 @@ export async function logWater(
   container: WaterContainer
 ): Promise<void> {
   const now = Date.now();
-  const today = new Date(now).toISOString().split('T')[0];
+  const today = getTodayLocal();
   const state = useWaterStore.getState();
   const newTotal = state.todayTotal + container.capacity_ml;
 

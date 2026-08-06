@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { useStepStore } from './stepStore';
+import { getTodayLocal } from '../lib/dateUtils';
 
 export type Intensity = 'light' | 'moderate' | 'intense';
 
@@ -71,7 +72,7 @@ export function calcWorkoutCalories(
  */
 export async function hydrateCaloriesStore(db: SQLiteDatabase): Promise<void> {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayLocal();
 
     // Walking calories — pull directly from step store
     const walkingCal = useStepStore.getState().todayCalories;
@@ -109,7 +110,7 @@ export async function logWorkout(
   note?: string
 ): Promise<void> {
   const now = Date.now();
-  const today = new Date(now).toISOString().split('T')[0];
+  const today = getTodayLocal();
   const calories = calcWorkoutCalories(durationMins, intensity, weightKg);
 
   try {

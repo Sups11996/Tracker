@@ -1,275 +1,374 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Moon } from 'lucide-react-native';
+import { useSleepStore } from '../../stores/sleepStore';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { BarChart } from '../steps/BarChart';
-import { useSleepStore } from '../../stores/sleepStore';
-import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
+import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
-interface SleepSession {
+interface DaySleep {
   date: string;
-  actual_duration: number;
-  goal_mins: number;
-  goal_met: number;
+  duration: number; // minutes
+  goal: number;     // minutes
+  goal_met: boolean;
 }
 
 export function SleepDashboard() {
   const db = useSQLiteContext();
-  const { goalMinutes } = useSleepStore();
+  const { goalMinutes, isActive, elapsedMinutes } = useSleepStore();
   const tabBarHeight = useBottomTabBarHeight();
-  
-  const [last7Days, setLast7Days] = useState<SleepSession[]>([]);
-  const [last30Days, setLast30Days] = useState<SleepSession[]>([]);
-  const [stats, setStats] = useState({
-    avgSleep: 0,
-    bestSleep: 0,
-    consistency: 0,
-    goalMetCount: 0,
-  });
+
+  const [thisWeekData, setThisWeekData] = useState<DaySleep[]>([]);
+  const [currentMonthData, setCurrentMonthData] = useState<DaySleep[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [selectedMonthData, setSelectedMonthData] = useState<DaySleep[]>([]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadWeekAndMonth();
+  }, [isActive, elapsedMinutes, db]);
 
-  async function loadData() {
+  useEffect(() => {
+    loadSelectedMonth(selectedMonth);
+  }, [selectedMonth, db]);
+
+  async function getSleepForDate(dateStr: string, todayStr: string): Promise<number> {
+    if (dateStr === todayStr && isActive && elapsedMinutes > 0) {
+      return elapsedMinutes;
+    }
+    const row = await db.getFirstAsync<{ actual_duration: number }>(
+      `SELECT actual_duration FROM sleep_sessions
+       WHERE is_active = 0 AND actual_duration IS NOT NULL AND date = ?
+       ORDER BY end_time DESC LIMIT 1`,
+      [dateStr]
+    );
+    return row?.actual_duration || 0;
+  }
+
+  async function loadWeekAndMonth() {
     try {
-      // Last 7 days
-      const seven = await db.getAllAsync<SleepSession>(
-        `SELECT date, actual_duration, goal_mins, goal_met 
-         FROM sleep_sessions 
-         WHERE is_active = 0 AND actual_duration IS NOT NULL
-         ORDER BY date DESC 
-         LIMIT 7`
-      );
-      setLast7Days(seven.reverse());
+      const todayStr = getTodayStr();
 
-      // Last 30 days
-      const thirty = await db.getAllAsync<SleepSession>(
-        `SELECT date, actual_duration, goal_mins, goal_met 
-         FROM sleep_sessions 
-         WHERE is_active = 0 AND actual_duration IS NOT NULL
-         ORDER BY date DESC 
-         LIMIT 30`
-      );
-      setLast30Days(thirty.reverse());
-
-      // Calculate stats
-      if (thirty.length > 0) {
-        const durations = thirty.map(s => s.actual_duration);
-        const avg = durations.reduce((a, b) => a + b, 0) / durations.length;
-        const best = Math.max(...durations);
-        const goalMet = thirty.filter(s => s.goal_met === 1).length;
-        
-        // Consistency: standard deviation (lower is better, normalize to 0-100)
-        const variance = durations.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / durations.length;
-        const stdDev = Math.sqrt(variance);
-        const consistency = Math.max(0, 100 - (stdDev / avg) * 100);
-
-        setStats({
-          avgSleep: Math.round(avg),
-          bestSleep: Math.round(best),
-          consistency: Math.round(consistency),
-          goalMetCount: goalMet,
-        });
+      // ── This week ─────────────────────────────────────────────────────────
+      const weekDates = getThisWeekDates();
+      const week: DaySleep[] = [];
+      for (const dateStr of weekDates) {
+        const duration = await getSleepForDate(dateStr, todayStr);
+        week.push({ date: dateStr, duration, goal: goalMinutes, goal_met: duration >= goalMinutes && duration > 0 });
       }
-    } catch (error) {
-      console.error('Failed to load sleep dashboard data:', error);
+      setThisWeekData(week);
+
+      // ── Current month ─────────────────────────────────────────────────────
+      const monthDates = getCurrentMonthDates();
+      const month: DaySleep[] = [];
+      for (const dateStr of monthDates) {
+        const duration = await getSleepForDate(dateStr, todayStr);
+        month.push({ date: dateStr, duration, goal: goalMinutes, goal_met: duration >= goalMinutes && duration > 0 });
+      }
+      setCurrentMonthData(month);
+    } catch (e) {
+      console.error('Failed to load sleep week/month:', e);
     }
   }
 
-  const chartData7 = last7Days.map(s => ({
-    label: new Date(s.date).toLocaleDateString('en-US', { weekday: 'short' }),
-    value: s.actual_duration / 60, // Convert to hours
-  }));
+  async function loadSelectedMonth(month: Date) {
+    try {
+      const todayStr = getTodayStr();
+      const year = month.getFullYear();
+      const monthIndex = month.getMonth();
+      const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+      const isCurrentMonth = month.getMonth() === new Date().getMonth() && month.getFullYear() === new Date().getFullYear();
+      const lastDay = isCurrentMonth ? new Date().getDate() : daysInMonth;
 
-  const chartData30 = last30Days.map(s => ({
-    label: new Date(s.date).getDate().toString(),
-    value: s.actual_duration / 60,
-  }));
+      const data: DaySleep[] = [];
+      for (let day = 1; day <= lastDay; day++) {
+        const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const duration = await getSleepForDate(dateStr, todayStr);
+        data.push({ date: dateStr, duration, goal: goalMinutes, goal_met: duration >= goalMinutes && duration > 0 });
+      }
+      setSelectedMonthData(data);
+    } catch (e) {
+      console.error('Failed to load selected month sleep:', e);
+    }
+  }
 
-  const qualityGoodCount = last30Days.filter(s => 
-    (s.actual_duration / s.goal_mins) >= 0.9
-  ).length;
-  const qualityFairCount = last30Days.filter(s => {
-    const pct = s.actual_duration / s.goal_mins;
-    return pct >= 0.7 && pct < 0.9;
-  }).length;
-  const qualityPoorCount = last30Days.length - qualityGoodCount - qualityFairCount;
+  // ── Derived values ──────────────────────────────────────────────────────────
+  const weeksInMonth = getWeeksInCurrentMonth(currentMonthData);
+  const weeklyAvg = (() => {
+    const days = thisWeekData.filter(d => d.duration > 0);
+    return days.length ? Math.round(days.reduce((s, d) => s + d.duration, 0) / days.length) : 0;
+  })();
+  const allDays = currentMonthData.filter(d => d.duration > 0);
+  const highSleep = allDays.length ? Math.max(...allDays.map(d => d.duration)) : 0;
+  const maxBarValue = Math.max(goalMinutes, highSleep, 60);
+
+  const selectedStats = calculateMonthStats(selectedMonthData, goalMinutes);
+
+  // Stats card
+  const avgSleep = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.duration, 0) / allDays.length) : 0;
+  const lowSleep = allDays.length ? Math.min(...allDays.map(d => d.duration)) : 0;
+  const goalDays = allDays.filter(d => d.goal_met).length;
+  let streak = 0;
+  for (const d of [...allDays].sort((a, b) => b.date.localeCompare(a.date))) {
+    if (d.goal_met) streak++; else break;
+  }
+
+  // Today's sleep
+  const todayStr = getTodayStr();
+  const todaySleep = isActive && elapsedMinutes > 0
+    ? elapsedMinutes
+    : thisWeekData.find(d => d.date === todayStr)?.duration || 0;
+
+  function goToPreviousMonth() {
+    setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  }
+  function goToNextMonth() {
+    const next = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 1);
+    if (next <= new Date()) setSelectedMonth(next);
+  }
+  const canGoNext = selectedMonth.getMonth() < new Date().getMonth() || selectedMonth.getFullYear() < new Date().getFullYear();
 
   return (
     <ScrollView
-      style={styles.container}
+      style={styles.scroll}
       contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <Moon size={24} color={COLORS.sleep} />
-        <Text style={styles.title}>Sleep Tracking</Text>
-      </View>
-
-      {/* Stats Grid */}
-      <View style={styles.statsGrid}>
-        <StatCard
-          label="Avg Sleep"
-          value={formatDuration(stats.avgSleep)}
-          accentColor={COLORS.sleep}
-        />
-        <StatCard
-          label="Best Night"
-          value={formatDuration(stats.bestSleep)}
-          accentColor={COLORS.success}
-        />
-        <StatCard
-          label="Consistency"
-          value={`${stats.consistency}%`}
-          accentColor={COLORS.water}
-        />
-        <StatCard
-          label="Goal Met"
-          value={`${stats.goalMetCount}/${last30Days.length}`}
-          accentColor={COLORS.sleep}
-        />
-      </View>
-
-      {/* 7-Day Chart */}
-      <Card style={styles.chartCard}>
-        <Text style={styles.chartTitle}>Last 7 Days</Text>
-        {chartData7.length > 0 ? (
-          <BarChart
-            data={chartData7}
-            height={180}
+      {/* Today */}
+      <Card style={styles.section}>
+        <SectionTitle title="Today" />
+        <View style={styles.statRow}>
+          <StatCard
+            label="Sleep"
+            value={todaySleep > 0 ? formatDuration(todaySleep) : '—'}
+            sub={isActive ? 'Session active' : `Goal: ${formatDuration(goalMinutes)}`}
             accentColor={COLORS.sleep}
-            maxValue={Math.ceil(goalMinutes / 60) + 1}
           />
-        ) : (
-          <View style={styles.emptyChart}>
-            <Text style={styles.emptyText}>No data yet</Text>
-          </View>
-        )}
+          <StatCard
+            label="Progress"
+            value={todaySleep > 0 ? `${Math.min(100, Math.round((todaySleep / goalMinutes) * 100))}%` : '—'}
+            accentColor={COLORS.sleep}
+          />
+        </View>
       </Card>
 
-      {/* 30-Day Chart */}
-      <Card style={styles.chartCard}>
-        <Text style={styles.chartTitle}>Last 30 Days</Text>
-        {chartData30.length > 0 ? (
-          <BarChart
-            data={chartData30}
-            height={180}
-            accentColor={COLORS.sleep}
-            maxValue={Math.ceil(goalMinutes / 60) + 1}
-            compact={true}
-          />
-        ) : (
-          <View style={styles.emptyChart}>
-            <Text style={styles.emptyText}>No data yet</Text>
-          </View>
-        )}
+      {/* This week */}
+      <Card style={styles.section}>
+        <SectionTitle title="This Week" sub={weeklyAvg > 0 ? `Avg ${formatDuration(weeklyAvg)}/night` : 'No data yet'} />
+        <BarChart
+          data={thisWeekData.map(d => ({
+            label: formatDay(d.date),
+            topLabel: formatDate(d.date),
+            value: d.duration,
+            valueLabel: d.duration > 0 ? formatDuration(d.duration) : '',
+            goalMet: d.goal_met,
+          }))}
+          maxValue={maxBarValue}
+          accentColor={COLORS.sleep}
+        />
       </Card>
 
-      {/* Quality Breakdown */}
-      {last30Days.length > 0 && (
-        <Card style={styles.qualityCard}>
-          <Text style={styles.chartTitle}>Sleep Quality (Last 30 Days)</Text>
-          <View style={styles.qualityRow}>
-            <QualityBadge label="Great" count={qualityGoodCount} color={COLORS.success} />
-            <QualityBadge label="Fair" count={qualityFairCount} color={COLORS.water} />
-            <QualityBadge label="Poor" count={qualityPoorCount} color={COLORS.calories} />
-          </View>
+      {/* Weekly graphs for current month */}
+      {weeksInMonth.map((week, index) => (
+        <Card key={index} style={styles.section}>
+          <SectionTitle title={`Week ${index + 1}`} sub={week.dateRange} />
+          <BarChart
+            data={week.data.map((d: DaySleep) => ({
+              label: formatDay(d.date),
+              topLabel: formatDate(d.date),
+              value: d.duration,
+              valueLabel: d.duration > 0 ? formatDuration(d.duration) : '',
+              goalMet: d.goal_met,
+            }))}
+            maxValue={maxBarValue}
+            accentColor={COLORS.sleep}
+          />
         </Card>
-      )}
+      ))}
+
+      {/* Month selector */}
+      <Card style={styles.section}>
+        <View style={styles.monthSelector}>
+          <TouchableOpacity onPress={goToPreviousMonth} style={styles.monthButton}>
+            <Text style={styles.monthButtonText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.monthTitle}>
+            {selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </Text>
+          <TouchableOpacity
+            onPress={goToNextMonth}
+            style={[styles.monthButton, !canGoNext && styles.monthButtonDisabled]}
+            disabled={!canGoNext}
+          >
+            <Text style={[styles.monthButtonText, !canGoNext && styles.monthButtonTextDisabled]}>→</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.statRow}>
+          <StatCard label="Avg Sleep" value={formatDuration(selectedStats.avgSleep)} accentColor={COLORS.sleep} />
+          <StatCard label="Best Night" value={formatDuration(selectedStats.mostSleep)} accentColor={COLORS.success} />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard label="Least Sleep" value={selectedStats.leastSleep > 0 ? formatDuration(selectedStats.leastSleep) : '—'} accentColor={COLORS.textSecondary} />
+          <StatCard label="Nights Tracked" value={`${selectedStats.trackedDays}`} accentColor={COLORS.sleep} />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard label="Goal Reached" value={`${selectedStats.goalReached} days`} accentColor={COLORS.success} />
+          <StatCard label="Goal Missed" value={`${selectedStats.goalMissed} days`} accentColor={COLORS.error} />
+        </View>
+      </Card>
+
+      {/* Stats */}
+      <Card style={styles.section}>
+        <SectionTitle title="Stats" />
+        <View style={styles.statRow}>
+          <StatCard label="Avg Sleep" value={formatDuration(avgSleep)} accentColor={COLORS.sleep} />
+          <StatCard label="Best Night" value={formatDuration(highSleep)} accentColor={COLORS.sleep} />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard label="Shortest" value={lowSleep > 0 ? formatDuration(lowSleep) : '—'} accentColor={COLORS.textSecondary} />
+          <StatCard label="Goal Streak" value={`${streak} days`} accentColor={streak > 0 ? COLORS.success : COLORS.textSecondary} />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard label="Goal Days" value={`${goalDays} days`} accentColor={COLORS.sleep} />
+          <StatCard label="Nights Logged" value={`${allDays.length}`} accentColor={COLORS.sleep} />
+        </View>
+      </Card>
     </ScrollView>
   );
 }
 
-function QualityBadge({ label, count, color }: { label: string; count: number; color: string }) {
+// ── Helper components ──────────────────────────────────────────────────────────
+
+function SectionTitle({ title, sub }: { title: string; sub?: string }) {
   return (
-    <View style={styles.qualityBadge}>
-      <View style={[styles.qualityDot, { backgroundColor: color }]} />
-      <Text style={styles.qualityLabel}>{label}</Text>
-      <Text style={[styles.qualityCount, { color }]}>{count}</Text>
+    <View style={{ marginBottom: SPACING.md }}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {sub ? <Text style={styles.sectionSub}>{sub}</Text> : null}
     </View>
   );
 }
 
-function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hours === 0) return `${mins}m`;
-  if (mins === 0) return `${hours}h`;
-  return `${hours}h ${mins}m`;
+// ── Helper functions ───────────────────────────────────────────────────────────
+
+function getTodayStr(): string {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }
 
+function getThisWeekDates(): string[] {
+  const today = new Date();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - today.getDay());
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+}
+
+function getCurrentMonthDates(): string[] {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  return Array.from({ length: today.getDate() }, (_, i) => {
+    const day = i + 1;
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  });
+}
+
+function getWeeksInCurrentMonth(monthData: DaySleep[]) {
+  if (monthData.length === 0) return [];
+  const weeks: any[] = [];
+  for (let i = 0; i < monthData.length; i += 7) {
+    const weekData = monthData.slice(i, i + 7);
+    const [sy, sm, sd] = weekData[0].date.split('-').map(Number);
+    const [ey, em, ed] = weekData[weekData.length - 1].date.split('-').map(Number);
+    const startDate = new Date(sy, sm - 1, sd);
+    const endDate = new Date(ey, em - 1, ed);
+    weeks.push({
+      data: weekData,
+      dateRange: `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+    });
+  }
+  return weeks;
+}
+
+function calculateMonthStats(monthData: DaySleep[], goalMinutes: number) {
+  const days = monthData.filter(d => d.duration > 0);
+  return {
+    avgSleep: days.length ? Math.round(days.reduce((s, d) => s + d.duration, 0) / days.length) : 0,
+    mostSleep: days.length ? Math.max(...days.map(d => d.duration)) : 0,
+    leastSleep: days.length ? Math.min(...days.map(d => d.duration)) : 0,
+    trackedDays: days.length,
+    goalReached: days.filter(d => d.goal_met).length,
+    goalMissed: days.length - days.filter(d => d.goal_met).length,
+  };
+}
+
+function formatDuration(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function formatDay(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(y, m - 1, d).getDay()];
+}
+
+function formatDate(date: string): string {
+  const [, m, d] = date.split('-').map(Number);
+  return `${m}/${d}`;
+}
+
+// ── Styles ─────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: {
-    padding: SPACING.lg,
-    gap: SPACING.lg,
-    paddingBottom: SPACING.xl,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.size.xl,
-    fontWeight: TYPOGRAPHY.weight.bold,
-    color: COLORS.textPrimary,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.md,
-  },
-  chartCard: {
-    gap: SPACING.md,
-  },
-  chartTitle: {
+  scroll: { flex: 1 },
+  content: { padding: SPACING.xl, gap: SPACING.lg },
+  section: { gap: SPACING.md },
+  statRow: { flexDirection: 'row', gap: SPACING.sm },
+  sectionTitle: {
     fontSize: TYPOGRAPHY.size.md,
     fontWeight: TYPOGRAPHY.weight.semibold,
     color: COLORS.textPrimary,
   },
-  emptyChart: {
-    height: 180,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: TYPOGRAPHY.size.sm,
+  sectionSub: {
+    fontSize: TYPOGRAPHY.size.xs,
     color: COLORS.textMuted,
+    marginTop: 2,
   },
-  qualityCard: {
-    gap: SPACING.md,
-  },
-  qualityRow: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  qualityBadge: {
-    flex: 1,
+  monthSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
-    padding: SPACING.md,
-    borderRadius: 12,
-    backgroundColor: COLORS.glassHighlight,
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
   },
-  qualityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  qualityLabel: {
-    flex: 1,
-    fontSize: TYPOGRAPHY.size.sm,
-    color: COLORS.textMuted,
-  },
-  qualityCount: {
+  monthTitle: {
     fontSize: TYPOGRAPHY.size.md,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    color: COLORS.textPrimary,
+  },
+  monthButton: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.sleep,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthButtonDisabled: {
+    backgroundColor: COLORS.cardSecondary,
+  },
+  monthButtonText: {
+    fontSize: TYPOGRAPHY.size.xl,
+    color: COLORS.textPrimary,
     fontWeight: TYPOGRAPHY.weight.bold,
+  },
+  monthButtonTextDisabled: {
+    color: COLORS.textMuted,
   },
 });

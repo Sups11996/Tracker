@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus, NativeModules, Platform } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useUserStore } from '../stores/userStore';
-import { hydrateStepStore, subscribeToStepEvents, unsubscribeFromStepEvents, useStepStore } from '../stores/stepStore';
+import { hydrateStepStore, subscribeToStepEvents, unsubscribeFromStepEvents, useStepStore, saveStepData } from '../stores/stepStore';
 import { hydrateSleepStore } from '../stores/sleepStore';
 import { hydrateWaterStore, useWaterStore } from '../stores/waterStore';
 import { hydrateCaloriesStore } from '../stores/caloriesStore';
@@ -32,7 +32,36 @@ export function useAppHydration(): { isReady: boolean } {
   async function handleDateChangeIfNeeded() {
     const dateChanged = await checkDateChanged(db);
     if (dateChanged) {
+      console.log('📅 Date changed detected - saving yesterday\'s step data before reset');
+      
+      // Get yesterday's date (the day that just ended)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const year = yesterday.getFullYear();
+      const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+      const day = String(yesterday.getDate()).padStart(2, '0');
+      const yesterdayDate = `${year}-${month}-${day}`;
+      
+      // Save yesterday's step data with yesterday's date
+      const state = useStepStore.getState();
+      const goalMet = state.todaySteps >= state.dailyGoal ? 1 : 0;
+      const now = Date.now();
+      
+      try {
+        await db.runAsync(
+          `INSERT OR REPLACE INTO daily_steps (date, steps, distance_m, calories, goal, goal_met, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, 
+             COALESCE((SELECT created_at FROM daily_steps WHERE date = ?), ?),
+             ?)`,
+          [yesterdayDate, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, yesterdayDate, now, now]
+        );
+        console.log('✅ Yesterday\'s step data saved:', yesterdayDate);
+      } catch (error) {
+        console.error('❌ Failed to save yesterday\'s data:', error);
+      }
+      
       // Reset step counter in store
+      console.log('🔄 Resetting step counters to 0 for new day');
       useStepStore.setState({ todaySteps: 0, todayDistance: 0, todayCalories: 0 });
 
       // Reset water in store
@@ -41,9 +70,11 @@ export function useAppHydration(): { isReady: boolean } {
       // Tell native step service to reset
       if (StepServiceModule) {
         try {
+          console.log('📱 Sending reset to native step service');
           await StepServiceModule.sendAction('reset');
+          console.log('✅ Native step service reset');
         } catch (error) {
-          // Silent fail - non-critical
+          console.error('❌ Failed to reset native service:', error);
         }
       }
       
@@ -82,6 +113,16 @@ export function useAppHydration(): { isReady: boolean } {
   // Re-hydrate on foreground (covers restart / OS kill / tab switch back) + date check
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
+      // Save step data when going to background
+      if (
+        appState.current === 'active' &&
+        nextState.match(/inactive|background/)
+      ) {
+        console.log('📱 App going to background - saving step data');
+        await saveStepData(db);
+      }
+      
+      // Re-hydrate when coming back to foreground
       if (
         appState.current.match(/inactive|background/) &&
         nextState === 'active'
@@ -103,6 +144,18 @@ export function useAppHydration(): { isReady: boolean } {
       unsubscribeFromStepEvents();
     };
   }, []);
+
+  // Periodic auto-save every 5 minutes while app is active
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (AppState.currentState === 'active') {
+        console.log('⏰ Periodic auto-save - saving step data');
+        await saveStepData(db);
+      }
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+
+    return () => clearInterval(interval);
+  }, [db]);
 
   return { isReady };
 }

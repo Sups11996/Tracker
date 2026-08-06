@@ -10,7 +10,9 @@ import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../constants';
 
 interface BarData {
   label: string;
+  topLabel?: string; // Date shown on top
   value: number;
+  valueLabel?: string; // Value shown on/above bar
   goalMet?: boolean;
 }
 
@@ -39,7 +41,7 @@ export function BarChart({
   }
 
   return (
-    <View style={[styles.container, { height: height + (compact ? 0 : 24) }]}>
+    <View style={[styles.container, { height: height + (compact ? 0 : 48) }]}>
       <View style={[styles.bars, { height }]}>
         {data.map((d, i) => (
           <Bar
@@ -47,6 +49,8 @@ export function BarChart({
             value={d.value}
             maxValue={maxValue}
             label={d.label}
+            topLabel={d.topLabel}
+            valueLabel={d.valueLabel}
             accentColor={d.goalMet ? accentColor : `${accentColor}70`}
             compact={compact}
           />
@@ -60,12 +64,16 @@ function Bar({
   value,
   maxValue,
   label,
+  topLabel,
+  valueLabel,
   accentColor,
   compact,
 }: {
   value: number;
   maxValue: number;
   label: string;
+  topLabel?: string;
+  valueLabel?: string;
   accentColor: string;
   compact: boolean;
 }) {
@@ -85,6 +93,21 @@ function Bar({
 
   return (
     <View style={styles.barWrapper}>
+      {/* Top label (date) */}
+      {topLabel && !compact && (
+        <Text style={styles.topLabel} numberOfLines={1}>
+          {topLabel}
+        </Text>
+      )}
+      
+      {/* Value label above bar */}
+      {valueLabel && !compact && (
+        <Text style={styles.valueLabel} numberOfLines={1}>
+          {valueLabel}
+        </Text>
+      )}
+      
+      {/* Bar */}
       <View style={styles.barTrack}>
         <Animated.View
           style={[
@@ -94,6 +117,8 @@ function Bar({
           ]}
         />
       </View>
+      
+      {/* Bottom label (day name) */}
       {!compact && (
         <Text style={styles.barLabel} numberOfLines={1}>
           {label}
@@ -116,7 +141,20 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     height: '100%',
-    gap: SPACING.xs,
+    gap: 2,
+  },
+  topLabel: {
+    fontSize: 8,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  valueLabel: {
+    fontSize: 9,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: 4,
   },
   barTrack: {
     flex: 1,
@@ -135,6 +173,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: COLORS.textMuted,
     textAlign: 'center',
+    marginTop: 2,
   },
   empty: {
     alignItems: 'center',
