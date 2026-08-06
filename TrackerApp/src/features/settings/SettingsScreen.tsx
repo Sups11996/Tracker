@@ -144,7 +144,6 @@ export function SettingsScreen() {
       setEditingProfile(false);
       showSuccess('Success', 'Profile updated successfully.');
     } catch (error) {
-      console.error('Failed to update profile:', error);
       showError('Error', 'Failed to save changes. Please try again.');
     }
   }, [profileForm, profile, db, setProfile, showError, showSuccess]);
@@ -178,7 +177,6 @@ export function SettingsScreen() {
           
           showSuccess('Done', 'Test data added! Check your dashboards.');
         } catch (error) {
-          console.error('Failed to seed test data:', error);
           showError('Error', 'Failed to seed test data. Check console for details.');
         }
       },
@@ -384,31 +382,24 @@ export function SettingsScreen() {
                 color={COLORS.steps}
                 onClearToday={async () => {
                   const today = getTodayLocal();
-                  console.log('🗑️ Deleting steps for today:', today);
                   
                   // Check rows before
                   const before = await db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM daily_steps WHERE date = ?', [today]);
-                  console.log('📊 Steps rows before delete:', before);
                   
                   await db.runAsync('DELETE FROM daily_steps WHERE date = ?', [today]);
                   
                   // Check rows after
                   const after = await db.getFirstAsync<{count: number}>('SELECT COUNT(*) as count FROM daily_steps WHERE date = ?', [today]);
-                  console.log('📊 Steps rows after delete:', after);
                   
                   // Reset native service counter
                   if (Platform.OS === 'android' && NativeModules.StepServiceModule) {
                     try {
-                      console.log('📱 Sending reset action to native service');
                       await NativeModules.StepServiceModule.sendAction('reset');
-                      console.log('✅ Native service reset completed');
                     } catch (error) {
-                      console.error('❌ Failed to reset native service:', error);
                     }
                   }
                   
                   // Reset in-memory store
-                  console.log('🧹 Resetting step store to 0');
                   useStepStore.setState({ 
                     todaySteps: 0, 
                     todayDistance: 0, 
@@ -417,7 +408,6 @@ export function SettingsScreen() {
                   });
                   
                   await hydrateStepStore(db);
-                  console.log('✅ hydrateStepStore done');
                 }}
                 onClearExceptToday={async () => {
                   const today = getTodayLocal();
@@ -430,11 +420,8 @@ export function SettingsScreen() {
                   // Reset native service counter
                   if (Platform.OS === 'android' && NativeModules.StepServiceModule) {
                     try {
-                      console.log('📱 Sending reset action to native service');
                       await NativeModules.StepServiceModule.sendAction('reset');
-                      console.log('✅ Native service reset completed');
                     } catch (error) {
-                      console.error('❌ Failed to reset native service:', error);
                     }
                   }
                   
@@ -690,7 +677,6 @@ export function SettingsScreen() {
         showSuccess('Success', 'All data has been cleared.');
       }, 100);
     } catch (error) {
-      console.error('Failed to clear data:', error);
       setTimeout(() => {
         showError('Error', 'Failed to clear data. Please try again.');
       }, 100);
@@ -715,7 +701,6 @@ function DataClearButton({ db, label, description, color, onClearToday, onClearE
   async function runClear(mode: 'today' | 'exceptToday' | 'all') {
     setClearing(true);
     try {
-      console.log('🗑️ runClear called with mode:', mode);
       if (mode === 'today') {
         await onClearToday();
       } else if (mode === 'exceptToday') {
@@ -723,14 +708,12 @@ function DataClearButton({ db, label, description, color, onClearToday, onClearE
       } else {
         await onClearAll();
       }
-      console.log('✅ runClear completed for mode:', mode);
       const msg =
         mode === 'today' ? "Today's data has been cleared." :
         mode === 'exceptToday' ? 'All history except today has been cleared.' :
         'All data has been completely cleared.';
       setTimeout(() => showSuccess('Done', msg), 100);
     } catch (error) {
-      console.error(`❌ Failed to clear ${label}:`, error);
       setTimeout(() => showError('Error', `Failed to clear ${label}. Please try again.`), 100);
     } finally {
       setClearing(false);
