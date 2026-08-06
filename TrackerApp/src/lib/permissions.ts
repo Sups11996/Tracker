@@ -29,7 +29,6 @@ export function requestIgnoreBatteryOptimizations(): void {
       PermissionsModule.requestIgnoreBatteryOptimizations();
       return;
     } catch (e) {
-      console.warn('[permissions] requestIgnoreBatteryOptimizations native failed:', e);
     }
   }
   // Fallback: open via Linking deep link
@@ -50,7 +49,6 @@ export function openUsageAccessSettings(): void {
       PermissionsModule.openUsageAccessSettings();
       return;
     } catch (e) {
-      console.warn('[permissions] openUsageAccessSettings native failed:', e);
     }
   }
   // Fallback via Linking
@@ -69,6 +67,5 @@ export function openAppSettings(): void {
   try {
     PermissionsModule.openAppSettings();
   } catch (e) {
-    console.warn('[permissions] openAppSettings failed:', e);
   }
 }

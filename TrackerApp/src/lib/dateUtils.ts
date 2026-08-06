@@ -97,7 +97,6 @@ export async function checkDateChanged(db: any): Promise<boolean> {
     
     return false;
   } catch (error) {
-    console.error('Failed to check date change:', error);
     return false;
   }
 }

@@ -32,7 +32,6 @@ export function useAppHydration(): { isReady: boolean } {
   async function handleDateChangeIfNeeded() {
     const dateChanged = await checkDateChanged(db);
     if (dateChanged) {
-      console.log('📅 Date changed detected - saving yesterday\'s step data before reset');
       
       // Get yesterday's date (the day that just ended)
       const yesterday = new Date();
@@ -55,13 +54,10 @@ export function useAppHydration(): { isReady: boolean } {
              ?)`,
           [yesterdayDate, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, yesterdayDate, now, now]
         );
-        console.log('✅ Yesterday\'s step data saved:', yesterdayDate);
       } catch (error) {
-        console.error('❌ Failed to save yesterday\'s data:', error);
       }
       
       // Reset step counter in store
-      console.log('🔄 Resetting step counters to 0 for new day');
       useStepStore.setState({ todaySteps: 0, todayDistance: 0, todayCalories: 0 });
 
       // Reset water in store
@@ -70,11 +66,8 @@ export function useAppHydration(): { isReady: boolean } {
       // Tell native step service to reset
       if (StepServiceModule) {
         try {
-          console.log('📱 Sending reset to native step service');
           await StepServiceModule.sendAction('reset');
-          console.log('✅ Native step service reset');
         } catch (error) {
-          console.error('❌ Failed to reset native service:', error);
         }
       }
       
@@ -118,7 +111,6 @@ export function useAppHydration(): { isReady: boolean } {
         appState.current === 'active' &&
         nextState.match(/inactive|background/)
       ) {
-        console.log('📱 App going to background - saving step data');
         await saveStepData(db);
       }
       
@@ -149,7 +141,6 @@ export function useAppHydration(): { isReady: boolean } {
   useEffect(() => {
     const interval = setInterval(async () => {
       if (AppState.currentState === 'active') {
-        console.log('⏰ Periodic auto-save - saving step data');
         await saveStepData(db);
       }
     }, 5 * 60 * 1000); // 5 minutes in milliseconds

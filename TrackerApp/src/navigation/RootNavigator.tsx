@@ -28,7 +28,6 @@ export function RootNavigator() {
           });
         }
       } catch (e) {
-        console.error('[RootNavigator] bootstrap error:', e);
       } finally {
         setIsReady(true);
       }
