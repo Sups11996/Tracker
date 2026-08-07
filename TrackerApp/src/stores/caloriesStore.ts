@@ -20,8 +20,10 @@ interface CaloriesState {
   workoutCalories: number;
   totalCalories: number;
   workoutLogs: WorkoutLog[];
+  dailyGoal: number;
   setWalkingCalories: (cal: number) => void;
   setWorkoutLogs: (logs: WorkoutLog[]) => void;
+  setDailyGoal: (goal: number) => void;
   recalcTotal: () => void;
 }
 
@@ -30,6 +32,7 @@ export const useCaloriesStore = create<CaloriesState>((set, get) => ({
   workoutCalories: 0,
   totalCalories: 0,
   workoutLogs: [],
+  dailyGoal: 0,
 
   setWalkingCalories: (cal) => {
     set({ walkingCalories: cal });
@@ -41,6 +44,8 @@ export const useCaloriesStore = create<CaloriesState>((set, get) => ({
     set({ workoutLogs: logs, workoutCalories });
     get().recalcTotal();
   },
+
+  setDailyGoal: (goal) => set({ dailyGoal: goal }),
 
   recalcTotal: () => {
     const { walkingCalories, workoutCalories } = get();
@@ -88,11 +93,18 @@ export async function hydrateCaloriesStore(db: SQLiteDatabase): Promise<void> {
 
     const workoutCal = logs.reduce((sum, l) => sum + l.calories, 0);
 
+    // Daily goal (optional — 0 means no goal)
+    const goalRow = await db.getFirstAsync<{ value: string }>(
+      `SELECT value FROM kv_store WHERE key = 'calories_daily_goal'`
+    );
+    const dailyGoal = goalRow ? parseInt(goalRow.value, 10) : 0;
+
     useCaloriesStore.setState({
       walkingCalories: walkingCal,
       workoutCalories: workoutCal,
       totalCalories: Math.round(walkingCal + workoutCal),
       workoutLogs: logs,
+      dailyGoal,
     });
   } catch (error) {
   }
@@ -106,11 +118,12 @@ export async function logWorkout(
   durationMins: number,
   intensity: Intensity,
   weightKg: number,
-  note?: string
+  note?: string,
+  customCalories?: number
 ): Promise<void> {
   const now = Date.now();
   const today = getTodayLocal();
-  const calories = calcWorkoutCalories(durationMins, intensity, weightKg);
+  const calories = customCalories ?? calcWorkoutCalories(durationMins, intensity, weightKg);
 
   try {
     const result = await db.runAsync(

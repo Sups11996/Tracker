@@ -17,7 +17,7 @@ interface DayCalories {
 
 export function CaloriesDashboard() {
   const db = useSQLiteContext();
-  const { totalCalories, workoutLogs } = useCaloriesStore();
+  const { totalCalories, workoutLogs, dailyGoal } = useCaloriesStore();
   const tabBarHeight = useBottomTabBarHeight();
 
   const [thisWeekData, setThisWeekData] = useState<DayCalories[]>([]);
@@ -56,7 +56,7 @@ export function CaloriesDashboard() {
       const week: DayCalories[] = [];
       for (const dateStr of weekDates) {
         const total = await getDayCalories(dateStr, todayStr);
-        week.push({ date: dateStr, total, goal_met: total > 0 });
+        week.push({ date: dateStr, total, goal_met: dailyGoal > 0 ? total >= dailyGoal : total > 0 });
       }
       setThisWeekData(week);
 
@@ -65,7 +65,7 @@ export function CaloriesDashboard() {
       const month: DayCalories[] = [];
       for (const dateStr of monthDates) {
         const total = await getDayCalories(dateStr, todayStr);
-        month.push({ date: dateStr, total, goal_met: total > 0 });
+        month.push({ date: dateStr, total, goal_met: dailyGoal > 0 ? total >= dailyGoal : total > 0 });
       }
       setCurrentMonthData(month);
     } catch (e) {
@@ -85,7 +85,7 @@ export function CaloriesDashboard() {
       for (let day = 1; day <= lastDay; day++) {
         const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const total = await getDayCalories(dateStr, todayStr);
-        data.push({ date: dateStr, total, goal_met: total > 0 });
+        data.push({ date: dateStr, total, goal_met: dailyGoal > 0 ? total >= dailyGoal : total > 0 });
       }
       setSelectedMonthData(data);
     } catch (e) {
@@ -94,11 +94,14 @@ export function CaloriesDashboard() {
 
   async function loadRecentWorkouts() {
     try {
+      const todayStr = getTodayStr();
       const workouts = await db.getAllAsync<WorkoutLog>(
         `SELECT id, date, logged_at, duration_mins, intensity, calories, note
          FROM workout_logs
+         WHERE date = ?
          ORDER BY logged_at DESC
-         LIMIT 20`
+         LIMIT 20`,
+        [todayStr]
       );
       setRecentWorkouts(workouts);
     } catch (e) {
@@ -109,6 +112,9 @@ export function CaloriesDashboard() {
     try {
       await deleteWorkout(db, id);
       setRecentWorkouts(prev => prev.filter(w => w.id !== id));
+      // Reload monthly data to update total
+      await loadWeekAndMonth();
+      await loadSelectedMonth(selectedMonth);
     } catch (e) {
     }
   }
@@ -166,7 +172,7 @@ export function CaloriesDashboard() {
           <StatCard
             label="Calories"
             value={`${displayCal} kcal`}
-            sub={selectedBar ? formatDate(displayDate) : 'Walking + Workouts'}
+            sub={dailyGoal > 0 ? `Goal: ${dailyGoal} kcal` : 'Walking + Workouts'}
             accentColor={COLORS.calories}
           />
           <StatCard
@@ -176,6 +182,20 @@ export function CaloriesDashboard() {
             accentColor={COLORS.calories}
           />
         </View>
+        {dailyGoal > 0 && (
+          <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+            <StatCard
+              label="Progress"
+              value={`${Math.min(100, Math.round((displayCal / dailyGoal) * 100))}%`}
+              accentColor={COLORS.calories}
+            />
+            <StatCard
+              label="Remaining"
+              value={displayCal >= dailyGoal ? 'Goal reached!' : `${dailyGoal - displayCal} kcal`}
+              accentColor={displayCal >= dailyGoal ? COLORS.success : COLORS.textSecondary}
+            />
+          </View>
+        )}
       </Card>
 
       {/* This week */}
@@ -189,7 +209,7 @@ export function CaloriesDashboard() {
             valueLabel: d.total > 0 ? `${d.total}` : '',
             goalMet: d.goal_met,
           }))}
-          maxValue={Math.max(highCal, 500, 1)}
+          maxValue={dailyGoal > 0 ? Math.max(dailyGoal, highCal, 1) : Math.max(highCal, 500, 1)}
           accentColor={COLORS.calories}
           selectedIndex={selectedBar?.chartId === 'week' ? selectedBar.barIndex : undefined}
           onBarPress={(i) => handleBarPress('week', i, thisWeekData)}
@@ -208,7 +228,7 @@ export function CaloriesDashboard() {
               valueLabel: d.total > 0 ? `${d.total}` : '',
               goalMet: d.goal_met,
             }))}
-            maxValue={Math.max(highCal, 500, 1)}
+            maxValue={dailyGoal > 0 ? Math.max(dailyGoal, highCal, 1) : Math.max(highCal, 500, 1)}
             accentColor={COLORS.calories}
             selectedIndex={selectedBar?.chartId === `month-${index}` ? selectedBar.barIndex : undefined}
             onBarPress={(i) => handleBarPress(`month-${index}`, i, week.data)}
@@ -242,8 +262,17 @@ export function CaloriesDashboard() {
           <StatCard label="Least" value={selectedStats.leastCal > 0 ? `${selectedStats.leastCal} kcal` : '—'} accentColor={COLORS.textSecondary} />
         </View>
         <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
-          <StatCard label="Active Days" value={`${selectedStats.activeDays} days`} accentColor={COLORS.calories} />
-          <StatCard label="Rest Days" value={`${selectedStats.restDays} days`} accentColor={COLORS.textSecondary} />
+          {dailyGoal > 0 ? (
+            <>
+              <StatCard label="Goal Reached" value={`${selectedStats.activeDays} days`} accentColor={COLORS.success} />
+              <StatCard label="Goal Missed" value={`${selectedStats.restDays} days`} accentColor={COLORS.error} />
+            </>
+          ) : (
+            <>
+              <StatCard label="Active Days" value={`${selectedStats.activeDays} days`} accentColor={COLORS.calories} />
+              <StatCard label="Rest Days" value={`${selectedStats.restDays} days`} accentColor={COLORS.textSecondary} />
+            </>
+          )}
         </View>
       </Card>
 
@@ -312,9 +341,10 @@ function getTodayStr(): string {
 
 function getThisWeekDates(): string[] {
   const today = new Date();
+  const dayOfWeek = today.getDay();
   const sunday = new Date(today);
-  sunday.setDate(today.getDate() - today.getDay());
-  return Array.from({ length: 7 }, (_, i) => {
+  sunday.setDate(today.getDate() - dayOfWeek);
+  return Array.from({ length: dayOfWeek + 1 }, (_, i) => {
     const d = new Date(sunday);
     d.setDate(sunday.getDate() + i);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

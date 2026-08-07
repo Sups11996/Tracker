@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -24,7 +27,7 @@ const INTENSITY_OPTIONS: { key: Intensity; label: string; desc: string }[] = [
 interface WorkoutLogModalProps {
   visible: boolean;
   weightKg: number;
-  onSave: (durationMins: number, intensity: Intensity, note: string) => void;
+  onSave: (durationMins: number, intensity: Intensity, note: string, customCalories?: number) => void;
   onCancel: () => void;
 }
 
@@ -39,53 +42,89 @@ export function WorkoutLogModal({
   const [useCustom, setUseCustom] = useState(false);
   const [intensity, setIntensity] = useState<Intensity>('moderate');
   const [note, setNote] = useState('');
+  const [customCalories, setCustomCalories] = useState('');
+  const [useCustomCalories, setUseCustomCalories] = useState(false);
 
   const activeDuration = useCustom && customDuration
     ? parseInt(customDuration, 10) || 0
     : duration;
 
-  const estCalories = activeDuration > 0
+  const calculatedCalories = activeDuration > 0
     ? calcWorkoutCalories(activeDuration, intensity, weightKg)
     : 0;
 
+  const estCalories = useCustomCalories && customCalories
+    ? parseInt(customCalories, 10) || 0
+    : calculatedCalories;
+
   function handleSave() {
     if (activeDuration < 1) return;
-    onSave(activeDuration, intensity, note.trim());
-    resetState();
+    const caloriesOverride = useCustomCalories && customCalories 
+      ? parseInt(customCalories, 10) 
+      : undefined;
+    onSave(activeDuration, intensity, note.trim(), caloriesOverride);
+    // Don't reset immediately - let modal close first
   }
 
   function handleCancel() {
-    resetState();
     onCancel();
+    // Don't reset immediately - let modal close first
   }
 
-  function resetState() {
-    setDuration(30);
-    setCustomDuration('');
-    setUseCustom(false);
-    setIntensity('moderate');
-    setNote('');
-  }
+  // Reset state when modal closes
+  React.useEffect(() => {
+    if (!visible) {
+      // Delay reset until after modal close animation
+      const timer = setTimeout(() => {
+        setDuration(30);
+        setCustomDuration('');
+        setUseCustom(false);
+        setIntensity('moderate');
+        setNote('');
+        setCustomCalories('');
+        setUseCustomCalories(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleCancel}>
-      {/* Dim scrim — strong blur so background is properly obscured */}
-      <BlurView intensity={90} tint="dark" style={styles.overlay}>
-        <View style={styles.overlayTint}>
-          {/* Modal sheet — full glass surface */}
-          <View style={styles.container}>
-            <BlurView intensity={GLASS.blurModal} tint="dark" style={styles.sheetBlur}>
-              <View style={styles.sheetTint}>
-                {/* Top accent line — calories colour */}
-                <View style={[styles.accentLine, { backgroundColor: COLORS.calories }]} />
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        style={{ flex: 1 }}
+      >
+        {/* Dim scrim — strong blur so background is properly obscured */}
+        <BlurView intensity={90} tint="dark" style={styles.overlay}>
+          <TouchableOpacity 
+            style={styles.overlayTint}
+            activeOpacity={1}
+            onPress={handleCancel}
+          >
+            {/* Modal sheet — full glass surface */}
+            <TouchableOpacity 
+              style={styles.container}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <BlurView intensity={GLASS.blurModal} tint="dark" style={{ borderRadius: GLASS.radius }}>
+                <ScrollView 
+                  style={styles.scrollView}
+                  contentContainerStyle={styles.scrollContent}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  <View style={styles.sheetTint}>
+                    {/* Top accent line — calories colour */}
+                    <View style={[styles.accentLine, { backgroundColor: COLORS.calories }]} />
 
-                {/* Header */}
-                <View style={styles.header}>
-                  <Text style={styles.title}>Log Workout</Text>
-                  <TouchableOpacity onPress={handleCancel} hitSlop={8}>
-                    <X size={24} color={COLORS.textMuted} />
-                  </TouchableOpacity>
-                </View>
+                    {/* Header */}
+                    <View style={styles.header}>
+                      <Text style={styles.title}>Log Workout</Text>
+                      <TouchableOpacity onPress={handleCancel} hitSlop={8}>
+                        <X size={24} color={COLORS.textMuted} />
+                      </TouchableOpacity>
+                    </View>
 
             {/* Duration */}
             <View style={styles.section}>
@@ -146,11 +185,31 @@ export function WorkoutLogModal({
               />
             </View>
 
+            {/* Custom Calories */}
+            <View style={styles.section}>
+              <Text style={styles.label}>Custom Calories (override the estimated) - Optional</Text>
+              <TextInput
+                value={customCalories}
+                onChangeText={setCustomCalories}
+                onFocus={() => setUseCustomCalories(true)}
+                onBlur={() => { if (!customCalories) setUseCustomCalories(false); }}
+                keyboardType="number-pad"
+                placeholder={`Estimated: ${calculatedCalories} kcal`}
+                style={styles.customInput}
+              />
+              {useCustomCalories && customCalories && (
+                <Text style={styles.calorieNote}>
+                  Using custom value instead of estimated {calculatedCalories} kcal
+                </Text>
+              )}
+            </View>
+
             {/* Estimate */}
             {estCalories > 0 && (
               <View style={styles.estimate}>
                 <Text style={styles.estimateText}>
-                  Estimated: <Text style={{ color: COLORS.calories, fontWeight: TYPOGRAPHY.weight.bold }}>{estCalories} kcal</Text>
+                  {useCustomCalories ? 'Custom: ' : 'Estimated: '}
+                  <Text style={{ color: COLORS.calories, fontWeight: TYPOGRAPHY.weight.bold }}>{estCalories} kcal</Text>
                 </Text>
               </View>
             )}
@@ -160,11 +219,13 @@ export function WorkoutLogModal({
               <Button label="Log Workout" onPress={handleSave} variant="primary" accentColor={COLORS.calories} style={styles.actionBtn} />
               <Button label="Cancel" onPress={handleCancel} variant="ghost" style={styles.actionBtn} />
             </View>
-              </View>
+                  </View>
+              </ScrollView>
             </BlurView>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </BlurView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -176,28 +237,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   overlayTint: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
+    flex: 1,
+    width: '100%',
     backgroundColor: 'rgba(0,0,0,0.70)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: SPACING.lg,
   },
   container: {
-    width: '92%',
+    width: '100%',
     maxWidth: 420,
+    maxHeight: '85%',
     borderRadius: GLASS.radius,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: GLASS.border,
     ...GLASS.shadow,
   },
-  sheetBlur: {
-    // BlurView clips to container's borderRadius via overflow:hidden above
+  scrollView: {
+  },
+  scrollContent: {
   },
   sheetTint: {
     backgroundColor: GLASS.modalBg,
     gap: SPACING.lg,
     padding: SPACING.xl,
+    paddingBottom: SPACING.xxl,
   },
   accentLine: {
     height: 3,
@@ -293,6 +358,11 @@ const styles = StyleSheet.create({
   estimateText: {
     fontSize: TYPOGRAPHY.size.sm,
     color: COLORS.textPrimary,
+  },
+  calorieNote: {
+    fontSize: TYPOGRAPHY.size.xs,
+    color: COLORS.textMuted,
+    fontStyle: 'italic',
   },
   actions: { flexDirection: 'row', gap: SPACING.sm },
   actionBtn: { flex: 1 },

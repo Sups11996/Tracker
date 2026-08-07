@@ -271,9 +271,10 @@ function getTodayStr(): string {
 
 function getThisWeekDates(): string[] {
   const today = new Date();
+  const dayOfWeek = today.getDay();
   const sunday = new Date(today);
-  sunday.setDate(today.getDate() - today.getDay());
-  return Array.from({ length: 7 }, (_, i) => {
+  sunday.setDate(today.getDate() - dayOfWeek);
+  return Array.from({ length: dayOfWeek + 1 }, (_, i) => {
     const d = new Date(sunday);
     d.setDate(sunday.getDate() + i);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

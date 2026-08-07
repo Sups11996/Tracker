@@ -120,6 +120,7 @@ export function HomeScreen() {
         style={styles.scroll}
         contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

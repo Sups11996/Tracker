@@ -42,9 +42,9 @@ export function CaloriesHomeCard({ onPress }: CaloriesHomeCardProps) {
     }));
   }, [stepCal]);
 
-  async function handleSaveWorkout(durationMins: number, intensity: Intensity, note: string) {
+  async function handleSaveWorkout(durationMins: number, intensity: Intensity, note: string, customCalories?: number) {
     try {
-      await logWorkout(db, durationMins, intensity, profile?.weight_kg ?? 70, note);
+      await logWorkout(db, durationMins, intensity, profile?.weight_kg ?? 70, note, customCalories);
       setShowModal(false);
     } catch (e) {
     }

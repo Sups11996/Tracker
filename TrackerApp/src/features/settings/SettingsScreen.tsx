@@ -49,6 +49,7 @@ import { useWaterStore } from '../../stores/waterStore';
 import { useSleepStore } from '../../stores/sleepStore';
 import { useCaloriesStore } from '../../stores/caloriesStore';
 import { useAbcStore } from '../../stores/abcStore';
+import { seedDatabase, clearAllData } from '../../lib/seedData';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 // Convert cm to ft.in display string (e.g. 175 → "5.9")
@@ -549,6 +550,55 @@ export function SettingsScreen() {
                   useAbcStore.getState().setTodayCount(0);
                 }}
               />
+            </View>
+
+            <View style={styles.dangerZone}>
+              <Text style={styles.dangerTitle}>Testing / Demo Data</Text>
+              <TouchableOpacity
+                style={[styles.dangerBtn, { borderColor: COLORS.steps, backgroundColor: `${COLORS.steps}10` }]}
+                onPress={async () => {
+                  try {
+                    await seedDatabase(db);
+                    await hydrateStepStore(db);
+                    await hydrateSleepStore(db);
+                    await hydrateWaterStore(db);
+                    await hydrateCaloriesStore(db);
+                    await hydrateAbcStore(db);
+                    showSuccess('Success', 'Loaded 90 days of demo data for screenshots!');
+                  } catch (e) {
+                    showError('Error', 'Failed to load seed data');
+                  }
+                }}
+              >
+                <Text style={[styles.dangerBtnText, { color: COLORS.steps }]}>Load 3 Months Seed Data</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dangerBtn, { borderColor: COLORS.error, backgroundColor: `${COLORS.error}10`, marginTop: SPACING.sm }]}
+                onPress={async () => {
+                  showConfirm(
+                    'Clear Seed Data',
+                    'This will clear ALL data. Are you sure?',
+                    async () => {
+                      try {
+                        await clearAllData(db);
+                        await hydrateStepStore(db);
+                        await hydrateSleepStore(db);
+                        await hydrateWaterStore(db);
+                        await hydrateCaloriesStore(db);
+                        await hydrateAbcStore(db);
+                        showSuccess('Success', 'All data cleared');
+                      } catch (e) {
+                        showError('Error', 'Failed to clear data');
+                      }
+                    },
+                    'Clear All',
+                    true
+                  );
+                }}
+              >
+                <Text style={[styles.dangerBtnText, { color: COLORS.error }]}>Clear All Seed Data</Text>
+              </TouchableOpacity>
+              <Text style={styles.dangerSubtext}>Load realistic data for screenshots and demos</Text>
             </View>
 
             <View style={styles.dangerZone}>

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Switch } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View, Switch } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useIsFocused } from '@react-navigation/native';
 import { Flame, Clock } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { TimePickerModal } from '../../components/ui/TimePickerModal';
 import { useUserStore } from '../../stores/userStore';
+import { useCaloriesStore } from '../../stores/caloriesStore';
 import {
   loadWorkoutReminderSettings,
   saveWorkoutReminderSettings,
@@ -18,8 +19,10 @@ export function CaloriesSettingsSection() {
   const db = useSQLiteContext();
   const isFocused = useIsFocused();
   const { profile } = useUserStore();
+  const { dailyGoal } = useCaloriesStore();
 
   const [gymEnabled, setGymEnabled] = useState(!!(profile?.uses_gym));
+  const [goalInput, setGoalInput] = useState(dailyGoal > 0 ? dailyGoal.toString() : '');
   const [reminderSettings, setReminderSettings] = useState<WorkoutReminderSettings>({
     enabled: false,
     hour: 18,
@@ -27,6 +30,31 @@ export function CaloriesSettingsSection() {
   });
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    setGoalInput(dailyGoal > 0 ? dailyGoal.toString() : '');
+  }, [dailyGoal]);
+
+  async function handleGoalSave() {
+    const trimmed = goalInput.trim();
+    if (trimmed === '' || trimmed === '0') {
+      // Clear goal
+      await db.runAsync(`DELETE FROM kv_store WHERE key = 'calories_daily_goal'`);
+      useCaloriesStore.getState().setDailyGoal(0);
+      setGoalInput('');
+      return;
+    }
+    const parsed = parseInt(trimmed, 10);
+    if (isNaN(parsed) || parsed < 1) {
+      setGoalInput(dailyGoal > 0 ? dailyGoal.toString() : '');
+      return;
+    }
+    await db.runAsync(
+      `INSERT OR REPLACE INTO kv_store (key, value) VALUES ('calories_daily_goal', ?)`,
+      [parsed.toString()]
+    );
+    useCaloriesStore.getState().setDailyGoal(parsed);
+  }
 
   useEffect(() => {
     if (!isFocused) return;
@@ -106,6 +134,27 @@ export function CaloriesSettingsSection() {
       </View>
 
       <Card style={styles.card}>
+        {/* Daily calorie goal (optional) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Daily Calorie Goal</Text>
+          <Text style={styles.description}>Optional — leave blank to disable</Text>
+          <View style={styles.goalRow}>
+            <TextInput
+              style={styles.goalInput}
+              value={goalInput}
+              onChangeText={setGoalInput}
+              onBlur={handleGoalSave}
+              onSubmitEditing={handleGoalSave}
+              keyboardType="number-pad"
+              maxLength={5}
+              placeholder="e.g. 2000"
+              placeholderTextColor={COLORS.textMuted}
+              returnKeyType="done"
+            />
+            <Text style={styles.goalUnit}>kcal / day</Text>
+          </View>
+        </View>
+
         {/* Gym tracking */}
         <View style={styles.section}>
           <View style={styles.row}>
@@ -205,6 +254,28 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   settingInfo: { flex: 1 },
+  goalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  goalInput: {
+    width: 100,
+    height: 44,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.calories,
+    backgroundColor: COLORS.glassHighlight,
+    color: COLORS.textPrimary,
+    fontSize: TYPOGRAPHY.size.md,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    textAlign: 'center',
+  },
+  goalUnit: {
+    fontSize: TYPOGRAPHY.size.sm,
+    color: COLORS.textMuted,
+  },
   timeButton: {
     flexDirection: 'row',
     alignItems: 'center',

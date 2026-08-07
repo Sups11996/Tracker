@@ -127,29 +127,23 @@ function Bar({
       activeOpacity={0.7}
       disabled={!onPress}
     >
-      {topLabel && !compact && (
-        <Text style={[styles.topLabel, isSelected && styles.topLabelSelected]} numberOfLines={1}>
-          {topLabel}
-        </Text>
-      )}
-
-      {valueLabel && !compact && (
+      {/* Always render labels to reserve consistent height across all bars */}
+      {!compact && (
         <Text style={[styles.valueLabel, isSelected && styles.valueLabelSelected]} numberOfLines={1}>
-          {valueLabel}
+          {valueLabel || ''}
         </Text>
       )}
 
       <View style={styles.barTrack}>
-        {/* Sized container — matches actual bar height */}
+        {value > 0 && (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: `${normalColor}25` }]} />
+        )}
         <Animated.View style={[styles.barFill, { height: animatedHeight }]}>
-          {/* Base color */}
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: normalColor }]} />
-          {/* Light overlay fills from bottom on select */}
+          {value > 0 && (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: normalColor }]} />
+          )}
           <Animated.View
-            style={[
-              styles.barOverlay,
-              { backgroundColor: lighten(normalColor), height: overlayHeight },
-            ]}
+            style={[styles.barOverlay, { backgroundColor: lighten(normalColor), height: overlayHeight }]}
           />
         </Animated.View>
       </View>
@@ -157,6 +151,11 @@ function Bar({
       {!compact && (
         <Text style={[styles.barLabel, isSelected && styles.barLabelSelected]} numberOfLines={1}>
           {label}
+        </Text>
+      )}
+      {!compact && (
+        <Text style={[styles.topLabel, isSelected && styles.topLabelSelected]} numberOfLines={1}>
+          {topLabel || ''}
         </Text>
       )}
     </TouchableOpacity>
@@ -181,20 +180,19 @@ const styles = StyleSheet.create({
   },
   bars: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'stretch',
     gap: 4,
   },
   barWrapper: {
     flex: 1,
     alignItems: 'center',
     height: '100%',
-    gap: 2,
   },
   topLabel: {
     fontSize: 8,
     color: COLORS.textMuted,
     textAlign: 'center',
-    marginBottom: 2,
+    height: 12,
   },
   topLabelSelected: {
     color: COLORS.textPrimary,
@@ -205,7 +203,7 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.weight.semibold,
     color: COLORS.textPrimary,
     textAlign: 'center',
-    marginBottom: 4,
+    height: 14,
   },
   valueLabelSelected: {
     color: COLORS.textPrimary,
@@ -221,7 +219,6 @@ const styles = StyleSheet.create({
   barFill: {
     width: '100%',
     borderRadius: RADIUS.sm,
-    minHeight: 3,
     overflow: 'hidden',
   },
   barOverlay: {
@@ -234,6 +231,7 @@ const styles = StyleSheet.create({
     fontSize: 9,
     color: COLORS.textMuted,
     textAlign: 'center',
+    height: 14,
     marginTop: 2,
   },
   barLabelSelected: {

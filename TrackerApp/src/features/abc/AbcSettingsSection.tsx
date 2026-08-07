@@ -153,8 +153,8 @@ export function AbcSettingsSection() {
         {/* Daily goal */}
         {abcEnabled && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Daily Goal</Text>
-            <Text style={styles.description}>Target count per day</Text>
+            <Text style={styles.sectionTitle}>Daily Limit</Text>
+            <Text style={styles.description}>Track a habit you want to limit (e.g., reduce unwanted behaviors)</Text>
             <View style={styles.goalRow}>
               <TextInput
                 style={styles.goalInput}
@@ -167,7 +167,7 @@ export function AbcSettingsSection() {
                 returnKeyType="done"
                 placeholderTextColor={COLORS.textMuted}
               />
-              <Text style={styles.goalUnit}>times / day</Text>
+              <Text style={styles.goalUnit}>/ day</Text>
             </View>
           </View>
         )}

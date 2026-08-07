@@ -177,7 +177,7 @@ export function StepDashboard() {
             valueLabel: d.steps > 0 ? (d.steps >= 1000 ? `${(d.steps / 1000).toFixed(1)}k` : d.steps.toString()) : '',
             goalMet: d.steps >= (d.goal || dailyGoal) && d.steps > 0,
           }))}
-          maxValue={Math.max(...thisWeekData.map(d => d.goal || dailyGoal), highSteps, 1)}
+          maxValue={Math.max(...thisWeekData.map(d => d.goal || dailyGoal), todaySteps, highSteps, 1)}
           accentColor={COLORS.steps}
           selectedIndex={selectedBar?.chartId === 'week' ? selectedBar.barIndex : undefined}
           onBarPress={(i) => handleBarPress('week', i, thisWeekData)}
@@ -269,8 +269,8 @@ function SectionTitle({ title, sub }: { title: string; sub?: string }) {
 }
 
 /**
- * Get this week's data (Sunday to Saturday)
- * Fills in empty days with 0 values
+ * Get this week's data (Sunday to today only — no future days)
+ * Fills in empty past days with 0 values
  */
 function getThisWeekData(weeklyData: any[], todayRecord: any) {
   const today = new Date();
@@ -281,12 +281,12 @@ function getThisWeekData(weeklyData: any[], todayRecord: any) {
   sunday.setDate(today.getDate() - dayOfWeek);
   
   const week = [];
-  for (let i = 0; i < 7; i++) {
+  // Only go up to today (dayOfWeek + 1 days: Sun=1, Mon=2, ... Fri=6)
+  for (let i = 0; i <= dayOfWeek; i++) {
     const date = new Date(sunday);
     date.setDate(sunday.getDate() + i);
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     
-    // Find existing data or use todayRecord or create empty
     let dayData = weeklyData.find(d => d.date === dateStr);
     if (!dayData && dateStr === todayRecord.date) {
       dayData = todayRecord;

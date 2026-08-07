@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, DeviceEventEmitter } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { BlurView } from 'expo-blur';
 import { BarChart2, Home, Settings } from 'lucide-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { HomeScreen } from '../features/home/HomeScreen';
@@ -17,16 +16,11 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const ICON_SIZE = 22;
 
 /**
- * Glass tab bar background.
- * BlurView sits at full size, then a semi-transparent tint + top border layered on top.
- * This is the same pattern as Card but adapted for the nav bar.
+ * Solid tab bar background - matches home page background
  */
 function TabBarBackground() {
   return (
-    <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill}>
-      {/* Tint layer — mirrors Card's tint */}
-      <View style={styles.tabBarTint} />
-    </BlurView>
+    <View style={styles.tabBarBackground} />
   );
 }
 
@@ -68,10 +62,17 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               canPreventDefault: true,
             });
 
+            // Save step data when switching TO Dashboard from Home or Settings
+            if (route.name === 'Dashboard' && !isFocused) {
+              const currentTab = state.routes[state.index]?.name;
+              if (currentTab === 'Home' || currentTab === 'Settings') {
+                DeviceEventEmitter.emit('SAVE_STEPS_NOW');
+              }
+            }
+
             if (!isFocused && !event.defaultPrevented) {
               navigation.navigate(route.name);
             }
-            // No timeout needed - useEffect handles clearing pressed state
           };
 
           // Get icon and label
@@ -126,11 +127,8 @@ export function MainTabs() {
         tabBar={props => <CustomTabBar {...props} />}
         screenOptions={{
           headerShown: false,
-          // Performance optimizations for instant tab switching
-          lazy: true, // Use lazy loading with skeleton states
+          lazy: true,
           tabBarHideOnKeyboard: true,
-          unmountOnBlur: false, // Keep screens mounted for faster switching
-          freezeOnBlur: true, // Freeze background screens to save resources
         }}
       >
         <Tab.Screen name="Home" component={HomeScreen} />
@@ -162,14 +160,19 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 64,
+    height: 70,
     borderTopWidth: 1,
     borderTopColor: GLASS.border,
+  },
+  tabBarBackground: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: COLORS.background,
   },
   tabBarContent: {
     flex: 1,
     flexDirection: 'row',
-    paddingBottom: 10,
+    paddingBottom: 16,
     paddingTop: 8,
   },
   tabButton: {
@@ -182,11 +185,6 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.size.xs,
     fontWeight: TYPOGRAPHY.weight.semibold,
     letterSpacing: 0.2,
-  },
-  tabBarTint: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(13,15,24,0.55)',
   },
   iconWrap: {
     width: 40,

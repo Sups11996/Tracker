@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AppState, AppStateStatus, NativeModules, Platform } from 'react-native';
+import { AppState, AppStateStatus, NativeModules, Platform, DeviceEventEmitter } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useUserStore } from '../stores/userStore';
 import { hydrateStepStore, subscribeToStepEvents, unsubscribeFromStepEvents, useStepStore, saveStepData } from '../stores/stepStore';
@@ -129,6 +129,24 @@ export function useAppHydration(): { isReady: boolean } {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.uses_abc]);
 
+  // Save step data when tab switches to Dashboard (triggered by MainTabs)
+  useEffect(() => {
+    let lastSavedSteps = -1;
+
+    const sub = DeviceEventEmitter.addListener('SAVE_STEPS_NOW', async () => {
+      const currentSteps = useStepStore.getState().todaySteps;
+      if (currentSteps !== lastSavedSteps) {
+        await saveStepData(db);
+        lastSavedSteps = currentSteps;
+        console.log(`[TabSave] Steps saved — ${currentSteps}`);
+      } else {
+        console.log(`[TabSave] Same steps, not changed — ${currentSteps}`);
+      }
+    });
+
+    return () => sub.remove();
+  }, [db]);
+
   // Subscribe to native step events once
   useEffect(() => {
     subscribeToStepEvents();
@@ -137,13 +155,18 @@ export function useAppHydration(): { isReady: boolean } {
     };
   }, []);
 
-  // Periodic auto-save every 5 minutes while app is active
+  // Periodic auto-save every 30 seconds — only writes if steps changed since last save
   useEffect(() => {
+    let lastSavedSteps = -1;
+
     const interval = setInterval(async () => {
-      if (AppState.currentState === 'active') {
+      if (AppState.currentState !== 'active') return;
+      const currentSteps = useStepStore.getState().todaySteps;
+      if (currentSteps !== lastSavedSteps) {
         await saveStepData(db);
+        lastSavedSteps = currentSteps;
       }
-    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+    }, 30 * 1000);
 
     return () => clearInterval(interval);
   }, [db]);

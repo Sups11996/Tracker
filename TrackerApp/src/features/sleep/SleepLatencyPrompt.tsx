@@ -72,8 +72,16 @@ export function SleepLatencyPrompt({
       onRequestClose={handleCancel}
     >
       <BlurView intensity={90} tint="dark" style={styles.overlay}>
-        <View style={styles.overlayTint}>
-          <View style={styles.container}>
+        <TouchableOpacity 
+          style={styles.overlayTint}
+          activeOpacity={1}
+          onPress={handleCancel}
+        >
+          <TouchableOpacity 
+            style={styles.container}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
             <BlurView intensity={GLASS.blurModal} tint="dark" style={styles.sheetBlur}>
               <View style={styles.sheetTint}>
                 {/* Top accent line — sleep colour */}
@@ -145,8 +153,8 @@ export function SleepLatencyPrompt({
                 </View>
               </View>
             </BlurView>
-          </View>
-        </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
       </BlurView>
     </Modal>
   );

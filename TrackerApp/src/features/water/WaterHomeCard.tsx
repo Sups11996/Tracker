@@ -6,18 +6,18 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Modal,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
-import { Droplets, Plus } from 'lucide-react-native';
+import { Droplets } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
+import { Button } from '../../components/ui/Button';
 import {
   useWaterStore,
   hydrateWaterStore,
   logWater,
   undoLastLog,
 } from '../../stores/waterStore';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS, GLASS } from '../../constants';
+import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 interface WaterHomeCardProps {
   onPress?: () => void;
@@ -27,12 +27,11 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   const db = useSQLiteContext();
   const { todayTotal, dailyGoal, containers, undoStack } = useWaterStore();
 
-  const [customModalVisible, setCustomModalVisible] = React.useState(false);
+  const [showCustomInput, setShowCustomInput] = React.useState(false);
   const [customMl, setCustomMl] = React.useState('');
+  const inputRef = useRef<TextInput>(null);
 
-  useEffect(() => {
-    hydrateWaterStore(db);
-  }, []);
+  useEffect(() => { hydrateWaterStore(db); }, []);
 
   const toastAnim = useRef(new Animated.Value(0)).current;
   const toastVisible = useRef(false);
@@ -43,17 +42,9 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
     if (hasUndo && !toastVisible.current) {
       toastVisible.current = true;
       setToastMounted(true);
-      Animated.timing(toastAnim, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
+      Animated.timing(toastAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
     } else if (!hasUndo && toastVisible.current) {
-      Animated.timing(toastAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => {
+      Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
         toastVisible.current = false;
         setToastMounted(false);
       });
@@ -61,33 +52,39 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   }, [hasUndo]);
 
   async function handleLog(container: typeof containers[0]) {
-    try {
-      await logWater(db, container);
-    } catch (e) {}
+    try { await logWater(db, container); } catch (e) {}
   }
 
   async function handleUndo() {
-    try {
-      await undoLastLog(db);
-    } catch (e) {}
+    try { await undoLastLog(db); } catch (e) {}
   }
 
-  async function handleCustomLog() {
+  function openCustomInput() {
+    setCustomMl('');
+    setShowCustomInput(true);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }
+
+  function cancelCustom() {
+    setCustomMl('');
+    setShowCustomInput(false);
+  }
+
+  async function confirmCustom() {
     const ml = parseInt(customMl, 10);
     if (!isNaN(ml) && ml > 0) {
       await logWater(db, { id: -1, name: 'Custom', capacity_ml: ml });
     }
     setCustomMl('');
-    setCustomModalVisible(false);
+    setShowCustomInput(false);
   }
 
   const progress = dailyGoal > 0 ? Math.min(todayTotal / dailyGoal, 1) : 0;
   const remaining = Math.max(0, dailyGoal - todayTotal);
-  // Show all containers
   const visibleContainers = containers;
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity onPress={showCustomInput ? undefined : onPress} activeOpacity={0.85} disabled={showCustomInput}>
       <Card style={styles.card}>
         {/* Header */}
         <View style={styles.header}>
@@ -111,8 +108,42 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
           {remaining > 0 ? `${formatMl(remaining)} remaining` : 'Goal reached!'}
         </Text>
 
-        {/* Container buttons + custom */}
-        {containers.length > 0 ? (
+        {/* Custom input OR Container buttons */}
+        {showCustomInput ? (
+          <View style={styles.customInputSection}>
+            <TextInput
+              ref={inputRef}
+              value={customMl}
+              onChangeText={setCustomMl}
+              keyboardType="number-pad"
+              placeholder="Amount in ml"
+              placeholderTextColor={COLORS.textMuted}
+              maxLength={5}
+              returnKeyType="done"
+              onSubmitEditing={confirmCustom}
+              autoFocus
+              style={styles.customInput}
+            />
+            <View style={styles.customBtns}>
+              <Button
+                label="Log"
+                onPress={confirmCustom}
+                variant="primary"
+                size="sm"
+                accentColor={COLORS.water}
+                style={{ flex: 1 }}
+              />
+              <Button
+                label="Cancel"
+                onPress={cancelCustom}
+                variant="ghost"
+                size="sm"
+                accentColor={COLORS.water}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        ) : (
           <View style={styles.buttons}>
             {visibleContainers.map((c) => (
               <TouchableOpacity
@@ -122,96 +153,28 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
                 activeOpacity={0.7}
               >
                 <Text style={styles.containerBtnMl}>+{c.capacity_ml}</Text>
-                <Text style={styles.containerBtnName} numberOfLines={1}>
-                  {c.name}
-                </Text>
+                <Text style={styles.containerBtnName} numberOfLines={1}>{c.name}</Text>
               </TouchableOpacity>
             ))}
-            {/* Custom ml button */}
             <TouchableOpacity
               style={styles.customBtn}
-              onPress={() => setCustomModalVisible(true)}
+              onPress={openCustomInput}
               activeOpacity={0.7}
             >
-              <Plus size={16} color={COLORS.water} />
+              <Text style={styles.containerBtnMl}>+</Text>
               <Text style={styles.containerBtnName}>Custom</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.buttons}>
-            <TouchableOpacity
-              style={[styles.containerBtn, { flex: 1 }]}
-              onPress={() => setCustomModalVisible(true)}
-              activeOpacity={0.7}
-            >
-              <Plus size={16} color={COLORS.water} />
-              <Text style={styles.containerBtnName}>Log Custom</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Custom ml modal */}
-        <Modal
-          visible={customModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setCustomModalVisible(false)}
-        >
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => { setCustomMl(''); setCustomModalVisible(false); }}
-          >
-            <TouchableOpacity activeOpacity={1} style={styles.modalBox}>
-              <Text style={styles.modalTitle}>Custom Amount</Text>
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.mlInput}
-                  value={customMl}
-                  onChangeText={setCustomMl}
-                  keyboardType="number-pad"
-                  placeholder="e.g. 350"
-                  placeholderTextColor={COLORS.textMuted}
-                  autoFocus
-                  maxLength={5}
-                  returnKeyType="done"
-                  onSubmitEditing={handleCustomLog}
-                />
-                <Text style={styles.mlUnit}>ml</Text>
-              </View>
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={styles.modalCancel}
-                  onPress={() => { setCustomMl(''); setCustomModalVisible(false); }}
-                >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalConfirm}
-                  onPress={handleCustomLog}
-                >
-                  <Text style={styles.modalConfirmText}>Log</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </Modal>
-
-        {/* Undo toast — only mounted when there's something to undo */}
+        {/* Undo toast */}
         {toastMounted && (
           <Animated.View
             style={[
               styles.toast,
               {
                 opacity: toastAnim,
-                transform: [
-                  {
-                    translateY: toastAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [10, 0],
-                    }),
-                  },
-                ],
+                transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
               },
             ]}
             pointerEvents={hasUndo ? 'auto' : 'none'}
@@ -238,51 +201,15 @@ function formatMl(ml: number): string {
 
 const styles = StyleSheet.create({
   card: { gap: SPACING.md },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.size.md,
-    fontWeight: TYPOGRAPHY.weight.semibold,
-    color: COLORS.textPrimary,
-  },
-  total: {
-    fontSize: TYPOGRAPHY.size.md,
-    fontWeight: TYPOGRAPHY.weight.bold,
-    color: COLORS.water,
-  },
-  goal: {
-    fontSize: TYPOGRAPHY.size.sm,
-    fontWeight: TYPOGRAPHY.weight.regular,
-    color: COLORS.textMuted,
-  },
-  trackBg: {
-    height: 8,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.glassHighlight,
-    overflow: 'hidden',
-  },
-  trackFill: {
-    height: '100%',
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.water,
-  },
-  remaining: {
-    fontSize: TYPOGRAPHY.size.sm,
-    color: COLORS.textMuted,
-  },
-  buttons: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    flexWrap: 'wrap',
-  },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+  title: { fontSize: TYPOGRAPHY.size.md, fontWeight: TYPOGRAPHY.weight.semibold, color: COLORS.textPrimary },
+  total: { fontSize: TYPOGRAPHY.size.md, fontWeight: TYPOGRAPHY.weight.bold, color: COLORS.water },
+  goal: { fontSize: TYPOGRAPHY.size.sm, fontWeight: TYPOGRAPHY.weight.regular, color: COLORS.textMuted },
+  trackBg: { height: 8, borderRadius: RADIUS.full, backgroundColor: COLORS.glassHighlight, overflow: 'hidden' },
+  trackFill: { height: '100%', borderRadius: RADIUS.full, backgroundColor: COLORS.water },
+  remaining: { fontSize: TYPOGRAPHY.size.sm, color: COLORS.textMuted },
+  buttons: { flexDirection: 'row', gap: SPACING.sm, flexWrap: 'wrap' },
   containerBtn: {
     width: '22%',
     alignItems: 'center',
@@ -293,21 +220,8 @@ const styles = StyleSheet.create({
     borderColor: COLORS.water,
     backgroundColor: `${COLORS.water}15`,
   },
-  containerBtnMl: {
-    fontSize: TYPOGRAPHY.size.sm,
-    fontWeight: TYPOGRAPHY.weight.bold,
-    color: COLORS.water,
-  },
-  containerBtnName: {
-    fontSize: TYPOGRAPHY.size.xs,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  noContainers: {
-    fontSize: TYPOGRAPHY.size.xs,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-  },
+  containerBtnMl: { fontSize: TYPOGRAPHY.size.sm, fontWeight: TYPOGRAPHY.weight.bold, color: COLORS.water },
+  containerBtnName: { fontSize: TYPOGRAPHY.size.xs, color: COLORS.textMuted, marginTop: 2 },
   customBtn: {
     width: '22%',
     alignItems: 'center',
@@ -321,80 +235,24 @@ const styles = StyleSheet.create({
     backgroundColor: `${COLORS.water}08`,
     gap: 2,
   },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: '30%',
+  // Custom input section (inline, replaces buttons)
+  customInputSection: {
+    gap: SPACING.md,
   },
-  modalBox: {
-    width: 280,
-    backgroundColor: GLASS.modalBg,
-    borderRadius: GLASS.radius,
-    padding: SPACING.xl,
-    gap: SPACING.lg,
-    borderWidth: 1,
-    borderColor: GLASS.border,
-    ...GLASS.shadow,
-  },
-  modalTitle: {
-    fontSize: TYPOGRAPHY.size.lg,
-    fontWeight: TYPOGRAPHY.weight.bold,
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-  },
-  mlInput: {
-    width: 120,
-    height: 52,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.water,
-    backgroundColor: COLORS.glassHighlight,
-    color: COLORS.textPrimary,
-    fontSize: TYPOGRAPHY.size.xl,
-    fontWeight: TYPOGRAPHY.weight.bold,
-    textAlign: 'center',
-  },
-  mlUnit: {
-    fontSize: TYPOGRAPHY.size.lg,
-    color: COLORS.textMuted,
-    fontWeight: TYPOGRAPHY.weight.semibold,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  modalCancel: {
-    flex: 1,
-    paddingVertical: SPACING.md,
+  customInput: {
+    backgroundColor: COLORS.background,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    fontSize: TYPOGRAPHY.size.sm,
-    color: COLORS.textMuted,
-    fontWeight: TYPOGRAPHY.weight.medium,
-  },
-  modalConfirm: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.water,
-    alignItems: 'center',
-  },
-  modalConfirmText: {
-    fontSize: TYPOGRAPHY.size.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    fontSize: TYPOGRAPHY.size.md,
     color: COLORS.textPrimary,
-    fontWeight: TYPOGRAPHY.weight.bold,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+  },
+  customBtns: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
   },
   toast: {
     flexDirection: 'row',
@@ -407,13 +265,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
   },
-  toastText: {
-    fontSize: TYPOGRAPHY.size.sm,
-    color: COLORS.textPrimary,
-  },
-  toastUndo: {
-    fontSize: TYPOGRAPHY.size.sm,
-    fontWeight: TYPOGRAPHY.weight.bold,
-    color: COLORS.water,
-  },
+  toastText: { fontSize: TYPOGRAPHY.size.sm, color: COLORS.textPrimary },
+  toastUndo: { fontSize: TYPOGRAPHY.size.sm, fontWeight: TYPOGRAPHY.weight.bold, color: COLORS.water },
 });

@@ -20,6 +20,7 @@
         "foregroundImage": "./assets/logo.png"
       },
       "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "android.permission.ACTIVITY_RECOGNITION",
         "android.permission.POST_NOTIFICATIONS",
