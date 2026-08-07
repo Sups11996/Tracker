@@ -138,9 +138,8 @@ export function useAppHydration(): { isReady: boolean } {
       if (currentSteps !== lastSavedSteps) {
         await saveStepData(db);
         lastSavedSteps = currentSteps;
-        console.log(`[TabSave] Steps saved — ${currentSteps}`);
       } else {
-        console.log(`[TabSave] Same steps, not changed — ${currentSteps}`);
+        // Steps haven't changed, skip save
       }
     });
 
@@ -161,6 +160,10 @@ export function useAppHydration(): { isReady: boolean } {
 
     const interval = setInterval(async () => {
       if (AppState.currentState !== 'active') return;
+      
+      // Check for date change every 30 seconds (covers midnight transition)
+      await handleDateChangeIfNeeded();
+      
       const currentSteps = useStepStore.getState().todaySteps;
       if (currentSteps !== lastSavedSteps) {
         await saveStepData(db);

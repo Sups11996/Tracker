@@ -117,20 +117,28 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
       useStepStore.getState().setGoal(state.daily_goal);
     }
 
-    // Weekly data (last 7 days)
+    // Weekly data (last 7 days using local timezone)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const startOfWeek = `${sevenDaysAgo.getFullYear()}-${String(sevenDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(sevenDaysAgo.getDate()).padStart(2, '0')}`;
+    
     const weekly = await db.getAllAsync<DayStepRecord>(
       `SELECT * FROM daily_steps
-       WHERE date >= date('now','-6 days')
-       ORDER BY date ASC`
+       WHERE date >= ? AND date <= ?
+       ORDER BY date ASC`,
+      [startOfWeek, today]
     );
     useStepStore.getState().setWeeklyData(weekly);
 
-    // Monthly data (current month only - from 1st to today)
+    // Monthly data (current month only - from 1st to today using local timezone)
+    const now = new Date();
+    const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    
     const monthly = await db.getAllAsync<DayStepRecord>(
       `SELECT * FROM daily_steps
-       WHERE date >= date('now','start of month')
-       AND date <= date('now')
-       ORDER BY date ASC`
+       WHERE date >= ? AND date <= ?
+       ORDER BY date ASC`,
+      [startOfMonth, today]
     );
     useStepStore.getState().setMonthlyData(monthly);
 
@@ -141,11 +149,12 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
 /**
  * Save current step data to the database.
  * Uses INSERT OR REPLACE to update today's record or create if it doesn't exist.
+ * @param dateOverride - Optional date to save to (for saving yesterday's data on date change)
  */
-export async function saveStepData(db: SQLite.SQLiteDatabase): Promise<void> {
+export async function saveStepData(db: SQLite.SQLiteDatabase, dateOverride?: string): Promise<void> {
   try {
     const state = useStepStore.getState();
-    const today = getTodayLocal();
+    const dateToSave = dateOverride ?? getTodayLocal();
     const goalMet = state.todaySteps >= state.dailyGoal ? 1 : 0;
     const now = Date.now();
 
@@ -154,24 +163,34 @@ export async function saveStepData(db: SQLite.SQLiteDatabase): Promise<void> {
        VALUES (?, ?, ?, ?, ?, ?, 
          COALESCE((SELECT created_at FROM daily_steps WHERE date = ?), ?),
          ?)`,
-      [today, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, today, now, now]
+      [dateToSave, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, dateToSave, now, now]
     );
 
     
     // Only refresh weekly/monthly historical data, don't reload today's data
     // (today's data comes from the native service in real-time)
+    
+    const today = getTodayLocal();
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const startOfWeek = `${sevenDaysAgo.getFullYear()}-${String(sevenDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(sevenDaysAgo.getDate()).padStart(2, '0')}`;
+    
     const weekly = await db.getAllAsync<DayStepRecord>(
       `SELECT * FROM daily_steps
-       WHERE date >= date('now','-6 days')
-       ORDER BY date ASC`
+       WHERE date >= ? AND date <= ?
+       ORDER BY date ASC`,
+      [startOfWeek, today]
     );
     useStepStore.getState().setWeeklyData(weekly);
 
+    const now = new Date();
+    const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    
     const monthly = await db.getAllAsync<DayStepRecord>(
       `SELECT * FROM daily_steps
-       WHERE date >= date('now','start of month')
-       AND date <= date('now')
-       ORDER BY date ASC`
+       WHERE date >= ? AND date <= ?
+       ORDER BY date ASC`,
+      [startOfMonth, today]
     );
     useStepStore.getState().setMonthlyData(monthly);
     
