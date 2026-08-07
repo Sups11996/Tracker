@@ -19,12 +19,6 @@ A personal health tracking app for Android. All data stays on your device — no
 
 <br/>
 
-## Screenshots
-
-> Coming soon
-
-<br/>
-
 ## Download
 
 Grab the latest APK from the [Releases](../../releases) page. On your Android device go to **Settings → Apps → Special app access → Install unknown apps** and allow your browser or file manager. Then open the APK and install.
