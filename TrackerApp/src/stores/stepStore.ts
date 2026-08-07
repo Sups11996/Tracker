@@ -183,8 +183,8 @@ export async function saveStepData(db: SQLite.SQLiteDatabase, dateOverride?: str
     );
     useStepStore.getState().setWeeklyData(weekly);
 
-    const now = new Date();
-    const startOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const currentDate = new Date();
+    const startOfMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
     
     const monthly = await db.getAllAsync<DayStepRecord>(
       `SELECT * FROM daily_steps
