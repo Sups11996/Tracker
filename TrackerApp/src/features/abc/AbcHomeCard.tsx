@@ -23,7 +23,7 @@ interface AbcHomeCardProps {
 
 export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
   const db = useSQLiteContext();
-  const { todayCount, lastLoggedAt, yesterdayCount, undoEntry, undoStack } = useAbcStore();
+  const { todayCount, lastLoggedAt, yesterdayCount, undoEntry, undoStack, dailyGoal } = useAbcStore();
 
   const toastAnim = useRef(new Animated.Value(0)).current;
   const toastVisible = useRef(false);
@@ -88,7 +88,10 @@ export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
       <Card style={styles.card}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>ABC</Text>
+          <View>
+            <Text style={styles.title}>ABC</Text>
+            <Text style={styles.goal}>Limit: {dailyGoal}/day</Text>
+          </View>
           <Text style={styles.count}>{todayCount}</Text>
         </View>
 
@@ -162,6 +165,11 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.size.md,
     fontWeight: TYPOGRAPHY.weight.semibold,
     color: COLORS.textPrimary,
+  },
+  goal: {
+    fontSize: TYPOGRAPHY.size.xs,
+    color: COLORS.textMuted,
+    marginTop: 2,
   },
   count: {
     fontSize: TYPOGRAPHY.size.xxl,
