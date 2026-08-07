@@ -15,6 +15,16 @@ export function StepDashboard() {
   
   const [selectedMonth, setSelectedMonth] = useState(new Date());
 
+  // Selected bar state: { date, steps, goal, chartId, barIndex }
+  // chartId distinguishes which chart the bar belongs to ('week' | 'month-0' | 'month-1' ...)
+  const [selectedBar, setSelectedBar] = useState<{
+    date: string;
+    steps: number;
+    goal: number;
+    chartId: string;
+    barIndex: number;
+  } | null>(null);
+
   useEffect(() => { hydrateStepStore(db); }, []);
 
   // Add today's data
@@ -68,17 +78,11 @@ export function StepDashboard() {
   
   const selectedMonthStats = calculateMonthStats(selectedMonthData, dailyGoal);
 
-  // ── Computed stats (for Stats card - all time) ───────────────────────────
+  // ── Computed stats ───────────────────────────────────────────────────────
   const allDays = currentMonthData.filter(d => d.steps > 0);
-  const avgSteps  = allDays.length
-    ? Math.round(allDays.reduce((s, d) => s + d.steps, 0) / allDays.length)
-    : 0;
-  const highSteps = allDays.length
-    ? Math.max(...allDays.map((d) => d.steps))
-    : 0;
-  const lowSteps  = allDays.filter((d) => d.steps > 0).length
-    ? Math.min(...allDays.filter((d) => d.steps > 0).map((d) => d.steps))
-    : 0;
+  const avgSteps  = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.steps, 0) / allDays.length) : 0;
+  const highSteps = allDays.length ? Math.max(...allDays.map((d) => d.steps)) : 0;
+  const lowSteps  = allDays.filter((d) => d.steps > 0).length ? Math.min(...allDays.filter((d) => d.steps > 0).map((d) => d.steps)) : 0;
   const goalDays  = allDays.filter((d) => d.goal_met).length;
   const totalDist = allDays.reduce((s, d) => s + d.distance_m, 0);
   const totalCal  = allDays.reduce((s, d) => s + d.calories, 0);
@@ -98,12 +102,31 @@ export function StepDashboard() {
   function goToNextMonth() {
     const today = new Date();
     const nextMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 1);
-    if (nextMonth <= today) {
-      setSelectedMonth(nextMonth);
-    }
+    if (nextMonth <= today) setSelectedMonth(nextMonth);
   }
   
   const canGoNext = selectedMonth.getMonth() < new Date().getMonth() || selectedMonth.getFullYear() < new Date().getFullYear();
+
+  // ── Bar tap handler ────────────────────────────────────────────────────────
+  function handleBarPress(chartId: string, barIndex: number, data: any[]) {
+    // If tapping the same bar again → deselect
+    if (selectedBar?.chartId === chartId && selectedBar?.barIndex === barIndex) {
+      setSelectedBar(null);
+      return;
+    }
+    const d = data[barIndex];
+    if (!d) return;
+    setSelectedBar({ date: d.date, steps: d.steps || 0, goal: d.goal || dailyGoal, chartId, barIndex });
+  }
+
+  // ── Display values for the top card ───────────────────────────────────────
+  const displaySteps    = selectedBar ? selectedBar.steps : todaySteps;
+  const displayGoal     = selectedBar ? selectedBar.goal  : dailyGoal;
+  const displayDate     = selectedBar ? selectedBar.date  : today;
+  const displayProgress = displayGoal > 0 ? Math.min(100, Math.round((displaySteps / displayGoal) * 100)) : 0;
+  const displayRemaining = Math.max(0, displayGoal - displaySteps);
+  const isToday         = displayDate === today;
+  const cardTitle       = isToday ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
 
   return (
     <ScrollView
@@ -111,19 +134,33 @@ export function StepDashboard() {
       contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Today overview */}
+      {/* Today / Selected day overview */}
       <Card style={styles.section}>
-        <SectionTitle title="Today" />
+        <SectionTitle title={cardTitle} />
         <View style={styles.statRow}>
           <StatCard
             label="Steps"
-            value={todaySteps.toLocaleString()}
-            sub={`Goal: ${dailyGoal.toLocaleString()}`}
+            value={displaySteps.toLocaleString()}
+            sub={`Goal: ${displayGoal.toLocaleString()}`}
             accentColor={COLORS.steps}
           />
           <StatCard
             label="Progress"
-            value={`${Math.min(100, Math.round((todaySteps / dailyGoal) * 100))}%`}
+            value={`${displayProgress}%`}
+            accentColor={COLORS.steps}
+          />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard
+            label="Remaining"
+            value={displayRemaining > 0 ? displayRemaining.toLocaleString() : 'Goal reached!'}
+            accentColor={displayRemaining > 0 ? COLORS.textSecondary : COLORS.success}
+          />
+          <StatCard
+            label="Distance"
+            value={selectedBar
+              ? `${((selectedBar.steps * 0.00078)).toFixed(2)} km`
+              : `${(todayDistance / 1000).toFixed(2)} km`}
             accentColor={COLORS.steps}
           />
         </View>
@@ -138,10 +175,12 @@ export function StepDashboard() {
             topLabel: formatDate(d.date),
             value: d.steps || 0,
             valueLabel: d.steps > 0 ? (d.steps >= 1000 ? `${(d.steps / 1000).toFixed(1)}k` : d.steps.toString()) : '',
-            goalMet: d.goal_met || false,
+            goalMet: d.steps >= (d.goal || dailyGoal) && d.steps > 0,
           }))}
-          maxValue={Math.max(dailyGoal, highSteps, 1)}
+          maxValue={Math.max(...thisWeekData.map(d => d.goal || dailyGoal), highSteps, 1)}
           accentColor={COLORS.steps}
+          selectedIndex={selectedBar?.chartId === 'week' ? selectedBar.barIndex : undefined}
+          onBarPress={(i) => handleBarPress('week', i, thisWeekData)}
         />
       </Card>
 
@@ -150,15 +189,17 @@ export function StepDashboard() {
         <Card key={index} style={styles.section}>
           <SectionTitle title={`Week ${index + 1}`} sub={week.dateRange} />
           <BarChart
-            data={week.data.map((d) => ({
+            data={week.data.map((d: any) => ({
               label: formatDay(d.date),
               topLabel: formatDate(d.date),
               value: d.steps || 0,
               valueLabel: d.steps > 0 ? (d.steps >= 1000 ? `${(d.steps / 1000).toFixed(1)}k` : d.steps.toString()) : '',
-              goalMet: d.goal_met || false,
+              goalMet: d.steps >= (d.goal || dailyGoal) && d.steps > 0,
             }))}
-            maxValue={Math.max(dailyGoal, highSteps, 1)}
+            maxValue={Math.max(...week.data.map((d: any) => d.goal || dailyGoal), highSteps, 1)}
             accentColor={COLORS.steps}
+            selectedIndex={selectedBar?.chartId === `month-${index}` ? selectedBar.barIndex : undefined}
+            onBarPress={(i) => handleBarPress(`month-${index}`, i, week.data)}
           />
         </Card>
       ))}

@@ -24,6 +24,7 @@ export function WaterDashboard() {
   const [currentMonthData, setCurrentMonthData] = useState<DayWater[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedMonthData, setSelectedMonthData] = useState<DayWater[]>([]);
+  const [selectedBar, setSelectedBar] = useState<{ date: string; total_ml: number; chartId: string; barIndex: number } | null>(null);
 
   useEffect(() => { hydrateWaterStore(db); }, []);
 
@@ -128,6 +129,23 @@ export function WaterDashboard() {
   }
   const canGoNext = selectedMonth.getMonth() < new Date().getMonth() || selectedMonth.getFullYear() < new Date().getFullYear();
 
+  function handleBarPress(chartId: string, barIndex: number, data: DayWater[]) {
+    if (selectedBar?.chartId === chartId && selectedBar?.barIndex === barIndex) {
+      setSelectedBar(null);
+      return;
+    }
+    const d = data[barIndex];
+    if (!d) return;
+    setSelectedBar({ date: d.date, total_ml: d.total_ml, chartId, barIndex });
+  }
+
+  const todayStr = getTodayStr();
+  const displayMl = selectedBar ? selectedBar.total_ml : todayTotal;
+  const displayDate = selectedBar ? selectedBar.date : todayStr;
+  const displayProgress = Math.min(100, Math.round((displayMl / dailyGoal) * 100));
+  const displayRemaining = Math.max(0, dailyGoal - displayMl);
+  const cardTitle = displayDate === todayStr ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
+
   return (
     <ScrollView
       style={styles.scroll}
@@ -136,17 +154,29 @@ export function WaterDashboard() {
     >
       {/* Today */}
       <Card style={styles.section}>
-        <SectionTitle title="Today" />
+        <SectionTitle title={cardTitle} />
         <View style={styles.statRow}>
           <StatCard
             label="Water"
-            value={formatMl(todayTotal)}
+            value={formatMl(displayMl)}
             sub={`Goal: ${formatMl(dailyGoal)}`}
             accentColor={COLORS.water}
           />
           <StatCard
             label="Progress"
-            value={`${Math.min(100, Math.round((todayTotal / dailyGoal) * 100))}%`}
+            value={`${displayProgress}%`}
+            accentColor={COLORS.water}
+          />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard
+            label="Remaining"
+            value={displayRemaining > 0 ? formatMl(displayRemaining) : 'Goal reached!'}
+            accentColor={displayRemaining > 0 ? COLORS.textSecondary : COLORS.success}
+          />
+          <StatCard
+            label="Glasses"
+            value={`~${Math.round(displayMl / 250)}`}
             accentColor={COLORS.water}
           />
         </View>
@@ -165,6 +195,8 @@ export function WaterDashboard() {
           }))}
           maxValue={Math.max(dailyGoal, highMl, 1)}
           accentColor={COLORS.water}
+          selectedIndex={selectedBar?.chartId === 'week' ? selectedBar.barIndex : undefined}
+          onBarPress={(i) => handleBarPress('week', i, thisWeekData)}
         />
       </Card>
 
@@ -182,6 +214,8 @@ export function WaterDashboard() {
             }))}
             maxValue={Math.max(dailyGoal, highMl, 1)}
             accentColor={COLORS.water}
+            selectedIndex={selectedBar?.chartId === `month-${index}` ? selectedBar.barIndex : undefined}
+            onBarPress={(i) => handleBarPress(`month-${index}`, i, week.data)}
           />
         </Card>
       ))}

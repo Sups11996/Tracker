@@ -1,18 +1,12 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
+import { StyleSheet, Text, View, TouchableOpacity, Animated } from 'react-native';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../constants';
 
 interface BarData {
   label: string;
-  topLabel?: string; // Date shown on top
+  topLabel?: string;
   value: number;
-  valueLabel?: string; // Value shown on/above bar
+  valueLabel?: string;
   goalMet?: boolean;
 }
 
@@ -20,9 +14,10 @@ interface BarChartProps {
   data: BarData[];
   maxValue: number;
   accentColor?: string;
-  /** Compact mode: smaller bars, no labels below */
   compact?: boolean;
   height?: number;
+  selectedIndex?: number;
+  onBarPress?: (index: number) => void;
 }
 
 export function BarChart({
@@ -31,6 +26,8 @@ export function BarChart({
   accentColor = COLORS.steps,
   compact = false,
   height = 120,
+  selectedIndex,
+  onBarPress,
 }: BarChartProps) {
   if (!data.length) {
     return (
@@ -45,14 +42,17 @@ export function BarChart({
       <View style={[styles.bars, { height }]}>
         {data.map((d, i) => (
           <Bar
-            key={i}
+            key={`bar-${i}`}
+            index={i}
             value={d.value}
             maxValue={maxValue}
             label={d.label}
             topLabel={d.topLabel}
             valueLabel={d.valueLabel}
-            accentColor={d.goalMet ? accentColor : `${accentColor}70`}
+            normalColor={d.goalMet ? accentColor : `${accentColor}70`}
             compact={compact}
+            isSelected={selectedIndex === i}
+            onPress={onBarPress}
           />
         ))}
       </View>
@@ -61,71 +61,118 @@ export function BarChart({
 }
 
 function Bar({
+  index,
   value,
   maxValue,
   label,
   topLabel,
   valueLabel,
-  accentColor,
+  normalColor,
   compact,
+  isSelected,
+  onPress,
 }: {
+  index: number;
   value: number;
   maxValue: number;
   label: string;
   topLabel?: string;
   valueLabel?: string;
-  accentColor: string;
+  normalColor: string;
   compact: boolean;
+  isSelected?: boolean;
+  onPress?: (index: number) => void;
 }) {
   const ratio = maxValue > 0 ? Math.min(value / maxValue, 1) : 0;
-  const animatedHeight = useSharedValue(0);
+
+  // Height — spring animation feels natural for bars growing up
+  const heightAnim = React.useRef(new Animated.Value(0)).current;
 
   React.useEffect(() => {
-    animatedHeight.value = withTiming(ratio, {
-      duration: 600,
-      easing: Easing.out(Easing.cubic),
-    });
+    Animated.spring(heightAnim, {
+      toValue: ratio,
+      friction: 7,
+      tension: 60,
+      useNativeDriver: false,
+    }).start();
   }, [ratio]);
 
-  const barStyle = useAnimatedStyle(() => ({
-    height: `${animatedHeight.value * 100}%` as any,
-  }));
+  const animatedHeight = heightAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
+
+  // Fill overlay — animates from 0% to 100% height on select
+  // Looks like the darker color is filling in from bottom
+  const fillAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    Animated.timing(fillAnim, {
+      toValue: isSelected ? 1 : 0,
+      duration: 350,
+      easing: (t) => 1 - Math.pow(1 - t, 3), // ease-out cubic
+      useNativeDriver: false,
+    }).start();
+  }, [isSelected]);
+
+  const overlayHeight = fillAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '100%'],
+  });
 
   return (
-    <View style={styles.barWrapper}>
-      {/* Top label (date) */}
+    <TouchableOpacity
+      style={styles.barWrapper}
+      onPress={() => onPress?.(index)}
+      activeOpacity={0.7}
+      disabled={!onPress}
+    >
       {topLabel && !compact && (
-        <Text style={styles.topLabel} numberOfLines={1}>
+        <Text style={[styles.topLabel, isSelected && styles.topLabelSelected]} numberOfLines={1}>
           {topLabel}
         </Text>
       )}
-      
-      {/* Value label above bar */}
+
       {valueLabel && !compact && (
-        <Text style={styles.valueLabel} numberOfLines={1}>
+        <Text style={[styles.valueLabel, isSelected && styles.valueLabelSelected]} numberOfLines={1}>
           {valueLabel}
         </Text>
       )}
-      
-      {/* Bar */}
+
       <View style={styles.barTrack}>
-        <Animated.View
-          style={[
-            styles.barFill,
-            { backgroundColor: accentColor },
-            barStyle,
-          ]}
-        />
+        {/* Sized container — matches actual bar height */}
+        <Animated.View style={[styles.barFill, { height: animatedHeight }]}>
+          {/* Base color */}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: normalColor }]} />
+          {/* Light overlay fills from bottom on select */}
+          <Animated.View
+            style={[
+              styles.barOverlay,
+              { backgroundColor: lighten(normalColor), height: overlayHeight },
+            ]}
+          />
+        </Animated.View>
       </View>
-      
-      {/* Bottom label (day name) */}
+
       {!compact && (
-        <Text style={styles.barLabel} numberOfLines={1}>
+        <Text style={[styles.barLabel, isSelected && styles.barLabelSelected]} numberOfLines={1}>
           {label}
         </Text>
       )}
-    </View>
+    </TouchableOpacity>
   );
+}
+
+function lighten(color: string): string {
+  const hex = color.replace('#', '');
+  if (hex.length === 6 || hex.length === 8) {
+    const r = Math.min(255, parseInt(hex.slice(0, 2), 16) + 60);
+    const g = Math.min(255, parseInt(hex.slice(2, 4), 16) + 60);
+    const b = Math.min(255, parseInt(hex.slice(4, 6), 16) + 60);
+    const alpha = hex.length === 8 ? hex.slice(6, 8) : '';
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}${alpha}`;
+  }
+  return color;
 }
 
 const styles = StyleSheet.create({
@@ -149,12 +196,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 2,
   },
+  topLabelSelected: {
+    color: COLORS.textPrimary,
+    fontWeight: TYPOGRAPHY.weight.bold,
+  },
   valueLabel: {
     fontSize: 9,
     fontWeight: TYPOGRAPHY.weight.semibold,
     color: COLORS.textPrimary,
     textAlign: 'center',
     marginBottom: 4,
+  },
+  valueLabelSelected: {
+    color: COLORS.textPrimary,
   },
   barTrack: {
     flex: 1,
@@ -168,12 +222,23 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: RADIUS.sm,
     minHeight: 3,
+    overflow: 'hidden',
+  },
+  barOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   barLabel: {
     fontSize: 9,
     color: COLORS.textMuted,
     textAlign: 'center',
     marginTop: 2,
+  },
+  barLabelSelected: {
+    color: COLORS.textPrimary,
+    fontWeight: TYPOGRAPHY.weight.bold,
   },
   empty: {
     alignItems: 'center',

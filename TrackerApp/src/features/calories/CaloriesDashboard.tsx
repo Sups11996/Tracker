@@ -25,6 +25,7 @@ export function CaloriesDashboard() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedMonthData, setSelectedMonthData] = useState<DayCalories[]>([]);
   const [recentWorkouts, setRecentWorkouts] = useState<WorkoutLog[]>([]);
+  const [selectedBar, setSelectedBar] = useState<{ date: string; total: number; chartId: string; barIndex: number } | null>(null);
 
   useEffect(() => {
     loadWeekAndMonth();
@@ -137,6 +138,21 @@ export function CaloriesDashboard() {
   }
   const canGoNext = selectedMonth.getMonth() < new Date().getMonth() || selectedMonth.getFullYear() < new Date().getFullYear();
 
+  function handleBarPress(chartId: string, barIndex: number, data: DayCalories[]) {
+    if (selectedBar?.chartId === chartId && selectedBar?.barIndex === barIndex) {
+      setSelectedBar(null);
+      return;
+    }
+    const d = data[barIndex];
+    if (!d) return;
+    setSelectedBar({ date: d.date, total: d.total, chartId, barIndex });
+  }
+
+  const todayStr = getTodayStr();
+  const displayCal = selectedBar ? selectedBar.total : totalCalories;
+  const displayDate = selectedBar ? selectedBar.date : todayStr;
+  const cardTitle = displayDate === todayStr ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
+
   return (
     <ScrollView
       style={styles.scroll}
@@ -145,18 +161,18 @@ export function CaloriesDashboard() {
     >
       {/* Today */}
       <Card style={styles.section}>
-        <SectionTitle title="Today" />
+        <SectionTitle title={cardTitle} />
         <View style={styles.statRow}>
           <StatCard
             label="Calories"
-            value={`${totalCalories} kcal`}
-            sub={`Walking + Workouts`}
+            value={`${displayCal} kcal`}
+            sub={selectedBar ? formatDate(displayDate) : 'Walking + Workouts'}
             accentColor={COLORS.calories}
           />
           <StatCard
-            label="Workouts"
-            value={workoutLogs.length.toString()}
-            sub="today"
+            label={displayDate === todayStr ? 'Workouts' : 'Active'}
+            value={displayDate === todayStr ? workoutLogs.length.toString() : (displayCal > 0 ? 'Yes' : 'Rest')}
+            sub={displayDate === todayStr ? 'today' : undefined}
             accentColor={COLORS.calories}
           />
         </View>
@@ -175,6 +191,8 @@ export function CaloriesDashboard() {
           }))}
           maxValue={Math.max(highCal, 500, 1)}
           accentColor={COLORS.calories}
+          selectedIndex={selectedBar?.chartId === 'week' ? selectedBar.barIndex : undefined}
+          onBarPress={(i) => handleBarPress('week', i, thisWeekData)}
         />
       </Card>
 
@@ -192,6 +210,8 @@ export function CaloriesDashboard() {
             }))}
             maxValue={Math.max(highCal, 500, 1)}
             accentColor={COLORS.calories}
+            selectedIndex={selectedBar?.chartId === `month-${index}` ? selectedBar.barIndex : undefined}
+            onBarPress={(i) => handleBarPress(`month-${index}`, i, week.data)}
           />
         </Card>
       ))}

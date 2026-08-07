@@ -24,6 +24,7 @@ export function SleepDashboard() {
   const [currentMonthData, setCurrentMonthData] = useState<DaySleep[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedMonthData, setSelectedMonthData] = useState<DaySleep[]>([]);
+  const [selectedBar, setSelectedBar] = useState<{ date: string; duration: number; goal: number; chartId: string; barIndex: number } | null>(null);
 
   useEffect(() => {
     loadWeekAndMonth();
@@ -127,6 +128,23 @@ export function SleepDashboard() {
   }
   const canGoNext = selectedMonth.getMonth() < new Date().getMonth() || selectedMonth.getFullYear() < new Date().getFullYear();
 
+  function handleBarPress(chartId: string, barIndex: number, data: DaySleep[]) {
+    if (selectedBar?.chartId === chartId && selectedBar?.barIndex === barIndex) {
+      setSelectedBar(null);
+      return;
+    }
+    const d = data[barIndex];
+    if (!d) return;
+    setSelectedBar({ date: d.date, duration: d.duration, goal: d.goal, chartId, barIndex });
+  }
+
+  const displayDuration = selectedBar ? selectedBar.duration : todaySleep;
+  const displayGoal = selectedBar ? selectedBar.goal : goalMinutes;
+  const displayDate = selectedBar ? selectedBar.date : todayStr;
+  const displayProgress = displayGoal > 0 ? Math.min(100, Math.round((displayDuration / displayGoal) * 100)) : 0;
+  const displayRemaining = Math.max(0, displayGoal - displayDuration);
+  const cardTitle = displayDate === todayStr ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
+
   return (
     <ScrollView
       style={styles.scroll}
@@ -135,17 +153,29 @@ export function SleepDashboard() {
     >
       {/* Today */}
       <Card style={styles.section}>
-        <SectionTitle title="Today" />
+        <SectionTitle title={cardTitle} />
         <View style={styles.statRow}>
           <StatCard
             label="Sleep"
-            value={todaySleep > 0 ? formatDuration(todaySleep) : '—'}
-            sub={isActive ? 'Session active' : `Goal: ${formatDuration(goalMinutes)}`}
+            value={displayDuration > 0 ? formatDuration(displayDuration) : '—'}
+            sub={isActive && displayDate === todayStr ? 'Session active' : `Goal: ${formatDuration(displayGoal)}`}
             accentColor={COLORS.sleep}
           />
           <StatCard
             label="Progress"
-            value={todaySleep > 0 ? `${Math.min(100, Math.round((todaySleep / goalMinutes) * 100))}%` : '—'}
+            value={displayDuration > 0 ? `${displayProgress}%` : '—'}
+            accentColor={COLORS.sleep}
+          />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard
+            label="Remaining"
+            value={displayDuration > 0 ? (displayRemaining > 0 ? formatDuration(displayRemaining) : 'Goal reached!') : '—'}
+            accentColor={displayRemaining > 0 ? COLORS.textSecondary : COLORS.success}
+          />
+          <StatCard
+            label="Quality"
+            value={displayDuration > 0 ? getSleepQuality(displayDuration, displayGoal) : '—'}
             accentColor={COLORS.sleep}
           />
         </View>
@@ -164,6 +194,8 @@ export function SleepDashboard() {
           }))}
           maxValue={maxBarValue}
           accentColor={COLORS.sleep}
+          selectedIndex={selectedBar?.chartId === 'week' ? selectedBar.barIndex : undefined}
+          onBarPress={(i) => handleBarPress('week', i, thisWeekData)}
         />
       </Card>
 
@@ -181,6 +213,8 @@ export function SleepDashboard() {
             }))}
             maxValue={maxBarValue}
             accentColor={COLORS.sleep}
+            selectedIndex={selectedBar?.chartId === `month-${index}` ? selectedBar.barIndex : undefined}
+            onBarPress={(i) => handleBarPress(`month-${index}`, i, week.data)}
           />
         </Card>
       ))}
@@ -320,6 +354,14 @@ function formatDay(date: string): string {
 function formatDate(date: string): string {
   const [, m, d] = date.split('-').map(Number);
   return `${m}/${d}`;
+}
+
+function getSleepQuality(duration: number, goal: number): string {
+  const pct = duration / goal;
+  if (pct >= 1.0) return 'Great';
+  if (pct >= 0.85) return 'Good';
+  if (pct >= 0.65) return 'Fair';
+  return 'Poor';
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────────

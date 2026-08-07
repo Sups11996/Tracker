@@ -3,11 +3,13 @@ import {
   Animated,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
+  Modal,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
-import { Droplets } from 'lucide-react-native';
+import { Droplets, Plus } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import {
   useWaterStore,
@@ -15,7 +17,7 @@ import {
   logWater,
   undoLastLog,
 } from '../../stores/waterStore';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
+import { COLORS, SPACING, TYPOGRAPHY, RADIUS, GLASS } from '../../constants';
 
 interface WaterHomeCardProps {
   onPress?: () => void;
@@ -25,6 +27,9 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   const db = useSQLiteContext();
   const { todayTotal, dailyGoal, containers, undoStack } = useWaterStore();
 
+  const [customModalVisible, setCustomModalVisible] = React.useState(false);
+  const [customMl, setCustomMl] = React.useState('');
+
   useEffect(() => {
     hydrateWaterStore(db);
   }, []);
@@ -33,7 +38,6 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   const toastVisible = useRef(false);
   const [toastMounted, setToastMounted] = React.useState(false);
 
-  // Animate toast in/out when undoStack changes
   const hasUndo = undoStack.length > 0;
   useEffect(() => {
     if (hasUndo && !toastVisible.current) {
@@ -59,19 +63,28 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   async function handleLog(container: typeof containers[0]) {
     try {
       await logWater(db, container);
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   async function handleUndo() {
     try {
       await undoLastLog(db);
-    } catch (e) {
+    } catch (e) {}
+  }
+
+  async function handleCustomLog() {
+    const ml = parseInt(customMl, 10);
+    if (!isNaN(ml) && ml > 0) {
+      await logWater(db, { id: -1, name: 'Custom', capacity_ml: ml });
     }
+    setCustomMl('');
+    setCustomModalVisible(false);
   }
 
   const progress = dailyGoal > 0 ? Math.min(todayTotal / dailyGoal, 1) : 0;
   const remaining = Math.max(0, dailyGoal - todayTotal);
+  // Show all containers
+  const visibleContainers = containers;
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
@@ -98,10 +111,10 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
           {remaining > 0 ? `${formatMl(remaining)} remaining` : 'Goal reached!'}
         </Text>
 
-        {/* Container buttons */}
+        {/* Container buttons + custom */}
         {containers.length > 0 ? (
           <View style={styles.buttons}>
-            {containers.slice(0, 4).map((c) => (
+            {visibleContainers.map((c) => (
               <TouchableOpacity
                 key={c.id}
                 style={styles.containerBtn}
@@ -114,12 +127,75 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
                 </Text>
               </TouchableOpacity>
             ))}
+            {/* Custom ml button */}
+            <TouchableOpacity
+              style={styles.customBtn}
+              onPress={() => setCustomModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Plus size={16} color={COLORS.water} />
+              <Text style={styles.containerBtnName}>Custom</Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          <Text style={styles.noContainers}>
-            Add containers in Settings to enable quick logging
-          </Text>
+          <View style={styles.buttons}>
+            <TouchableOpacity
+              style={[styles.containerBtn, { flex: 1 }]}
+              onPress={() => setCustomModalVisible(true)}
+              activeOpacity={0.7}
+            >
+              <Plus size={16} color={COLORS.water} />
+              <Text style={styles.containerBtnName}>Log Custom</Text>
+            </TouchableOpacity>
+          </View>
         )}
+
+        {/* Custom ml modal */}
+        <Modal
+          visible={customModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setCustomModalVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => { setCustomMl(''); setCustomModalVisible(false); }}
+          >
+            <TouchableOpacity activeOpacity={1} style={styles.modalBox}>
+              <Text style={styles.modalTitle}>Custom Amount</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.mlInput}
+                  value={customMl}
+                  onChangeText={setCustomMl}
+                  keyboardType="number-pad"
+                  placeholder="e.g. 350"
+                  placeholderTextColor={COLORS.textMuted}
+                  autoFocus
+                  maxLength={5}
+                  returnKeyType="done"
+                  onSubmitEditing={handleCustomLog}
+                />
+                <Text style={styles.mlUnit}>ml</Text>
+              </View>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={styles.modalCancel}
+                  onPress={() => { setCustomMl(''); setCustomModalVisible(false); }}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.modalConfirm}
+                  onPress={handleCustomLog}
+                >
+                  <Text style={styles.modalConfirmText}>Log</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Undo toast — only mounted when there's something to undo */}
         {toastMounted && (
@@ -208,8 +284,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   containerBtn: {
-    flex: 1,
-    minWidth: 60,
+    width: '22%',
     alignItems: 'center',
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.xs,
@@ -232,6 +307,94 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.size.xs,
     color: COLORS.textMuted,
     textAlign: 'center',
+  },
+  customBtn: {
+    width: '22%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.water,
+    borderStyle: 'dashed',
+    backgroundColor: `${COLORS.water}08`,
+    gap: 2,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: '30%',
+  },
+  modalBox: {
+    width: 280,
+    backgroundColor: GLASS.modalBg,
+    borderRadius: GLASS.radius,
+    padding: SPACING.xl,
+    gap: SPACING.lg,
+    borderWidth: 1,
+    borderColor: GLASS.border,
+    ...GLASS.shadow,
+  },
+  modalTitle: {
+    fontSize: TYPOGRAPHY.size.lg,
+    fontWeight: TYPOGRAPHY.weight.bold,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+  },
+  mlInput: {
+    width: 120,
+    height: 52,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.water,
+    backgroundColor: COLORS.glassHighlight,
+    color: COLORS.textPrimary,
+    fontSize: TYPOGRAPHY.size.xl,
+    fontWeight: TYPOGRAPHY.weight.bold,
+    textAlign: 'center',
+  },
+  mlUnit: {
+    fontSize: TYPOGRAPHY.size.lg,
+    color: COLORS.textMuted,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: TYPOGRAPHY.size.sm,
+    color: COLORS.textMuted,
+    fontWeight: TYPOGRAPHY.weight.medium,
+  },
+  modalConfirm: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.water,
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    fontSize: TYPOGRAPHY.size.sm,
+    color: COLORS.textPrimary,
+    fontWeight: TYPOGRAPHY.weight.bold,
   },
   toast: {
     flexDirection: 'row',

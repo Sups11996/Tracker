@@ -1,252 +1,377 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { Circle } from 'lucide-react-native';
+import { useAbcStore, hydrateAbcStore } from '../../stores/abcStore';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { BarChart } from '../steps/BarChart';
-import { useAbcStore } from '../../stores/abcStore';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
-interface DayData {
+interface DayAbc {
   date: string;
   count: number;
-}
-
-interface TimeBreakdown {
-  morning: number;   // 6am-12pm
-  afternoon: number; // 12pm-6pm
-  evening: number;   // 6pm-12am
-  night: number;     // 12am-6am
+  goal: number;
+  goal_met: boolean;
 }
 
 export function AbcDashboard() {
   const db = useSQLiteContext();
-  const { todayCount } = useAbcStore();
+  const { todayCount, dailyGoal } = useAbcStore();
   const tabBarHeight = useBottomTabBarHeight();
 
-  const [last7, setLast7] = useState<DayData[]>([]);
-  const [last30, setLast30] = useState<DayData[]>([]);
-  const [timeBreakdown, setTimeBreakdown] = useState<TimeBreakdown>({
-    morning: 0,
-    afternoon: 0,
-    evening: 0,
-    night: 0,
-  });
-  const [stats, setStats] = useState({
-    weeklyAvg: 0,
-    monthlyAvg: 0,
-    highest: 0,
-    lowest: 999,
-  });
+  const [thisWeekData, setThisWeekData] = useState<DayAbc[]>([]);
+  const [currentMonthData, setCurrentMonthData] = useState<DayAbc[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [selectedMonthData, setSelectedMonthData] = useState<DayAbc[]>([]);
+  const [selectedBar, setSelectedBar] = useState<{ date: string; count: number; goal: number; chartId: string; barIndex: number } | null>(null);
+
+  useEffect(() => { hydrateAbcStore(db); }, []);
 
   useEffect(() => {
-    loadData();
-  }, [todayCount]);
+    loadWeekAndMonth();
+  }, [todayCount, dailyGoal, db]);
 
-  async function loadData() {
-    try {
-      // Last 7 days
-      const seven = await db.getAllAsync<DayData>(
-        'SELECT date, count FROM abc_daily_summary ORDER BY date DESC LIMIT 7'
-      );
-      setLast7(seven.reverse());
+  useEffect(() => {
+    loadSelectedMonth(selectedMonth);
+  }, [selectedMonth, dailyGoal, db]);
 
-      // Last 30 days
-      const thirty = await db.getAllAsync<DayData>(
-        'SELECT date, count FROM abc_daily_summary ORDER BY date DESC LIMIT 30'
-      );
-      setLast30(thirty.reverse());
-
-      // Calculate stats
-      if (thirty.length > 0) {
-        const counts = thirty.map(d => d.count);
-        const weeklyAvg = seven.length > 0
-          ? Math.round(seven.reduce((sum, d) => sum + d.count, 0) / seven.length)
-          : 0;
-        const monthlyAvg = Math.round(counts.reduce((a, b) => a + b, 0) / counts.length);
-        const highest = Math.max(...counts);
-        const lowest = Math.min(...counts);
-
-        setStats({ weeklyAvg, monthlyAvg, highest, lowest });
-      }
-
-      // Time of day breakdown (today only)
-      const today = new Date().toISOString().split('T')[0];
-      const entries = await db.getAllAsync<{ logged_at: number }>(
-        'SELECT logged_at FROM abc_logs WHERE date = ?',
-        [today]
-      );
-
-      const breakdown: TimeBreakdown = { morning: 0, afternoon: 0, evening: 0, night: 0 };
-      for (const entry of entries) {
-        const hour = new Date(entry.logged_at).getHours();
-        if (hour >= 6 && hour < 12) breakdown.morning++;
-        else if (hour >= 12 && hour < 18) breakdown.afternoon++;
-        else if (hour >= 18 && hour < 24) breakdown.evening++;
-        else breakdown.night++;
-      }
-      setTimeBreakdown(breakdown);
-
-    } catch (error) {
-    }
+  async function getCountForDate(dateStr: string, todayStr: string): Promise<number> {
+    if (dateStr === todayStr) return todayCount;
+    const row = await db.getFirstAsync<{ count: number }>(
+      `SELECT count FROM abc_daily_summary WHERE date = ?`, [dateStr]
+    );
+    return row?.count || 0;
   }
 
-  const chartData7 = last7.map(d => ({
-    label: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' }),
-    value: d.count,
-  }));
+  async function loadWeekAndMonth() {
+    try {
+      const todayStr = getTodayStr();
 
-  const chartData30 = last30.map(d => ({
-    label: new Date(d.date + 'T00:00:00').getDate().toString(),
-    value: d.count,
-  }));
+      // This week
+      const weekDates = getThisWeekDates();
+      const week: DayAbc[] = [];
+      for (const dateStr of weekDates) {
+        const count = await getCountForDate(dateStr, todayStr);
+        week.push({ date: dateStr, count, goal: dailyGoal, goal_met: count >= dailyGoal && count > 0 });
+      }
+      setThisWeekData(week);
 
-  const maxVal7 = chartData7.length > 0 ? Math.max(...chartData7.map(d => d.value), 5) : 10;
-  const maxVal30 = chartData30.length > 0 ? Math.max(...chartData30.map(d => d.value), 5) : 10;
+      // Current month
+      const monthDates = getCurrentMonthDates();
+      const month: DayAbc[] = [];
+      for (const dateStr of monthDates) {
+        const count = await getCountForDate(dateStr, todayStr);
+        month.push({ date: dateStr, count, goal: dailyGoal, goal_met: count >= dailyGoal && count > 0 });
+      }
+      setCurrentMonthData(month);
+    } catch (e) { }
+  }
+
+  async function loadSelectedMonth(month: Date) {
+    try {
+      const todayStr = getTodayStr();
+      const year = month.getFullYear();
+      const monthIndex = month.getMonth();
+      const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+      const isCurrentMonth = month.getMonth() === new Date().getMonth() && month.getFullYear() === new Date().getFullYear();
+      const lastDay = isCurrentMonth ? new Date().getDate() : daysInMonth;
+
+      const data: DayAbc[] = [];
+      for (let day = 1; day <= lastDay; day++) {
+        const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const count = await getCountForDate(dateStr, todayStr);
+        data.push({ date: dateStr, count, goal: dailyGoal, goal_met: count >= dailyGoal && count > 0 });
+      }
+      setSelectedMonthData(data);
+    } catch (e) { }
+  }
+
+  // Derived values
+  const weeksInMonth = getWeeksInCurrentMonth(currentMonthData);
+  const weeklyTotal = thisWeekData.reduce((s, d) => s + d.count, 0);
+  const allDays = currentMonthData.filter(d => d.count > 0);
+  const highCount = allDays.length ? Math.max(...allDays.map(d => d.count)) : 0;
+
+  const selectedStats = calculateMonthStats(selectedMonthData, dailyGoal);
+
+  const avgCount = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.count, 0) / allDays.length) : 0;
+  const lowCount = allDays.length ? Math.min(...allDays.map(d => d.count)) : 0;
+  const goalDays = allDays.filter(d => d.goal_met).length;
+  let streak = 0;
+  for (const d of [...allDays].sort((a, b) => b.date.localeCompare(a.date))) {
+    if (d.goal_met) streak++; else break;
+  }
+
+  function goToPreviousMonth() {
+    setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  }
+  function goToNextMonth() {
+    const next = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 1);
+    if (next <= new Date()) setSelectedMonth(next);
+  }
+  const canGoNext = selectedMonth.getMonth() < new Date().getMonth() || selectedMonth.getFullYear() < new Date().getFullYear();
+
+  function handleBarPress(chartId: string, barIndex: number, data: DayAbc[]) {
+    if (selectedBar?.chartId === chartId && selectedBar?.barIndex === barIndex) {
+      setSelectedBar(null);
+      return;
+    }
+    const d = data[barIndex];
+    if (!d) return;
+    setSelectedBar({ date: d.date, count: d.count, goal: d.goal, chartId, barIndex });
+  }
+
+  const todayStr = getTodayStr();
+  const displayCount = selectedBar ? selectedBar.count : todayCount;
+  const displayGoal = selectedBar ? selectedBar.goal : dailyGoal;
+  const displayDate = selectedBar ? selectedBar.date : todayStr;
+  const displayProgress = displayGoal > 0 ? Math.min(100, Math.round((displayCount / displayGoal) * 100)) : 0;
+  const displayRemaining = Math.max(0, displayGoal - displayCount);
+  const cardTitle = displayDate === todayStr ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
 
   return (
     <ScrollView
-      style={styles.container}
+      style={styles.scroll}
       contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <Circle size={24} color={COLORS.abc} fill={COLORS.abc} />
-        <Text style={styles.title}>ABC</Text>
-      </View>
-
-      {/* Stats grid */}
-      <View style={styles.grid}>
-        <StatCard label="Today" value={`${todayCount}`} accentColor={COLORS.abc} />
-        <StatCard label="Weekly Avg" value={`${stats.weeklyAvg}`} sub="per day" accentColor={COLORS.abc} />
-        <StatCard label="Monthly Avg" value={`${stats.monthlyAvg}`} sub="per day" accentColor={COLORS.textMuted} />
-        <StatCard label="Highest" value={`${stats.highest}`} sub="in 30d" accentColor={COLORS.calories} />
-      </View>
-
-      {/* 7-day chart */}
-      <Card style={styles.chartCard}>
-        <Text style={styles.chartTitle}>Last 7 Days</Text>
-        {chartData7.length > 0 ? (
-          <BarChart
-            data={chartData7}
-            height={180}
+      {/* Today */}
+      <Card style={styles.section}>
+        <SectionTitle title={cardTitle} />
+        <View style={styles.statRow}>
+          <StatCard
+            label="Count"
+            value={displayCount.toString()}
+            sub={`Goal: ${displayGoal}`}
             accentColor={COLORS.abc}
-            maxValue={Math.ceil(maxVal7)}
           />
-        ) : (
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>No data yet</Text>
-          </View>
-        )}
+          <StatCard
+            label="Progress"
+            value={`${displayProgress}%`}
+            accentColor={COLORS.abc}
+          />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard
+            label="Remaining"
+            value={displayCount > displayGoal ? 'Limit exceeded!' : (displayRemaining > 0 ? displayRemaining.toString() : 'Goal reached!')}
+            accentColor={displayCount > displayGoal ? COLORS.error : (displayRemaining > 0 ? COLORS.textSecondary : COLORS.success)}
+          />
+          <StatCard
+            label="Weekly Total"
+            value={weeklyTotal.toString()}
+            accentColor={COLORS.abc}
+          />
+        </View>
       </Card>
 
-      {/* 30-day chart */}
-      <Card style={styles.chartCard}>
-        <Text style={styles.chartTitle}>Last 30 Days</Text>
-        {chartData30.length > 0 ? (
-          <BarChart
-            data={chartData30}
-            height={180}
-            accentColor={COLORS.abc}
-            maxValue={Math.ceil(maxVal30)}
-            compact={true}
-          />
-        ) : (
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>No data yet</Text>
-          </View>
-        )}
+      {/* This week */}
+      <Card style={styles.section}>
+        <SectionTitle title="This Week" sub={`${weeklyTotal} total`} />
+        <BarChart
+          data={thisWeekData.map(d => ({
+            label: formatDay(d.date),
+            topLabel: formatDate(d.date),
+            value: d.count,
+            valueLabel: d.count > 0 ? d.count.toString() : '',
+            goalMet: d.goal_met,
+          }))}
+          maxValue={Math.max(dailyGoal, highCount, 1)}
+          accentColor={COLORS.abc}
+          selectedIndex={selectedBar?.chartId === 'week' ? selectedBar.barIndex : undefined}
+          onBarPress={(i) => handleBarPress('week', i, thisWeekData)}
+        />
       </Card>
 
-      {/* Time of day breakdown */}
-      {todayCount > 0 && (
-        <Card style={styles.timeCard}>
-          <Text style={styles.chartTitle}>Today's Breakdown</Text>
-          <View style={styles.timeGrid}>
-            <TimeSlot label="Morning" count={timeBreakdown.morning} />
-            <TimeSlot label="Afternoon" count={timeBreakdown.afternoon} />
-            <TimeSlot label="Evening" count={timeBreakdown.evening} />
-            <TimeSlot label="Night" count={timeBreakdown.night} />
-          </View>
+      {/* Weekly graphs for current month */}
+      {weeksInMonth.map((week, index) => (
+        <Card key={index} style={styles.section}>
+          <SectionTitle title={`Week ${index + 1}`} sub={week.dateRange} />
+          <BarChart
+            data={week.data.map((d: DayAbc) => ({
+              label: formatDay(d.date),
+              topLabel: formatDate(d.date),
+              value: d.count,
+              valueLabel: d.count > 0 ? d.count.toString() : '',
+              goalMet: d.goal_met,
+            }))}
+            maxValue={Math.max(dailyGoal, highCount, 1)}
+            accentColor={COLORS.abc}
+            selectedIndex={selectedBar?.chartId === `month-${index}` ? selectedBar.barIndex : undefined}
+            onBarPress={(i) => handleBarPress(`month-${index}`, i, week.data)}
+          />
         </Card>
-      )}
+      ))}
+
+      {/* Month selector */}
+      <Card style={styles.section}>
+        <View style={styles.monthSelector}>
+          <TouchableOpacity onPress={goToPreviousMonth} style={styles.monthButton}>
+            <Text style={styles.monthButtonText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.monthTitle}>
+            {selectedMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </Text>
+          <TouchableOpacity
+            onPress={goToNextMonth}
+            style={[styles.monthButton, !canGoNext && styles.monthButtonDisabled]}
+            disabled={!canGoNext}
+          >
+            <Text style={[styles.monthButtonText, !canGoNext && styles.monthButtonTextDisabled]}>→</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.statRow}>
+          <StatCard label="Total" value={selectedStats.total.toString()} accentColor={COLORS.abc} />
+          <StatCard label="Daily Avg" value={selectedStats.avg.toString()} accentColor={COLORS.abc} />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard label="Most" value={selectedStats.most.toString()} accentColor={COLORS.success} />
+          <StatCard label="Least" value={selectedStats.least > 0 ? selectedStats.least.toString() : '—'} accentColor={COLORS.textSecondary} />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard label="Goal Reached" value={`${selectedStats.goalReached} days`} accentColor={COLORS.success} />
+          <StatCard label="Goal Missed" value={`${selectedStats.goalMissed} days`} accentColor={COLORS.error} />
+        </View>
+      </Card>
+
+      {/* Stats */}
+      <Card style={styles.section}>
+        <SectionTitle title="Stats" />
+        <View style={styles.statRow}>
+          <StatCard label="Daily Avg" value={avgCount.toString()} accentColor={COLORS.abc} />
+          <StatCard label="Best Day" value={highCount.toString()} accentColor={COLORS.abc} />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard label="Lowest Day" value={lowCount > 0 ? lowCount.toString() : '—'} accentColor={COLORS.textSecondary} />
+          <StatCard label="Goal Streak" value={`${streak} days`} accentColor={streak > 0 ? COLORS.success : COLORS.textSecondary} />
+        </View>
+        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
+          <StatCard label="Goal Days" value={`${goalDays} days`} accentColor={COLORS.abc} />
+          <StatCard label="Monthly Tot" value={allDays.reduce((s, d) => s + d.count, 0).toString()} accentColor={COLORS.abc} />
+        </View>
+      </Card>
     </ScrollView>
   );
 }
 
-function TimeSlot({ label, count }: { label: string; count: number }) {
+function SectionTitle({ title, sub }: { title: string; sub?: string }) {
   return (
-    <View style={styles.timeSlot}>
-      <Text style={styles.timeLabel}>{label}</Text>
-      <Text style={styles.timeCount}>{count}</Text>
+    <View style={{ marginBottom: SPACING.md }}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {sub ? <Text style={styles.sectionSub}>{sub}</Text> : null}
     </View>
   );
 }
 
+function getTodayStr(): string {
+  const t = new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+}
+
+function getThisWeekDates(): string[] {
+  const today = new Date();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - today.getDay());
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+}
+
+function getCurrentMonthDates(): string[] {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  return Array.from({ length: today.getDate() }, (_, i) => {
+    const day = i + 1;
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  });
+}
+
+function getWeeksInCurrentMonth(monthData: DayAbc[]) {
+  if (monthData.length === 0) return [];
+  const weeks: any[] = [];
+  for (let i = 0; i < monthData.length; i += 7) {
+    const weekData = monthData.slice(i, i + 7);
+    const [sy, sm, sd] = weekData[0].date.split('-').map(Number);
+    const [ey, em, ed] = weekData[weekData.length - 1].date.split('-').map(Number);
+    const startDate = new Date(sy, sm - 1, sd);
+    const endDate = new Date(ey, em - 1, ed);
+    weeks.push({
+      data: weekData,
+      dateRange: `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+    });
+  }
+  return weeks;
+}
+
+function calculateMonthStats(monthData: DayAbc[], dailyGoal: number) {
+  const days = monthData.filter(d => d.count > 0);
+  return {
+    total: monthData.reduce((s, d) => s + d.count, 0),
+    avg: days.length ? Math.round(monthData.reduce((s, d) => s + d.count, 0) / days.length) : 0,
+    most: days.length ? Math.max(...days.map(d => d.count)) : 0,
+    least: days.length ? Math.min(...days.map(d => d.count)) : 0,
+    goalReached: monthData.filter(d => d.goal_met).length,
+    goalMissed: days.length - monthData.filter(d => d.goal_met).length,
+  };
+}
+
+function formatDay(date: string): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(y, m - 1, d).getDay()];
+}
+
+function formatDate(date: string): string {
+  const [, m, d] = date.split('-').map(Number);
+  return `${m}/${d}`;
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: {
-    padding: SPACING.lg,
-    gap: SPACING.lg,
-    paddingBottom: SPACING.xl,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.size.xl,
-    fontWeight: TYPOGRAPHY.weight.bold,
-    color: COLORS.textPrimary,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.md,
-  },
-  chartCard: { gap: SPACING.md },
-  chartTitle: {
+  scroll: { flex: 1 },
+  content: { padding: SPACING.xl, gap: SPACING.lg },
+  section: { gap: SPACING.md },
+  statRow: { flexDirection: 'row', gap: SPACING.sm },
+  sectionTitle: {
     fontSize: TYPOGRAPHY.size.md,
     fontWeight: TYPOGRAPHY.weight.semibold,
     color: COLORS.textPrimary,
   },
-  empty: {
-    height: 180,
+  sectionSub: {
+    fontSize: TYPOGRAPHY.size.xs,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  monthSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+  },
+  monthTitle: {
+    fontSize: TYPOGRAPHY.size.md,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    color: COLORS.textPrimary,
+  },
+  monthButton: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.abc,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  emptyText: {
-    fontSize: TYPOGRAPHY.size.sm,
-    color: COLORS.textMuted,
+  monthButtonDisabled: {
+    backgroundColor: COLORS.cardSecondary,
   },
-  timeCard: { gap: SPACING.md },
-  timeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.md,
-  },
-  timeSlot: {
-    flex: 1,
-    minWidth: '45%',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.glassHighlight,
-    borderWidth: 1,
-    borderColor: COLORS.glassBorder,
-  },
-  timeLabel: {
-    fontSize: TYPOGRAPHY.size.xs,
-    color: COLORS.textMuted,
-  },
-  timeCount: {
-    fontSize: TYPOGRAPHY.size.lg,
+  monthButtonText: {
+    fontSize: TYPOGRAPHY.size.xl,
+    color: COLORS.textPrimary,
     fontWeight: TYPOGRAPHY.weight.bold,
-    color: COLORS.abc,
+  },
+  monthButtonTextDisabled: {
+    color: COLORS.textMuted,
   },
 });

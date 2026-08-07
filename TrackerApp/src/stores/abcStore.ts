@@ -18,15 +18,15 @@ interface AbcState {
   lastLoggedAt: number | null;
   yesterdayCount: number;
   entries: AbcEntry[];
-  // Stack of undoable entries — each tap pushes one; undo pops one
+  dailyGoal: number;
   undoStack: UndoEntry[];
-  // Legacy single-entry kept for UI visibility check
   undoEntry: UndoEntry | null;
   undoTimer: ReturnType<typeof setTimeout> | null;
   setTodayCount: (count: number) => void;
   setLastLoggedAt: (time: number | null) => void;
   setYesterdayCount: (count: number) => void;
   setEntries: (entries: AbcEntry[]) => void;
+  setDailyGoal: (goal: number) => void;
   setUndoEntry: (entry: UndoEntry | null) => void;
   setUndoTimer: (timer: ReturnType<typeof setTimeout> | null) => void;
 }
@@ -36,6 +36,7 @@ export const useAbcStore = create<AbcState>((set) => ({
   lastLoggedAt: null,
   yesterdayCount: 0,
   entries: [],
+  dailyGoal: 3,
   undoStack: [],
   undoEntry: null,
   undoTimer: null,
@@ -43,6 +44,7 @@ export const useAbcStore = create<AbcState>((set) => ({
   setLastLoggedAt: (time) => set({ lastLoggedAt: time }),
   setYesterdayCount: (count) => set({ yesterdayCount: count }),
   setEntries: (entries) => set({ entries }),
+  setDailyGoal: (goal) => set({ dailyGoal: goal }),
   setUndoEntry: (entry) => set({ undoEntry: entry }),
   setUndoTimer: (timer) => set({ undoTimer: timer }),
 }));
@@ -71,11 +73,18 @@ export async function hydrateAbcStore(db: SQLiteDatabase): Promise<void> {
     );
     const yesterdayCount = yesterdayRow?.count ?? 0;
 
+    // Daily goal
+    const goalRow = await db.getFirstAsync<{ value: string }>(
+      `SELECT value FROM kv_store WHERE key = 'abc_daily_goal'`
+    );
+    const dailyGoal = goalRow ? parseInt(goalRow.value, 10) : 10;
+
     useAbcStore.setState({
       todayCount,
       lastLoggedAt,
       yesterdayCount,
       entries: todayEntries,
+      dailyGoal,
       undoStack: [],
       undoEntry: null,
     });

@@ -25,6 +25,7 @@ import { useUserStore } from '../../stores/userStore';
 import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { getTodayLocal } from '../../lib/dateUtils';
+import { seedTestData, clearSeedData } from '../../lib/seedData';
 import {
   requestIgnoreBatteryOptimizations,
   openUsageAccessSettings,
@@ -335,6 +336,73 @@ export function SettingsScreen() {
         <AbcSettingsSection />
         <PermissionsSection />
         
+        {/* Developer Tools */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Developer Tools</Text>
+          </View>
+          <Card style={styles.card}>
+            <Text style={styles.dataSubtitle}>
+              Seed 3 months of realistic test data across all features to test graphs and month selector.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: SPACING.sm, flexWrap: 'wrap' }}>
+              <TouchableOpacity
+                style={[styles.dangerBtn, { borderColor: COLORS.success, backgroundColor: `${COLORS.success}10` }]}
+                onPress={() => {
+                  showConfirm(
+                    'Seed Test Data',
+                    'This will insert 3 months of sample data for steps, sleep, water, calories and ABC. Existing data may be overwritten.',
+                    async () => {
+                      try {
+                        await seedTestData(db);
+                        await hydrateStepStore(db);
+                        await hydrateSleepStore(db);
+                        await hydrateWaterStore(db);
+                        await hydrateCaloriesStore(db);
+                        await hydrateAbcStore(db);
+                        setTimeout(() => showSuccess('Done', '3 months of test data seeded!'), 100);
+                      } catch (e) {
+                        setTimeout(() => showError('Error', 'Failed to seed data.'), 100);
+                      }
+                    },
+                    'Seed Data',
+                    false
+                  );
+                }}
+              >
+                <Text style={[styles.dangerBtnText, { color: COLORS.success }]}>Seed 3 Months</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.dangerBtn, { borderColor: COLORS.warning, backgroundColor: `${COLORS.warning}10` }]}
+                onPress={() => {
+                  showConfirm(
+                    'Clear Seed Data',
+                    'This will delete all historical data (keeps today). Cannot be undone.',
+                    async () => {
+                      try {
+                        await clearSeedData(db);
+                        await hydrateStepStore(db);
+                        await hydrateSleepStore(db);
+                        await hydrateWaterStore(db);
+                        await hydrateCaloriesStore(db);
+                        await hydrateAbcStore(db);
+                        setTimeout(() => showSuccess('Done', 'Historical data cleared.'), 100);
+                      } catch (e) {
+                        setTimeout(() => showError('Error', 'Failed to clear data.'), 100);
+                      }
+                    },
+                    'Clear',
+                    true
+                  );
+                }}
+              >
+                <Text style={[styles.dangerBtnText, { color: COLORS.warning }]}>Clear History</Text>
+              </TouchableOpacity>
+            </View>
+          </Card>
+        </View>
+
         {/* Data Management Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
