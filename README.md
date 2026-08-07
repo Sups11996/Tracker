@@ -20,10 +20,13 @@ A personal health tracking app for Android. Track steps, sleep, water, calories,
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/home.png" width="200" />
-  <img src="screenshots/steps.png" width="200" />
-  <img src="screenshots/sleep.png" width="200" />
-  <img src="screenshots/water.png" width="200" />
+  <img src="screenshots/home.jpeg" width="200" />
+  <img src="screenshots/steps.jpeg" width="200" />
+  <img src="screenshots/sleep.jpeg" width="200" />
+  <img src="screenshots/water.jpeg" width="200" />
+  <img src="screenshots/calorie.jpeg" width="200" />
+  <img src="screenshots/settings.jpeg" width="200" />
+  
 </p>
 
 <!-- If you have more screenshots, uncomment below:
