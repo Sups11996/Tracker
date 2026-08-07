@@ -8,12 +8,12 @@ A personal health tracking app for Android. Track steps, sleep, water, calories,
 
 ## Why This App?
 
-- **🔒 Complete Privacy** — Your data never leaves your phone
-- **⚡ Fast & Lightweight** — No ads, no bloat, instant interactions
-- **📊 Rich Visualizations** — Weekly and monthly graphs for all features
-- **🎯 Goal Tracking** — Set and monitor daily goals with progress indicators
-- **🔋 Battery Efficient** — Background step counting with minimal battery drain
-- **📴 Fully Offline** — Works without internet connection
+- **Complete Privacy** — Your data never leaves your phone
+- **Fast & Lightweight** — No ads, no bloat, instant interactions
+- **Rich Visualizations** — Weekly and monthly graphs for all features
+- **Goal Tracking** — Set and monitor daily goals with progress indicators
+- **Battery Efficient** — Background step counting with minimal battery drain
+- **Fully Offline** — Works without internet connection
 
 <br/>
 
@@ -26,15 +26,7 @@ A personal health tracking app for Android. Track steps, sleep, water, calories,
   <img src="screenshots/water.jpeg" width="200" />
   <img src="screenshots/calorie.jpeg" width="200" />
   <img src="screenshots/settings.jpeg" width="200" />
-  
 </p>
-
-<!-- If you have more screenshots, uncomment below:
-<p align="center">
-  <img src="screenshots/calories.png" width="200" />
-  <img src="screenshots/settings.png" width="200" />
-</p>
--->
 
 ## Demo
 
@@ -211,3 +203,4 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ---
 
+Made for privacy-conscious health tracking
