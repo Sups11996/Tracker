@@ -6,6 +6,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  AppState,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useIsFocused } from '@react-navigation/native';
@@ -67,6 +68,33 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
 
     reloadTrackingState();
   }, [isFocused, db]);
+
+  // Listen for app coming to foreground to detect notification actions
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && isFocused) {
+        // App came to foreground, reload status from DB
+        db.getFirstAsync<{ is_tracking: number; is_paused: number }>(
+          'SELECT is_tracking, is_paused FROM step_tracking_state WHERE id = 1'
+        ).then((result) => {
+          if (result) {
+            const isTracking = result.is_tracking === 1;
+            const isPaused = result.is_paused === 1;
+            
+            if (!isTracking) {
+              useStepStore.getState().setStatus('unavailable');
+            } else if (isPaused) {
+              useStepStore.getState().setStatus('paused');
+            } else {
+              useStepStore.getState().setStatus('tracking');
+            }
+          }
+        }).catch(() => {});
+      }
+    });
+
+    return () => subscription.remove();
+  }, [db, isFocused]);
 
   const progress  = dailyGoal > 0 ? todaySteps / dailyGoal : 0;
   const remaining = Math.max(0, dailyGoal - todaySteps);
