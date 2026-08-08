@@ -1,6 +1,6 @@
 {
   "name": "trackerapp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "index.ts",
   "dependencies": {
     "@expo-google-fonts/inter": "^0.2.3",
