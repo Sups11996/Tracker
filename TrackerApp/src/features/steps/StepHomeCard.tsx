@@ -72,38 +72,49 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
   // Listen for app coming to foreground to detect notification actions
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
-      console.log('[StepHomeCard] AppState changed to:', nextAppState, 'isFocused:', isFocused);
-      if (nextAppState === 'active' && isFocused) {
-        // App came to foreground, reload status from DB
-        console.log('[StepHomeCard] App came to foreground, reloading status from DB');
-        db.getFirstAsync<{ is_tracking: number; is_paused: number }>(
-          'SELECT is_tracking, is_paused FROM step_tracking_state WHERE id = 1'
-        ).then((result) => {
-          console.log('[StepHomeCard] DB result:', result);
-          if (result) {
-            const isTracking = result.is_tracking === 1;
-            const isPaused = result.is_paused === 1;
-            console.log('[StepHomeCard] isTracking:', isTracking, 'isPaused:', isPaused);
-            
-            if (!isTracking) {
-              console.log('[StepHomeCard] Setting status to unavailable');
-              useStepStore.getState().setStatus('unavailable');
-            } else if (isPaused) {
-              console.log('[StepHomeCard] Setting status to paused');
-              useStepStore.getState().setStatus('paused');
-            } else {
-              console.log('[StepHomeCard] Setting status to tracking');
-              useStepStore.getState().setStatus('tracking');
+      if (nextAppState === 'background') {
+        console.log('========================================');
+        console.log('📱 APP WENT TO BACKGROUND');
+        console.log('Current status:', status);
+        console.log('========================================');
+      } else if (nextAppState === 'active') {
+        console.log('========================================');
+        console.log('📱 APP CAME TO FOREGROUND');
+        console.log('Current status in app:', status);
+        console.log('isFocused:', isFocused);
+        console.log('========================================');
+        
+        if (isFocused) {
+          // App came to foreground, reload status from DB
+          db.getFirstAsync<{ is_tracking: number; is_paused: number }>(
+            'SELECT is_tracking, is_paused FROM step_tracking_state WHERE id = 1'
+          ).then((result) => {
+            if (result) {
+              const isTracking = result.is_tracking === 1;
+              const isPaused = result.is_paused === 1;
+              console.log('📊 DB VALUES: is_tracking =', isTracking, ', is_paused =', isPaused);
+              
+              let newStatus: 'tracking' | 'paused' | 'unavailable';
+              if (!isTracking) {
+                newStatus = 'unavailable';
+              } else if (isPaused) {
+                newStatus = 'paused';
+              } else {
+                newStatus = 'tracking';
+              }
+              
+              console.log('🔄 UPDATING STATUS TO:', newStatus);
+              useStepStore.getState().setStatus(newStatus);
             }
-          }
-        }).catch((error) => {
-          console.log('[StepHomeCard] DB error:', error);
-        });
+          }).catch((error) => {
+            console.log('❌ DB ERROR:', error);
+          });
+        }
       }
     });
 
     return () => subscription.remove();
-  }, [db, isFocused]);
+  }, [db, isFocused, status]);
 
   const progress  = dailyGoal > 0 ? todaySteps / dailyGoal : 0;
   const remaining = Math.max(0, dailyGoal - todaySteps);

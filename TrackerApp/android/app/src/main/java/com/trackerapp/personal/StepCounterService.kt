@@ -61,30 +61,32 @@ class StepCounterService : Service(), SensorEventListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
-        android.util.Log.d("StepCounterService", "onStartCommand action: $action")
         when (action) {
             ACTION_PAUSE  -> { 
-                android.util.Log.d("StepCounterService", "ACTION_PAUSE received")
+                android.util.Log.e("StepService", "========================================")
+                android.util.Log.e("StepService", "⏸️ NOTIFICATION PAUSE CLICKED")
                 isPaused = true
                 updateDatabasePauseState(true)
+                android.util.Log.e("StepService", "✅ DB updated: is_paused = 1")
                 emitStatus("paused")
                 updateNotification()
+                android.util.Log.e("StepService", "========================================")
             }
             ACTION_RESUME -> { 
-                android.util.Log.d("StepCounterService", "ACTION_RESUME received")
+                android.util.Log.e("StepService", "========================================")
+                android.util.Log.e("StepService", "▶️ NOTIFICATION RESUME CLICKED")
                 isPaused = false
                 updateDatabasePauseState(false)
+                android.util.Log.e("StepService", "✅ DB updated: is_paused = 0")
                 emitStatus("tracking")
                 updateNotification()
+                android.util.Log.e("StepService", "========================================")
             }
             ACTION_RESET  -> resetSteps()
             else -> {
-                android.util.Log.d("StepCounterService", "Starting service normally")
                 startForeground(NOTIFICATION_ID, buildNotification())
                 registerSensor()
                 loadPauseStateFromDatabase()
-                android.util.Log.d("StepCounterService", "After loadPauseStateFromDatabase, isPaused: $isPaused")
-                emitStatus(if (isPaused) "paused" else "tracking")
             }
         }
         return START_STICKY
@@ -259,7 +261,6 @@ class StepCounterService : Service(), SensorEventListener {
     private fun loadPauseStateFromDatabase() {
         try {
             val dbPath = getDatabasePath("tracker.db")
-            android.util.Log.d("StepCounterService", "loadPauseStateFromDatabase - dbPath: $dbPath, exists: ${dbPath.exists()}")
             if (!dbPath.exists()) return
             
             val db = android.database.sqlite.SQLiteDatabase.openDatabase(
@@ -272,23 +273,22 @@ class StepCounterService : Service(), SensorEventListener {
             
             if (cursor.moveToFirst()) {
                 isPaused = cursor.getInt(0) == 1
-                android.util.Log.d("StepCounterService", "Loaded isPaused from DB: $isPaused")
-            } else {
-                android.util.Log.d("StepCounterService", "No row found in step_tracking_state")
             }
             
             cursor.close()
             db.close()
         } catch (e: Exception) {
-            android.util.Log.e("StepCounterService", "Failed to load pause state from DB", e)
+            android.util.Log.e("StepService", "❌ Failed to load pause state", e)
         }
     }
 
     private fun updateDatabasePauseState(paused: Boolean) {
         try {
             val dbPath = getDatabasePath("tracker.db")
-            android.util.Log.d("StepCounterService", "updateDatabasePauseState - paused: $paused, dbPath: $dbPath, exists: ${dbPath.exists()}")
-            if (!dbPath.exists()) return
+            if (!dbPath.exists()) {
+                android.util.Log.e("StepService", "❌ Database not found at: $dbPath")
+                return
+            }
             
             val db = android.database.sqlite.SQLiteDatabase.openDatabase(
                 dbPath.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE
@@ -298,11 +298,10 @@ class StepCounterService : Service(), SensorEventListener {
                 "UPDATE step_tracking_state SET is_paused = ? WHERE id = 1",
                 arrayOf(if (paused) 1 else 0)
             )
-            android.util.Log.d("StepCounterService", "Updated is_paused in DB to: ${if (paused) 1 else 0}")
             
             db.close()
         } catch (e: Exception) {
-            android.util.Log.e("StepCounterService", "Failed to update pause state in DB", e)
+            android.util.Log.e("StepService", "❌ Failed to update pause state", e)
         }
     }
 }
