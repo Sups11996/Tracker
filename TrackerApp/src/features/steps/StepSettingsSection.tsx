@@ -20,8 +20,9 @@ export function StepSettingsSection() {
   const [hasLoaded, setHasLoaded] = useState(false);
 
   // Sync trackingEnabled with store status whenever status changes
+  // Note: 'paused' means tracking is enabled but temporarily paused
   useEffect(() => {
-    const isTracking = status === 'tracking';
+    const isTracking = status === 'tracking' || status === 'paused';
     setTrackingEnabled(isTracking);
   }, [status]);
 
@@ -31,17 +32,22 @@ export function StepSettingsSection() {
     
     async function loadTrackingState() {
       try {
-        const result = await db.getFirstAsync<{ is_tracking: number }>(
-          'SELECT is_tracking FROM step_tracking_state WHERE id = 1'
+        const result = await db.getFirstAsync<{ is_tracking: number; is_paused: number }>(
+          'SELECT is_tracking, is_paused FROM step_tracking_state WHERE id = 1'
         );
         
         if (result) {
           const isTracking = result.is_tracking === 1;
+          const isPaused = result.is_paused === 1;
+          
           setTrackingEnabled(isTracking);
-          if (isTracking) {
-            useStepStore.getState().setStatus('tracking');
-          } else {
+          
+          if (!isTracking) {
+            useStepStore.getState().setStatus('unavailable');
+          } else if (isPaused) {
             useStepStore.getState().setStatus('paused');
+          } else {
+            useStepStore.getState().setStatus('tracking');
           }
         }
         setHasLoaded(true);
@@ -90,7 +96,7 @@ export function StepSettingsSection() {
         
         useStepStore.getState().setStatus('tracking');
         
-        // Update only is_tracking field in DB
+        // Update is_tracking field in DB (enable tracking)
         await db.runAsync(
           'UPDATE step_tracking_state SET is_tracking = ?, updated_at = ? WHERE id = 1',
           [1, new Date().toISOString()]
@@ -102,9 +108,9 @@ export function StepSettingsSection() {
         } else {
         }
         
-        useStepStore.getState().setStatus('paused');
+        useStepStore.getState().setStatus('unavailable');
         
-        // Update only is_tracking field in DB
+        // Update is_tracking field in DB (disable tracking completely)
         await db.runAsync(
           'UPDATE step_tracking_state SET is_tracking = ?, updated_at = ? WHERE id = 1',
           [0, new Date().toISOString()]
