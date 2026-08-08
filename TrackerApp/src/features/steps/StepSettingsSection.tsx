@@ -19,13 +19,6 @@ export function StepSettingsSection() {
   const [trackingEnabled, setTrackingEnabled] = useState(status !== 'unavailable');
   const [hasLoaded, setHasLoaded] = useState(false);
 
-  // Sync trackingEnabled with store status whenever status changes
-  // Note: 'paused' means tracking is enabled but temporarily paused
-  useEffect(() => {
-    const isTracking = status === 'tracking' || status === 'paused';
-    setTrackingEnabled(isTracking);
-  }, [status]);
-
   // Load tracking state from DB on mount ONLY
   useEffect(() => {
     if (hasLoaded) return; // Only run once
