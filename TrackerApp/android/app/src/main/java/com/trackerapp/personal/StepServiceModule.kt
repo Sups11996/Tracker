@@ -51,20 +51,4 @@ class StepServiceModule(reactContext: ReactApplicationContext) :
             promise.reject("ACTION_ERROR", e.message, e)
         }
     }
-
-    @ReactMethod
-    fun sendAction(action: String) {
-        try {
-            val intent = StepCounterService.getIntent(reactApplicationContext).apply {
-                this.action = action
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                reactApplicationContext.startForegroundService(intent)
-            } else {
-                reactApplicationContext.startService(intent)
-            }
-        } catch (e: Exception) {
-            // Silently fail
-        }
-    }
 }
