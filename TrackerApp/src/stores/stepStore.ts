@@ -73,8 +73,10 @@ export function subscribeToStepEvents() {
       } catch (_) {}
     });
 
+    // Don't accept status events from native service
+    // Status is controlled by database only to prevent race conditions
     statusSub = DeviceEventEmitter.addListener('STEP_STATUS', (status: string) => {
-      useStepStore.getState().setStatus(status as TrackingStatus);
+      // Ignore - status is managed by DB and UI actions only
     });
   } catch (_) {}
 }
