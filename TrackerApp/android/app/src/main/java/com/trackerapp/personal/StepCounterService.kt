@@ -63,24 +63,16 @@ class StepCounterService : Service(), SensorEventListener {
         val action = intent?.action
         when (action) {
             ACTION_PAUSE  -> { 
-                android.util.Log.e("StepService", "========================================")
-                android.util.Log.e("StepService", "⏸️ NOTIFICATION PAUSE CLICKED")
                 isPaused = true
                 updateDatabasePauseState(true)
-                android.util.Log.e("StepService", "✅ DB updated: is_paused = 1")
                 emitStatus("paused")
                 updateNotification()
-                android.util.Log.e("StepService", "========================================")
             }
             ACTION_RESUME -> { 
-                android.util.Log.e("StepService", "========================================")
-                android.util.Log.e("StepService", "▶️ NOTIFICATION RESUME CLICKED")
                 isPaused = false
                 updateDatabasePauseState(false)
-                android.util.Log.e("StepService", "✅ DB updated: is_paused = 0")
                 emitStatus("tracking")
                 updateNotification()
-                android.util.Log.e("StepService", "========================================")
             }
             ACTION_RESET  -> resetSteps()
             else -> {
@@ -278,17 +270,43 @@ class StepCounterService : Service(), SensorEventListener {
             cursor.close()
             db.close()
         } catch (e: Exception) {
-            android.util.Log.e("StepService", "❌ Failed to load pause state", e)
+            // Silently fail
         }
     }
 
     private fun updateDatabasePauseState(paused: Boolean) {
         try {
-            val dbPath = getDatabasePath("tracker.db")
-            if (!dbPath.exists()) {
-                android.util.Log.e("StepService", "❌ Database not found at: $dbPath")
-                return
+            val appFilesDir = applicationContext.filesDir
+            val possiblePaths = mutableListOf<java.io.File>()
+            
+            // Standard Android path
+            possiblePaths.add(applicationContext.getDatabasePath("tracker.db"))
+            
+            // Expo SQLite path
+            val sqliteDir = java.io.File(appFilesDir, "SQLite")
+            if (sqliteDir.exists()) {
+                possiblePaths.add(java.io.File(sqliteDir, "tracker.db"))
             }
+            
+            // Check all subdirectories in files
+            appFilesDir?.listFiles()?.forEach { dir ->
+                if (dir.isDirectory) {
+                    val trackerDb = java.io.File(dir, "tracker.db")
+                    if (trackerDb.exists()) {
+                        possiblePaths.add(trackerDb)
+                    }
+                }
+            }
+            
+            var dbPath: java.io.File? = null
+            for (path in possiblePaths) {
+                if (path.exists()) {
+                    dbPath = path
+                    break
+                }
+            }
+            
+            if (dbPath == null) return
             
             val db = android.database.sqlite.SQLiteDatabase.openDatabase(
                 dbPath.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE
@@ -301,7 +319,7 @@ class StepCounterService : Service(), SensorEventListener {
             
             db.close()
         } catch (e: Exception) {
-            android.util.Log.e("StepService", "❌ Failed to update pause state", e)
+            // Silently fail
         }
     }
 }

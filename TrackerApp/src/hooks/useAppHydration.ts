@@ -119,6 +119,29 @@ export function useAppHydration(): { isReady: boolean } {
         appState.current.match(/inactive|background/) &&
         nextState === 'active'
       ) {
+        // Reload step tracking status from database
+        try {
+          const result = await db.getFirstAsync<{ is_tracking: number; is_paused: number }>(
+            'SELECT is_tracking, is_paused FROM step_tracking_state WHERE id = 1'
+          );
+          if (result) {
+            const isTracking = result.is_tracking === 1;
+            const isPaused = result.is_paused === 1;
+            
+            let newStatus: 'tracking' | 'paused' | 'unavailable';
+            if (!isTracking) {
+              newStatus = 'unavailable';
+            } else if (isPaused) {
+              newStatus = 'paused';
+            } else {
+              newStatus = 'tracking';
+            }
+            
+            useStepStore.getState().setStatus(newStatus);
+          }
+        } catch (error) {
+        }
+        
         await handleDateChangeIfNeeded();
         await hydrateAll();
       }
