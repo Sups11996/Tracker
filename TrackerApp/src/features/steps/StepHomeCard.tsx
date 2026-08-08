@@ -72,24 +72,33 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
   // Listen for app coming to foreground to detect notification actions
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
+      console.log('[StepHomeCard] AppState changed to:', nextAppState, 'isFocused:', isFocused);
       if (nextAppState === 'active' && isFocused) {
         // App came to foreground, reload status from DB
+        console.log('[StepHomeCard] App came to foreground, reloading status from DB');
         db.getFirstAsync<{ is_tracking: number; is_paused: number }>(
           'SELECT is_tracking, is_paused FROM step_tracking_state WHERE id = 1'
         ).then((result) => {
+          console.log('[StepHomeCard] DB result:', result);
           if (result) {
             const isTracking = result.is_tracking === 1;
             const isPaused = result.is_paused === 1;
+            console.log('[StepHomeCard] isTracking:', isTracking, 'isPaused:', isPaused);
             
             if (!isTracking) {
+              console.log('[StepHomeCard] Setting status to unavailable');
               useStepStore.getState().setStatus('unavailable');
             } else if (isPaused) {
+              console.log('[StepHomeCard] Setting status to paused');
               useStepStore.getState().setStatus('paused');
             } else {
+              console.log('[StepHomeCard] Setting status to tracking');
               useStepStore.getState().setStatus('tracking');
             }
           }
-        }).catch(() => {});
+        }).catch((error) => {
+          console.log('[StepHomeCard] DB error:', error);
+        });
       }
     });
 

@@ -61,14 +61,17 @@ class StepCounterService : Service(), SensorEventListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
+        android.util.Log.d("StepCounterService", "onStartCommand action: $action")
         when (action) {
             ACTION_PAUSE  -> { 
+                android.util.Log.d("StepCounterService", "ACTION_PAUSE received")
                 isPaused = true
                 updateDatabasePauseState(true)
                 emitStatus("paused")
                 updateNotification()
             }
             ACTION_RESUME -> { 
+                android.util.Log.d("StepCounterService", "ACTION_RESUME received")
                 isPaused = false
                 updateDatabasePauseState(false)
                 emitStatus("tracking")
@@ -76,9 +79,11 @@ class StepCounterService : Service(), SensorEventListener {
             }
             ACTION_RESET  -> resetSteps()
             else -> {
+                android.util.Log.d("StepCounterService", "Starting service normally")
                 startForeground(NOTIFICATION_ID, buildNotification())
                 registerSensor()
                 loadPauseStateFromDatabase()
+                android.util.Log.d("StepCounterService", "After loadPauseStateFromDatabase, isPaused: $isPaused")
                 emitStatus(if (isPaused) "paused" else "tracking")
             }
         }
@@ -254,6 +259,7 @@ class StepCounterService : Service(), SensorEventListener {
     private fun loadPauseStateFromDatabase() {
         try {
             val dbPath = getDatabasePath("tracker.db")
+            android.util.Log.d("StepCounterService", "loadPauseStateFromDatabase - dbPath: $dbPath, exists: ${dbPath.exists()}")
             if (!dbPath.exists()) return
             
             val db = android.database.sqlite.SQLiteDatabase.openDatabase(
@@ -266,6 +272,9 @@ class StepCounterService : Service(), SensorEventListener {
             
             if (cursor.moveToFirst()) {
                 isPaused = cursor.getInt(0) == 1
+                android.util.Log.d("StepCounterService", "Loaded isPaused from DB: $isPaused")
+            } else {
+                android.util.Log.d("StepCounterService", "No row found in step_tracking_state")
             }
             
             cursor.close()
@@ -278,6 +287,7 @@ class StepCounterService : Service(), SensorEventListener {
     private fun updateDatabasePauseState(paused: Boolean) {
         try {
             val dbPath = getDatabasePath("tracker.db")
+            android.util.Log.d("StepCounterService", "updateDatabasePauseState - paused: $paused, dbPath: $dbPath, exists: ${dbPath.exists()}")
             if (!dbPath.exists()) return
             
             val db = android.database.sqlite.SQLiteDatabase.openDatabase(
@@ -288,6 +298,7 @@ class StepCounterService : Service(), SensorEventListener {
                 "UPDATE step_tracking_state SET is_paused = ? WHERE id = 1",
                 arrayOf(if (paused) 1 else 0)
             )
+            android.util.Log.d("StepCounterService", "Updated is_paused in DB to: ${if (paused) 1 else 0}")
             
             db.close()
         } catch (e: Exception) {
