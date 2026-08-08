@@ -45,16 +45,20 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
 
     async function reloadTrackingState() {
       try {
-        const result = await db.getFirstAsync<{ is_tracking: number }>(
-          'SELECT is_tracking FROM step_tracking_state WHERE id = 1'
+        const result = await db.getFirstAsync<{ is_tracking: number; is_paused: number }>(
+          'SELECT is_tracking, is_paused FROM step_tracking_state WHERE id = 1'
         );
         
         if (result) {
           const isTracking = result.is_tracking === 1;
-          if (isTracking) {
-            useStepStore.getState().setStatus('tracking');
-          } else {
+          const isPaused = result.is_paused === 1;
+          
+          if (!isTracking) {
+            useStepStore.getState().setStatus('unavailable');
+          } else if (isPaused) {
             useStepStore.getState().setStatus('paused');
+          } else {
+            useStepStore.getState().setStatus('tracking');
           }
         }
       } catch (error) {
@@ -95,11 +99,11 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
       } else {
       }
       
-      // Update DB to persist the state
-      const isTracking = action === 'resume' ? 1 : 0;
+      // Update DB to persist the paused state (NOT is_tracking, only is_paused)
+      const isPaused = action === 'pause' ? 1 : 0;
       db.runAsync(
-        'UPDATE step_tracking_state SET is_tracking = ?, updated_at = ? WHERE id = 1',
-        [isTracking, new Date().toISOString()]
+        'UPDATE step_tracking_state SET is_paused = ?, updated_at = ? WHERE id = 1',
+        [isPaused, new Date().toISOString()]
       ).then(() => {
       }).catch((error) => {
       });

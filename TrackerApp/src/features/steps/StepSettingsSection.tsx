@@ -96,10 +96,10 @@ export function StepSettingsSection() {
         
         useStepStore.getState().setStatus('tracking');
         
-        // Update is_tracking field in DB (enable tracking)
+        // Enable tracking and clear paused state
         await db.runAsync(
-          'UPDATE step_tracking_state SET is_tracking = ?, updated_at = ? WHERE id = 1',
-          [1, new Date().toISOString()]
+          'UPDATE step_tracking_state SET is_tracking = ?, is_paused = ?, updated_at = ? WHERE id = 1',
+          [1, 0, new Date().toISOString()]
         );
       } else {
         // Try to stop service if available
@@ -110,7 +110,7 @@ export function StepSettingsSection() {
         
         useStepStore.getState().setStatus('unavailable');
         
-        // Update is_tracking field in DB (disable tracking completely)
+        // Disable tracking completely
         await db.runAsync(
           'UPDATE step_tracking_state SET is_tracking = ?, updated_at = ? WHERE id = 1',
           [0, new Date().toISOString()]
