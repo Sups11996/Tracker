@@ -116,12 +116,14 @@ class StepCounterService : Service(), SensorEventListener {
             sensorBase = rawValue
             saveState()
         } else if (rawValue < sensorBase) {
-            // Sensor reset detected (device reboot) - preserve existing steps
-            // and update baseline to current sensor value
+            // Sensor reset detected (device reboot or sensor restart)
+            // The hardware step counter resets to 0 after reboot, but we've
+            // loaded the pre-reboot step count from SharedPreferences.
+            // Update the baseline to the current sensor value and preserve
+            // the existing steps - new steps will be added on top.
             sensorBase = rawValue
             saveState()
-            // todaySteps stays the same (preserved from before reboot)
-            return  // Don't recalculate steps this cycle
+            return
         }
 
         val newSteps = (rawValue - sensorBase).toInt().coerceAtLeast(0)
