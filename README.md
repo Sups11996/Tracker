@@ -49,7 +49,7 @@ Session-based sleep tracking with:
 - Weekly and monthly sleep patterns
 
 ### Water Intake
-Quick logging with customizable drink containers. Add custom amounts for flexibility. Track daily hydration progress with visual indicators.
+Quick logging with customizable drink containers. Add custom amounts and track daily hydration progress with visual indicators.
 
 ### Calorie Tracking
 - Automatic calorie calculation from walking activity
@@ -58,13 +58,13 @@ Quick logging with customizable drink containers. Add custom amounts for flexibi
 - Weekly and monthly summaries
 
 ### ABC (Activity-Based Counter)
-Daily habit limiter for tracking behaviors you want to reduce. Set custom daily limits with summary notifications to help build better habits.
+Daily habit limiter for tracking behaviors you want to reduce. Set daily limits with summary notifications.
 
 ### Data Visualization
 - Weekly bar charts for all metrics
-- Month-by-week breakdown views
+- Month-by-week breakdown
 - Month selector with detailed statistics
-- Tap any data point to see detailed information
+- Interactive data points
 
 ---
 
@@ -93,10 +93,7 @@ The app uses Android's `TYPE_STEP_COUNTER` hardware sensor, a dedicated chip in 
 - **Phone placement** — Pocket placement works best, followed by hand-held
 - **Walking pattern** — Normal walking is detected most reliably
 
-**Data persistence:** The hardware step counter resets on device reboot. The app automatically saves your count to local storage when:
-- App goes to background
-- Date changes at midnight
-- Every 30 seconds while active
+**Data persistence:** Steps are continuously saved to local storage and automatically restored after device reboot. The background service resumes tracking seamlessly without manual intervention.
 
 ### Data Storage
 
@@ -105,18 +102,18 @@ All data is stored in a local SQLite database on your device:
 - User profile and preferences
 - Historical data for weekly and monthly summaries
 
-**Your data is yours** — No cloud synchronization, no external transmission, complete privacy.
+**Your data is yours** — No cloud sync, no external transmission, complete privacy.
 
 ---
 
 ## Tech Stack
 
-- **React Native + Expo** — Cross-platform framework with native module access
-- **TypeScript** — Type-safe development with enhanced IDE support
+- **React Native + Expo** — Cross-platform framework with native module support
+- **TypeScript** — Type-safe development
 - **Zustand** — Lightweight state management
 - **expo-sqlite** — Local SQLite database
-- **expo-notifications** — Reminders and daily summary notifications
-- **Custom Native Module** — `StepCounterService.kt` provides reliable background step tracking
+- **expo-notifications** — Reminders and daily summaries
+- **Native Services** — Kotlin-based background step tracking with automatic reboot recovery
 
 ---
 
@@ -202,6 +199,8 @@ TrackerApp/
 └── android/
     └── app/src/main/java/com/trackerapp/personal/
         ├── StepCounterService.kt    # Foreground service for step counting
+        ├── BootReceiver.kt          # Auto-restart service after device reboot
+        ├── PermissionsModule.kt     # Battery optimization permission handler
         └── StepServiceModule.kt     # React Native bridge module
 ```
 

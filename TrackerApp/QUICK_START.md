@@ -58,11 +58,9 @@ adb install app/build/outputs/apk/release/app-release.apk
 
 ## What Happens During `npm install`
 
-The `postinstall` script automatically patches these native modules:
+The `postinstall` script automatically patches native modules for Android NDK 27 compatibility:
 - `react-native-gesture-handler/android/src/main/jni/CMakeLists.txt`
 - `expo-modules-core/android/cmake/jsi.cmake`
-
-These patches add `c++_shared` library linking required by Android NDK 27.
 
 ## Troubleshooting
 
@@ -87,4 +85,4 @@ org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m
 
 ## For Complete Instructions
 
-See [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md) for detailed step-by-step guide.
+See [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md) for detailed guide.

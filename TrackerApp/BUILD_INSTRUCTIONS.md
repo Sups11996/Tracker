@@ -91,17 +91,9 @@ npm install
 **What happens during `npm install`:**
 - Downloads all Node.js dependencies
 - Automatically runs `postinstall` script that patches native modules
-- Patches applied:
+- Patches:
   - `react-native-gesture-handler` - adds C++ stdlib linking
   - `expo-modules-core` - adds C++ stdlib linking to JSI module
-
-You should see output like:
-```
-🔧 Patching native modules for Android NDK 27...
-✓ Patched react-native-gesture-handler
-✓ Patched expo-modules-core/jsi.cmake
-✅ Native module patching complete!
-```
 
 ### Step 3: Clean Build (Recommended for first build)
 
@@ -159,7 +151,7 @@ android/app/build/outputs/apk/release/app-release.apk
    adb install <full-path-to-apk>
    ```
 
-**Note:** Physical device required for step tracking (step sensor unavailable on emulators)
+**Note:** Physical device required for step tracking (emulators don't have step sensor)
 
 ## Troubleshooting
 
@@ -225,10 +217,7 @@ org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m
 
 ### Why These Patches Are Needed
 
-- **Android NDK 27** requires explicit linking of `c++_shared` library
-- Some React Native modules don't include this in their CMakeLists.txt
-- The postinstall script adds `c++_shared` to `target_link_libraries`
-- Gradle build configuration also sets global CMake linker flags
+Android NDK 27 requires explicit linking of `c++_shared` library. Some React Native modules don't include this in their CMakeLists.txt. The postinstall script adds `c++_shared` to `target_link_libraries`.
 
 ### Build Configuration
 
@@ -268,10 +257,8 @@ The APK includes native libraries for:
 
 If you encounter issues:
 
-1. Check that **all prerequisites** are installed with correct versions
-2. Verify **NDK 27.1.12297006** is installed (not newer or older)
-3. Ensure **postinstall script** ran successfully
-4. Try a **clean build** (delete build folders and rebuild)
-5. Check **environment variables** are set correctly
-
-For project-specific issues, please open an issue on the repository.
+1. Check all prerequisites are installed with correct versions
+2. Verify NDK 27.1.12297006 is installed (exact version)
+3. Ensure postinstall script ran successfully
+4. Try a clean build (delete build folders and rebuild)
+5. Check environment variables are set correctly
