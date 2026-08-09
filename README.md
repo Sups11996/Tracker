@@ -134,7 +134,7 @@ cd android
 
 **APK location:** `android/app/build/outputs/apk/release/app-release.apk`
 
-### 📖 Complete Build Guide
+### Complete Build Guide
 
 **First time building?** See the comprehensive guide: **[BUILD_INSTRUCTIONS.md](TrackerApp/BUILD_INSTRUCTIONS.md)**
 
