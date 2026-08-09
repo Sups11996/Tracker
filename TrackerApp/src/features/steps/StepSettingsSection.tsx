@@ -90,9 +90,12 @@ export function StepSettingsSection() {
         useStepStore.getState().setStatus('tracking');
         
         // Enable tracking and clear paused state
+        // Use INSERT OR REPLACE to ensure row exists
         await db.runAsync(
-          'UPDATE step_tracking_state SET is_tracking = ?, is_paused = ?, updated_at = ? WHERE id = 1',
-          [1, 0, new Date().toISOString()]
+          `INSERT OR REPLACE INTO step_tracking_state 
+           (id, is_tracking, is_paused, is_vehicle_mode, last_sensor_step_count, session_start_steps, daily_goal, updated_at)
+           VALUES (1, 1, 0, 0, 0, 0, ?, ?)`,
+          [dailyGoal, Date.now()]
         );
       } else {
         // Try to stop service if available
@@ -104,9 +107,12 @@ export function StepSettingsSection() {
         useStepStore.getState().setStatus('unavailable');
         
         // Disable tracking completely
+        // Use INSERT OR REPLACE to ensure row exists
         await db.runAsync(
-          'UPDATE step_tracking_state SET is_tracking = ?, updated_at = ? WHERE id = 1',
-          [0, new Date().toISOString()]
+          `INSERT OR REPLACE INTO step_tracking_state 
+           (id, is_tracking, is_paused, is_vehicle_mode, last_sensor_step_count, session_start_steps, daily_goal, updated_at)
+           VALUES (1, 0, 0, 0, 0, 0, ?, ?)`,
+          [dailyGoal, Date.now()]
         );
       }
       
