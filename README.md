@@ -223,4 +223,4 @@ This project is open source and available under the [MIT License](TrackerApp/LIC
 
 ---
 
-**Built for privacy-conscious health tracking**
+**Built with love cause somebody got a bit of fat**
