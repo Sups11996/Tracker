@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Animated, Easing } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useAbcStore, hydrateAbcStore } from '../../stores/abcStore';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { BarChart } from '../steps/BarChart';
+import { SkeletonCard } from '../../components/ui/SkeletonCard';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 interface DayAbc {
@@ -20,13 +21,38 @@ export function AbcDashboard() {
   const { todayCount, dailyGoal } = useAbcStore();
   const tabBarHeight = useBottomTabBarHeight();
 
+  const [isLoading, setIsLoading] = useState(true);
   const [thisWeekData, setThisWeekData] = useState<DayAbc[]>([]);
   const [currentMonthData, setCurrentMonthData] = useState<DayAbc[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedMonthData, setSelectedMonthData] = useState<DayAbc[]>([]);
   const [selectedBar, setSelectedBar] = useState<{ date: string; count: number; goal: number; chartId: string; barIndex: number } | null>(null);
 
+  // Animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
   useEffect(() => { hydrateAbcStore(db); }, []);
+
+  // Slide up + fade in when loading completes
+  useEffect(() => {
+    if (!isLoading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 600,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isLoading]);
 
   useEffect(() => {
     loadWeekAndMonth();
@@ -46,6 +72,7 @@ export function AbcDashboard() {
 
   async function loadWeekAndMonth() {
     try {
+      setIsLoading(true);
       const todayStr = getTodayStr();
 
       // This week
@@ -65,7 +92,13 @@ export function AbcDashboard() {
         month.push({ date: dateStr, count, goal: dailyGoal, goal_met: count >= dailyGoal && count > 0 });
       }
       setCurrentMonthData(month);
-    } catch (e) { }
+
+      // Short delay to ensure smooth transition
+      await new Promise(resolve => setTimeout(resolve, 200));
+      setIsLoading(false);
+    } catch (e) {
+      setIsLoading(false);
+    }
   }
 
   async function loadSelectedMonth(month: Date) {
@@ -130,12 +163,24 @@ export function AbcDashboard() {
   const displayRemaining = Math.max(0, displayGoal - displayCount);
   const cardTitle = displayDate === todayStr ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
 
+  // Show skeleton while loading
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, padding: SPACING.xl, gap: SPACING.lg }}>
+        <SkeletonCard lines={4} height={200} />
+        <SkeletonCard lines={3} height={150} />
+        <SkeletonCard lines={2} height={100} />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
-      showsVerticalScrollIndicator={false}
-    >
+    <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
+        showsVerticalScrollIndicator={false}
+      >
       {/* Today */}
       <Card style={styles.section}>
         <SectionTitle title={cardTitle} />
@@ -252,6 +297,7 @@ export function AbcDashboard() {
         </View>
       </Card>
     </ScrollView>
+    </Animated.View>
   );
 }
 

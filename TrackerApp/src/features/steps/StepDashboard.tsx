@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Animated, Easing } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useStepStore, hydrateStepStore } from '../../stores/stepStore';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { BarChart } from './BarChart';
+import { SkeletonCard } from '../../components/ui/SkeletonCard';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 export function StepDashboard() {
@@ -13,7 +14,12 @@ export function StepDashboard() {
   const { todaySteps, todayDistance, todayCalories, dailyGoal, weeklyData, monthlyData } = useStepStore();
   const tabBarHeight = useBottomTabBarHeight();
   
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
+
+  // Animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   // Selected bar state: { date, steps, goal, chartId, barIndex }
   // chartId distinguishes which chart the bar belongs to ('week' | 'month-0' | 'month-1' ...)
@@ -25,7 +31,31 @@ export function StepDashboard() {
     barIndex: number;
   } | null>(null);
 
-  useEffect(() => { hydrateStepStore(db); }, []);
+  useEffect(() => {
+    hydrateStepStore(db);
+    // Short delay for animation
+    setTimeout(() => setIsLoading(false), 200);
+  }, []);
+
+  // Slide up + fade in when loading completes
+  useEffect(() => {
+    if (!isLoading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 600,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isLoading]);
 
   // Add today's data
   const today = new Date().toISOString().split('T')[0];
@@ -128,12 +158,24 @@ export function StepDashboard() {
   const isToday         = displayDate === today;
   const cardTitle       = isToday ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
 
+  // Show skeleton while loading
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, padding: SPACING.xl, gap: SPACING.lg }}>
+        <SkeletonCard lines={4} height={200} />
+        <SkeletonCard lines={3} height={150} />
+        <SkeletonCard lines={2} height={100} />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
-      showsVerticalScrollIndicator={false}
-    >
+    <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
+        showsVerticalScrollIndicator={false}
+      >
       {/* Today / Selected day overview */}
       <Card style={styles.section}>
         <SectionTitle title={cardTitle} />
@@ -256,6 +298,7 @@ export function StepDashboard() {
         </View>
       </Card>
     </ScrollView>
+    </Animated.View>
   );
 }
 

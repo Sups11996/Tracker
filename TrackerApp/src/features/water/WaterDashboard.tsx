@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Animated, Easing } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useWaterStore, hydrateWaterStore } from '../../stores/waterStore';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { BarChart } from '../steps/BarChart';
+import { SkeletonCard } from '../../components/ui/SkeletonCard';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 interface DayWater {
@@ -20,13 +21,40 @@ export function WaterDashboard() {
   const { todayTotal, dailyGoal } = useWaterStore();
   const tabBarHeight = useBottomTabBarHeight();
 
+  const [isLoading, setIsLoading] = useState(true);
   const [thisWeekData, setThisWeekData] = useState<DayWater[]>([]);
   const [currentMonthData, setCurrentMonthData] = useState<DayWater[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedMonthData, setSelectedMonthData] = useState<DayWater[]>([]);
   const [selectedBar, setSelectedBar] = useState<{ date: string; total_ml: number; chartId: string; barIndex: number } | null>(null);
 
-  useEffect(() => { hydrateWaterStore(db); }, []);
+  // Animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    hydrateWaterStore(db);
+  }, []);
+
+  // Slide up + fade in when loading completes
+  useEffect(() => {
+    if (!isLoading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 600,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [isLoading]);
 
   // Reload week + current month whenever todayTotal changes
   useEffect(() => {
@@ -39,6 +67,7 @@ export function WaterDashboard() {
 
   async function loadWeekAndMonth() {
     try {
+      setIsLoading(true);
       const todayStr = getTodayStr();
 
       // ── This week ──────────────────────────────────────────────────────────
@@ -72,7 +101,12 @@ export function WaterDashboard() {
         }
       }
       setCurrentMonthData(month);
+
+      // Short delay to ensure smooth transition
+      await new Promise(resolve => setTimeout(resolve, 200));
+      setIsLoading(false);
     } catch (e) {
+      setIsLoading(false);
     }
   }
 
@@ -146,12 +180,24 @@ export function WaterDashboard() {
   const displayRemaining = Math.max(0, dailyGoal - displayMl);
   const cardTitle = displayDate === todayStr ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
 
+  // Show skeleton while loading
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, padding: SPACING.xl, gap: SPACING.lg }}>
+        <SkeletonCard lines={4} height={200} />
+        <SkeletonCard lines={3} height={150} />
+        <SkeletonCard lines={2} height={100} />
+      </View>
+    );
+  }
+
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
-      showsVerticalScrollIndicator={false}
-    >
+    <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
+        showsVerticalScrollIndicator={false}
+      >
       {/* Today */}
       <Card style={styles.section}>
         <SectionTitle title={cardTitle} />
@@ -268,6 +314,7 @@ export function WaterDashboard() {
         </View>
       </Card>
     </ScrollView>
+    </Animated.View>
   );
 }
 
