@@ -10,7 +10,7 @@ A personal health tracking app for Android. Track steps, sleep, water intake, ca
 
 - **Complete Privacy** — Your health data never leaves your phone
 - **Fast & Lightweight** — No ads, no bloat, instant interactions
-- **Rich Visualizations** — Weekly and monthly graphs for comprehensive insights
+- **Rich Visualizations** — Weekly graphs and monthly stats for comprehensive insights
 - **Goal Tracking** — Set and monitor daily goals with real-time progress
 - **Battery Efficient** — Background step counting with minimal power consumption
 - **Fully Offline** — Works without internet connection
@@ -223,4 +223,4 @@ This project is open source and available under the [MIT License](TrackerApp/LIC
 
 ---
 
-**Built with love cause somebody got a bit of fat**
+**Built with love cause somebody gained a bit of fat**

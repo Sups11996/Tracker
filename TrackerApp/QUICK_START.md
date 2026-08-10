@@ -21,15 +21,15 @@ adb install app/build/outputs/apk/release/app-release.apk
 
 **Output:** `android/app/build/outputs/apk/release/app-release.apk`
 
-## Requirements Checklist
+## Requirements
 
-- [ ] Node.js 18+
-- [ ] JDK 17
-- [ ] Android SDK with:
-  - [ ] NDK **27.1.12297006** (exact version)
-  - [ ] CMake 3.22.1
-  - [ ] Build-Tools 34.0.0+
-- [ ] `ANDROID_HOME` and `JAVA_HOME` environment variables set
+- Node.js 18+
+- JDK 17
+- Android SDK with:
+  - NDK **27.1.12297006** (exact version)
+  - CMake 3.22.1
+  - Build-Tools 34.0.0+
+- `ANDROID_HOME` and `JAVA_HOME` environment variables set
 
 ## First Time Setup
 
