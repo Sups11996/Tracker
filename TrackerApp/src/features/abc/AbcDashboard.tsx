@@ -175,13 +175,14 @@ export function AbcDashboard() {
   }
 
   return (
-    <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+    <View style={{ flex: 1 }}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
+        contentContainerStyle={{ paddingBottom: tabBarHeight + SPACING.lg }}
         showsVerticalScrollIndicator={false}
       >
-      {/* Today */}
+        <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        {/* Today */}
       <Card style={styles.section}>
         <SectionTitle title={cardTitle} />
         <View style={styles.statRow}>
@@ -296,8 +297,9 @@ export function AbcDashboard() {
           <StatCard label="Monthly Tot" value={allDays.reduce((s, d) => s + d.count, 0).toString()} accentColor={COLORS.abc} />
         </View>
       </Card>
-    </ScrollView>
-    </Animated.View>
+        </Animated.View>
+      </ScrollView>
+    </View>
   );
 }
 

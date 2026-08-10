@@ -170,13 +170,14 @@ export function StepDashboard() {
   }
 
   return (
-    <Animated.View style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
+    <View style={{ flex: 1 }}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[styles.content, { paddingBottom: tabBarHeight + SPACING.lg }]}
+        contentContainerStyle={{ paddingBottom: tabBarHeight + SPACING.lg }}
         showsVerticalScrollIndicator={false}
       >
-      {/* Today / Selected day overview */}
+        <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        {/* Today / Selected day overview */}
       <Card style={styles.section}>
         <SectionTitle title={cardTitle} />
         <View style={styles.statRow}>
@@ -297,8 +298,9 @@ export function StepDashboard() {
           <StatCard label="Total Cal"    value={`${Math.round(totalCal)} kcal`} accentColor={COLORS.calories} fullWidth />
         </View>
       </Card>
-    </ScrollView>
-    </Animated.View>
+        </Animated.View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -477,7 +479,7 @@ function formatMonthDay(date: string): string {
 }
 
 const styles = StyleSheet.create({
-  scroll:  { flex: 1 },
+  scroll: { flex: 1 },
   content: { padding: SPACING.xl, gap: SPACING.lg },
   section: { gap: SPACING.md },
   statRow: { flexDirection: 'row', gap: SPACING.sm },
