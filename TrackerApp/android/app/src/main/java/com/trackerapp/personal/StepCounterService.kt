@@ -32,6 +32,7 @@ class StepCounterService : Service(), SensorEventListener {
         const val PREF_STEPS = "steps"
         const val PREF_DATE = "date"
         const val PREF_SENSOR_BASE = "sensor_base"
+        const val PREF_PRE_REBOOT_STEPS = "pre_reboot_steps"
         // Average step length: 0.762m, calories per step: 0.04 kcal
         const val STEP_LENGTH_M = 0.762f
         const val CAL_PER_STEP = 0.04f
@@ -45,6 +46,8 @@ class StepCounterService : Service(), SensorEventListener {
 
     private var todaySteps = 0
     private var sensorBase = -1L   // raw sensor value at service start or reset
+    private var preRebootSteps = 0  // steps before sensor reset (preserved across reboot)
+    private var sensorResetDetected = false  // flag to skip first reading after reset
     private var currentDate = ""
     private var isPaused = false
 
@@ -108,6 +111,8 @@ class StepCounterService : Service(), SensorEventListener {
             currentDate = today
             sensorBase = rawValue
             todaySteps = 0
+            preRebootSteps = 0
+            sensorResetDetected = false
             saveState()
         }
 
@@ -115,26 +120,35 @@ class StepCounterService : Service(), SensorEventListener {
             // First time initialization
             sensorBase = rawValue
             saveState()
-        } else if (rawValue < sensorBase) {
+            return
+        }
+        
+        if (rawValue < sensorBase) {
             // Sensor reset detected (device reboot or sensor restart)
-            // The hardware step counter resets to 0 after reboot, but we've
-            // loaded the pre-reboot step count from SharedPreferences.
-            // Update the baseline to the current sensor value and preserve
-            // the existing steps - new steps will be added on top.
-            sensorBase = rawValue
+            // Save current steps as pre-reboot steps
+            preRebootSteps = todaySteps
+            // Set flag to ignore THIS reading and wait for next one
+            sensorResetDetected = true
+            sensorBase = -1L  // Force re-initialization on next reading
             saveState()
             return
         }
 
-        val newSteps = (rawValue - sensorBase).toInt().coerceAtLeast(0)
-        // Add preserved steps to new steps from sensor
-        val totalSteps = todaySteps + newSteps
-        
-        // Only update if we have NEW steps from sensor
-        if (newSteps > 0 && totalSteps != todaySteps) {
-            todaySteps = totalSteps
-            // Update baseline to current sensor reading
+        if (sensorResetDetected) {
+            // First reading after reset - use this as new baseline
             sensorBase = rawValue
+            sensorResetDetected = false
+            saveState()
+            return
+        }
+
+        // Calculate new steps: pre-reboot steps + steps since new baseline
+        val newStepsFromSensor = (rawValue - sensorBase).toInt().coerceAtLeast(0)
+        val totalSteps = preRebootSteps + newStepsFromSensor
+        
+        // Only update if steps increased
+        if (totalSteps != todaySteps) {
+            todaySteps = totalSteps
             saveState()
             emitSteps()
             updateNotification()
@@ -153,7 +167,9 @@ class StepCounterService : Service(), SensorEventListener {
 
     private fun resetSteps() {
         todaySteps = 0
+        preRebootSteps = 0
         sensorBase = -1L
+        sensorResetDetected = false
         saveState()
         emitSteps()
         updateNotification()
@@ -165,9 +181,11 @@ class StepCounterService : Service(), SensorEventListener {
         if (savedDate == today) {
             todaySteps = prefs.getInt(PREF_STEPS, 0)
             sensorBase = prefs.getLong(PREF_SENSOR_BASE, -1L)
+            preRebootSteps = prefs.getInt(PREF_PRE_REBOOT_STEPS, 0)
         } else {
             todaySteps = 0
             sensorBase = -1L
+            preRebootSteps = 0
         }
         currentDate = today
     }
@@ -177,6 +195,7 @@ class StepCounterService : Service(), SensorEventListener {
             .putInt(PREF_STEPS, todaySteps)
             .putString(PREF_DATE, currentDate)
             .putLong(PREF_SENSOR_BASE, sensorBase)
+            .putInt(PREF_PRE_REBOOT_STEPS, preRebootSteps)
             .apply()
     }
 
