@@ -37,6 +37,7 @@ import { WaterSettingsSection } from '../water/WaterSettingsSection';
 import { CaloriesSettingsSection } from '../calories/CaloriesSettingsSection';
 import { AbcSettingsSection } from '../abc/AbcSettingsSection';
 import { SkeletonCard } from '../../components/ui/SkeletonCard';
+import { AnimatedCard } from '../../components/ui/AnimatedCard';
 import {
   hydrateStepStore,
   hydrateSleepStore,
@@ -89,11 +90,11 @@ export function SettingsScreen() {
   // Loading state for smooth transitions
   const [isLoading, setIsLoading] = useState(true);
 
-  // Simulate loading delay for smooth skeleton transition
+  // Simulate loading delay for smooth skeleton transition - longer to let stagger animation play
   useEffect(() => {
     if (isFocused) {
       setIsLoading(true);
-      const timer = setTimeout(() => setIsLoading(false), 100); // Reduced from 120ms
+      const timer = setTimeout(() => setIsLoading(false), 300); // Match animation timing
       return () => clearTimeout(timer);
     }
   }, [isFocused]);
@@ -189,6 +190,7 @@ export function SettingsScreen() {
         ) : (
           <>
             {/* Profile Section */}
+            <AnimatedCard index={0}>
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Profile</Text>
@@ -326,16 +328,18 @@ export function SettingsScreen() {
             )}
           </Card>
         </View>
+        </AnimatedCard>
         
         {/* Settings Sections */}
-        <StepSettingsSection />
-        <SleepSettingsSection />
-        <WaterSettingsSection />
-        <CaloriesSettingsSection />
-        <AbcSettingsSection />
-        <PermissionsSection />
+        <AnimatedCard index={1}><StepSettingsSection /></AnimatedCard>
+        <AnimatedCard index={2}><SleepSettingsSection /></AnimatedCard>
+        <AnimatedCard index={3}><WaterSettingsSection /></AnimatedCard>
+        <AnimatedCard index={4}><CaloriesSettingsSection /></AnimatedCard>
+        <AnimatedCard index={5}><AbcSettingsSection /></AnimatedCard>
+        <AnimatedCard index={6}><PermissionsSection /></AnimatedCard>
         
         {/* Data Management Section */}
+        <AnimatedCard index={7}>
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Data Management</Text>
@@ -562,6 +566,7 @@ export function SettingsScreen() {
             </View>
           </Card>
         </View>
+        </AnimatedCard>
           </>
         )}
       </ScrollView>
