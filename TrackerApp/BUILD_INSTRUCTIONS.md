@@ -34,7 +34,7 @@ After installing Android Studio:
 3. **SDK Tools tab:**
    - Check "Show Package Details" at bottom right
    - Install these exact versions:
-     - **NDK (Side by side)** version **27.1.12297006** - CRITICAL: must be exact version
+     - **NDK (Side by side)** version **27.1.12297006** - **CRITICAL**: must be exact version
      - **CMake** version 3.22.1
      - **Android SDK Build-Tools** (v34.0.0 or higher)
      - Android SDK Command-line Tools (latest)
