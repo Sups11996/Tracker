@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useIsFocused, type RouteProp } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { StepDashboard } from '../steps/StepDashboard';
 import { SleepDashboard } from '../sleep/SleepDashboard';
 import { WaterDashboard } from '../water/WaterDashboard';
@@ -35,10 +36,8 @@ export function DashboardScreen() {
   const { profile } = useUserStore();
   const tabBarHeight = useBottomTabBarHeight();
   
-  // Loading state for smooth transitions
-  const [isLoading, setIsLoading] = useState(true);
-
   const [activeTab, setActiveTab] = useState<Tab>(route.params?.tab ?? 'steps');
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // When navigated to with a specific tab param, switch to it
   useEffect(() => {
@@ -47,22 +46,36 @@ export function DashboardScreen() {
     }
   }, [isFocused, route.params?.tab]);
 
-  // Simulate loading delay for smooth skeleton transition
+  // Show brief loading on tab change
   useEffect(() => {
-    if (isFocused) {
-      setIsLoading(true);
-      const timer = setTimeout(() => setIsLoading(false), 100); // Reduced from 150ms
-      return () => clearTimeout(timer);
-    }
-  }, [isFocused, activeTab]);
+    setIsTransitioning(true);
+    const timer = setTimeout(() => setIsTransitioning(false), 200);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
 
-  // Hide ABC tab if not enabled, hide Calories if gym off
+  // Hide ABC tab if not enabled
   const visibleTabs = ALL_TABS.filter(t => {
     if (t.key === 'abc' && !profile?.uses_abc) return false;
     return true;
   });
 
   const activeColor = ALL_TABS.find(t => t.key === activeTab)?.color ?? COLORS.textMuted;
+
+  // Swipe gesture handler
+  const onSwipe = ({ nativeEvent }: any) => {
+    if (nativeEvent.state === State.END) {
+      const currentIndex = visibleTabs.findIndex(t => t.key === activeTab);
+      
+      // Swipe left = next tab (translationX < 0)
+      if (nativeEvent.translationX < -50 && currentIndex < visibleTabs.length - 1) {
+        setActiveTab(visibleTabs[currentIndex + 1].key);
+      }
+      // Swipe right = previous tab (translationX > 0)
+      else if (nativeEvent.translationX > 50 && currentIndex > 0) {
+        setActiveTab(visibleTabs[currentIndex - 1].key);
+      }
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -73,7 +86,7 @@ export function DashboardScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.tabs}
         >
-          {visibleTabs.map((t) => {
+          {visibleTabs.map((t, index) => {
             const active = activeTab === t.key;
             return (
               <TouchableOpacity
@@ -85,7 +98,15 @@ export function DashboardScreen() {
                 onPress={() => setActiveTab(t.key)}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.tabLabel, active && { color: t.color, fontWeight: TYPOGRAPHY.weight.semibold }]}>
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    active && {
+                      color: t.color,
+                      fontWeight: TYPOGRAPHY.weight.semibold,
+                    },
+                  ]}
+                >
                   {t.label}
                 </Text>
               </TouchableOpacity>
@@ -97,22 +118,26 @@ export function DashboardScreen() {
       {/* Active indicator bar */}
       <View style={[styles.activeBar, { backgroundColor: activeColor }]} />
 
-      {/* Dashboard content */}
-      {isLoading ? (
-        <View style={{ flex: 1, padding: SPACING.xl, gap: SPACING.lg }}>
-          <SkeletonCard lines={4} height={200} />
-          <SkeletonCard lines={3} height={150} />
-          <SkeletonCard lines={2} height={100} />
+      {/* Dashboard content - brief skeleton on switch, wrapped with swipe gesture */}
+      <PanGestureHandler onHandlerStateChange={onSwipe}>
+        <View style={{ flex: 1 }}>
+          {isTransitioning ? (
+            <View style={{ flex: 1, padding: SPACING.xl, gap: SPACING.lg }}>
+              <SkeletonCard lines={4} height={200} />
+              <SkeletonCard lines={3} height={150} />
+              <SkeletonCard lines={2} height={100} />
+            </View>
+          ) : (
+            <>
+              {activeTab === 'steps'    && <StepDashboard />}
+              {activeTab === 'sleep'    && <SleepDashboard />}
+              {activeTab === 'water'    && <WaterDashboard />}
+              {activeTab === 'calories' && <CaloriesDashboard />}
+              {activeTab === 'abc'      && <AbcDashboard />}
+            </>
+          )}
         </View>
-      ) : (
-        <>
-          {activeTab === 'steps'    && <StepDashboard />}
-          {activeTab === 'sleep'    && <SleepDashboard />}
-          {activeTab === 'water'    && <WaterDashboard />}
-          {activeTab === 'calories' && <CaloriesDashboard />}
-          {activeTab === 'abc'      && <AbcDashboard />}
-        </>
-      )}
+      </PanGestureHandler>
     </SafeAreaView>
   );
 }
