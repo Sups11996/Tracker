@@ -119,7 +119,11 @@ export function DashboardScreen() {
       <View style={[styles.activeBar, { backgroundColor: activeColor }]} />
 
       {/* Dashboard content - brief skeleton on switch, wrapped with swipe gesture */}
-      <PanGestureHandler onHandlerStateChange={onSwipe}>
+      <PanGestureHandler 
+        onHandlerStateChange={onSwipe}
+        activeOffsetX={[-50, 50]}
+        failOffsetY={[-10, 10]}
+      >
         <View style={{ flex: 1 }}>
           {isTransitioning ? (
             <View style={{ flex: 1, padding: SPACING.xl, gap: SPACING.lg }}>
