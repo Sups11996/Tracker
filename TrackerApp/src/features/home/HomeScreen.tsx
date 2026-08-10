@@ -139,6 +139,9 @@ export function HomeScreen() {
               weekday: 'long', month: 'long', day: 'numeric',
             })}
           </Text>
+          <Text style={styles.disclaimer}>
+            Step counts are based on hardware sensor data and may have some variance
+          </Text>
         </View>
 
         {/* Feature cards — each taps to its dashboard tab */}
@@ -189,5 +192,11 @@ const styles = StyleSheet.create({
   date: {
     fontSize: TYPOGRAPHY.size.sm,
     color: COLORS.textMuted,
+  },
+  disclaimer: {
+    fontSize: TYPOGRAPHY.size.xs,
+    color: COLORS.textMuted,
+    marginTop: SPACING.xs,
+    opacity: 0.6,
   },
 });

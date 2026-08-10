@@ -93,6 +93,15 @@ The app uses Android's `TYPE_STEP_COUNTER` hardware sensor, a dedicated chip in 
 - **Phone placement** — Pocket placement works best, followed by hand-held
 - **Walking pattern** — Normal walking is detected most reliably
 
+**Important: Hardware Sensor Limitations**
+
+The step counter accuracy depends entirely on your phone's hardware sensor. Error margins are normal:
+- **Over-counting**: Sensor may count extra steps from vibrations, bouncing, or hand movements
+- **Under-counting**: Slow walking or irregular patterns may be missed
+- **Typical variance**: ±10-15% depending on conditions and device quality
+
+The app displays what the hardware sensor reports. This is not a software bug but a characteristic of motion sensors. For best accuracy, keep your phone in a stable pocket during normal walking.
+
 **Data persistence:** Steps are continuously saved to local storage and automatically restored after device reboot. The background service resumes tracking seamlessly without manual intervention.
 
 ### Data Storage
