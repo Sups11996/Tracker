@@ -48,6 +48,7 @@ class StepCounterService : Service(), SensorEventListener {
     private var sensorBase = -1L   // raw sensor value at service start or reset
     private var preRebootSteps = 0  // steps before sensor reset (preserved across reboot)
     private var sensorResetDetected = false  // flag to skip first reading after reset
+    private var latestSensorValue = -1L  // tracks sensor value even when paused
     private var currentDate = ""
     private var isPaused = false
 
@@ -73,6 +74,13 @@ class StepCounterService : Service(), SensorEventListener {
             }
             ACTION_RESUME -> { 
                 isPaused = false
+                
+                // Reset baseline to latest sensor value to discard steps accumulated during pause
+                if (latestSensorValue >= 0) {
+                    sensorBase = latestSensorValue
+                    preRebootSteps = 0  // Clear preRebootSteps when resetting baseline
+                }
+                
                 updateDatabasePauseState(false)
                 emitStatus("tracking")
                 updateNotification()
@@ -99,11 +107,16 @@ class StepCounterService : Service(), SensorEventListener {
     // ── Sensor ────────────────────────────────────────────────────────────────
 
     override fun onSensorChanged(event: SensorEvent?) {
-        if (isPaused) return
         event ?: return
         if (event.sensor.type != Sensor.TYPE_STEP_COUNTER) return
 
         val rawValue = event.values[0].toLong()
+        
+        // Always track the latest sensor value, even when paused
+        latestSensorValue = rawValue
+        
+        // If paused, don't process steps but keep tracking sensor
+        if (isPaused) return
 
         // Check if date changed
         val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
@@ -114,6 +127,21 @@ class StepCounterService : Service(), SensorEventListener {
             preRebootSteps = 0
             sensorResetDetected = false
             saveState()
+        }
+
+        if (sensorResetDetected) {
+            // First reading after reset - use this as new baseline
+            // BUT FIRST: Add any steps taken between reset detection and this reading
+            val stepsDuringReset = (rawValue - 0).toInt().coerceAtLeast(0)
+            todaySteps = preRebootSteps + stepsDuringReset
+            
+            sensorBase = rawValue
+            preRebootSteps = 0  // Clear after adding to todaySteps
+            sensorResetDetected = false
+            saveState()
+            emitSteps()
+            updateNotification()
+            return
         }
 
         if (sensorBase < 0) {
@@ -127,17 +155,9 @@ class StepCounterService : Service(), SensorEventListener {
             // Sensor reset detected (device reboot or sensor restart)
             // Save current steps as pre-reboot steps
             preRebootSteps = todaySteps
-            // Set flag to ignore THIS reading and wait for next one
+            // Set flag to handle next reading specially
             sensorResetDetected = true
             sensorBase = -1L  // Force re-initialization on next reading
-            saveState()
-            return
-        }
-
-        if (sensorResetDetected) {
-            // First reading after reset - use this as new baseline
-            sensorBase = rawValue
-            sensorResetDetected = false
             saveState()
             return
         }
