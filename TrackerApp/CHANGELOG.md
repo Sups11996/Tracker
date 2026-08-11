@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2025-01-26
+
+### Fixed
+- **Critical crash fix**: Fixed crash when app paused for 2+ hours then reopened
+  - Added null checks in native step service for React context after long pause
+  - Fixed race conditions in app hydration when rapidly switching foreground/background
+  - Added defensive checks for empty data arrays in all dashboards
+  - Fixed date parsing timezone issues that could cause midnight boundary bugs
+  - Added array operation safeguards to prevent -Infinity crashes
+
+### Technical
+- Enhanced StepCounterService.kt with null-safe event emission
+- Added hydration guards (isHydrating, isCheckingDate) to prevent concurrent operations
+- Improved date component parsing across all dashboard formatters
+- Added empty array checks in getWeeksInCurrentMonth functions
+
 ## [1.2.0] - 2025-01-26
 
 ### Added
