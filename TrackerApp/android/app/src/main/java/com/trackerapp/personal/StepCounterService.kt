@@ -77,8 +77,8 @@ class StepCounterService : Service(), SensorEventListener {
                 
                 // Reset baseline to latest sensor value to discard steps accumulated during pause
                 if (latestSensorValue >= 0) {
+                    preRebootSteps = todaySteps  // Save current steps before resetting baseline
                     sensorBase = latestSensorValue
-                    preRebootSteps = 0  // Clear preRebootSteps when resetting baseline
                 }
                 
                 updateDatabasePauseState(false)
@@ -115,10 +115,7 @@ class StepCounterService : Service(), SensorEventListener {
         // Always track the latest sensor value, even when paused
         latestSensorValue = rawValue
         
-        // If paused, don't process steps but keep tracking sensor
-        if (isPaused) return
-
-        // Check if date changed
+        // Check if date changed (do this even when paused to reset at midnight)
         val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
         if (today != currentDate) {
             currentDate = today
@@ -127,16 +124,35 @@ class StepCounterService : Service(), SensorEventListener {
             preRebootSteps = 0
             sensorResetDetected = false
             saveState()
+            emitSteps()  // Emit zero steps for new day
+            updateNotification()
+            // Don't return - continue to handle pause state
         }
+        
+        // If paused, don't process steps but keep tracking sensor
+        if (isPaused) return
 
         if (sensorResetDetected) {
             // First reading after reset - use this as new baseline
             // BUT FIRST: Add any steps taken between reset detection and this reading
             val stepsDuringReset = (rawValue - 0).toInt().coerceAtLeast(0)
+            
+            // Sanity check: if steps during reset > 1000, likely a sensor glitch not real reboot
+            // Real reboots typically show 0-500 steps during sensor initialization (~10-30 seconds)
+            // If someone walks 1000+ steps in that time, sensor would need multiple readings anyway
+            if (stepsDuringReset > 1000) {
+                // Treat as sensor glitch - reset baseline without adding steps
+                sensorBase = rawValue
+                sensorResetDetected = false
+                saveState()
+                return
+            }
+            
             todaySteps = preRebootSteps + stepsDuringReset
             
+            // Update preRebootSteps to the new total for future calculations
+            preRebootSteps = todaySteps
             sensorBase = rawValue
-            preRebootSteps = 0  // Clear after adding to todaySteps
             sensorResetDetected = false
             saveState()
             emitSteps()
@@ -161,13 +177,23 @@ class StepCounterService : Service(), SensorEventListener {
             saveState()
             return
         }
+        
+        // Detect massive forward jump (sensor glitch, not normal walking)
+        // A jump of >50000 steps is impossible in one reading (would need 6+ hours of continuous walking)
+        val stepsSinceLastReading = (rawValue - sensorBase).toInt()
+        if (stepsSinceLastReading > 50000) {
+            // Treat as sensor glitch - reset baseline to current value without adding steps
+            sensorBase = rawValue
+            saveState()
+            return
+        }
 
         // Calculate new steps: pre-reboot steps + steps since new baseline
         val newStepsFromSensor = (rawValue - sensorBase).toInt().coerceAtLeast(0)
         val totalSteps = preRebootSteps + newStepsFromSensor
         
-        // Only update if steps increased
-        if (totalSteps != todaySteps) {
+        // Only update if steps increased (prevent sensor noise from decreasing count)
+        if (totalSteps > todaySteps) {
             todaySteps = totalSteps
             saveState()
             emitSteps()
@@ -310,7 +336,9 @@ class StepCounterService : Service(), SensorEventListener {
         wakeLock = pm.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "TrackerApp::StepCounterWakeLock"
-        ).apply { acquire(10 * 60 * 1000L) } // 10 min max
+        ).apply { 
+            acquire()  // Acquire indefinitely - will be released in onDestroy
+        }
     }
 
     // ── Database Sync ─────────────────────────────────────────────────────────
