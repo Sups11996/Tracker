@@ -220,7 +220,7 @@ export function StepDashboard() {
             valueLabel: d.steps > 0 ? (d.steps >= 1000 ? `${(d.steps / 1000).toFixed(1)}k` : d.steps.toString()) : '',
             goalMet: d.steps >= (d.goal || dailyGoal) && d.steps > 0,
           }))}
-          maxValue={Math.max(...thisWeekData.map(d => d.goal || dailyGoal), todaySteps, highSteps, 1)}
+          maxValue={Math.max(thisWeekData.length > 0 ? Math.max(...thisWeekData.map(d => d.goal || dailyGoal)) : dailyGoal, todaySteps, highSteps, 1)}
           accentColor={COLORS.steps}
           selectedIndex={selectedBar?.chartId === 'week' ? selectedBar.barIndex : undefined}
           onBarPress={(i) => handleBarPress('week', i, thisWeekData)}
@@ -239,7 +239,7 @@ export function StepDashboard() {
               valueLabel: d.steps > 0 ? (d.steps >= 1000 ? `${(d.steps / 1000).toFixed(1)}k` : d.steps.toString()) : '',
               goalMet: d.steps >= (d.goal || dailyGoal) && d.steps > 0,
             }))}
-            maxValue={Math.max(...week.data.map((d: any) => d.goal || dailyGoal), highSteps, 1)}
+            maxValue={Math.max(week.data.length > 0 ? Math.max(...week.data.map((d: any) => d.goal || dailyGoal)) : dailyGoal, highSteps, 1)}
             accentColor={COLORS.steps}
             selectedIndex={selectedBar?.chartId === `month-${index}` ? selectedBar.barIndex : undefined}
             onBarPress={(i) => handleBarPress(`month-${index}`, i, week.data)}
@@ -362,8 +362,8 @@ function getCurrentMonthData(monthlyData: any[], todayRecord: any) {
   
   // Filter out any data not from current month
   const currentMonthOnly = monthlyData.filter(d => {
-    const recordDate = new Date(d.date + 'T12:00:00');
-    return recordDate.getMonth() === month && recordDate.getFullYear() === year;
+    const [y, m] = d.date.split('-').map(Number);
+    return m === month + 1 && y === year;
   });
   
   const monthData = [];
@@ -427,7 +427,7 @@ function getWeeksInCurrentMonth(monthData: any[]) {
   
   for (let i = 0; i < monthData.length; i += 7) {
     const weekData = monthData.slice(i, i + 7);
-    if (weekData.length === 0) continue;
+    if (weekData.length === 0) continue; // Skip if somehow empty
     
     const firstDate = weekData[0].date;
     const lastDate = weekData[weekData.length - 1].date;
@@ -464,18 +464,18 @@ function getThisMonthData(monthlyData: any[], todayRecord: any) {
 }
 
 function formatDay(date: string): string {
-  const d = new Date(date + 'T00:00:00');
-  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+  const [y, m, d] = date.split('-').map(Number);
+  return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(y, m - 1, d).getDay()];
 }
 
 function formatDate(date: string): string {
-  const d = new Date(date + 'T00:00:00');
-  return `${d.getMonth() + 1}/${d.getDate()}`;
+  const [, m, d] = date.split('-').map(Number);
+  return `${m}/${d}`;
 }
 
 function formatMonthDay(date: string): string {
-  const d = new Date(date + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
 }
 
 const styles = StyleSheet.create({

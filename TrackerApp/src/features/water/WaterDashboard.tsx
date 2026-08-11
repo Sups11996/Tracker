@@ -366,6 +366,7 @@ function getWeeksInCurrentMonth(monthData: DayWater[]) {
   const weeks: any[] = [];
   for (let i = 0; i < monthData.length; i += 7) {
     const weekData = monthData.slice(i, i + 7);
+    if (weekData.length === 0) continue; // Skip if somehow empty
     const [sy, sm, sd] = weekData[0].date.split('-').map(Number);
     const [ey, em, ed] = weekData[weekData.length - 1].date.split('-').map(Number);
     const startDate = new Date(sy, sm - 1, sd);

@@ -28,55 +28,71 @@ export function useAppHydration(): { isReady: boolean } {
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const hasHydratedOnce = useRef(false);
   const [isReady, setIsReady] = useState(false);
+  
+  // Race condition guards
+  const isHydrating = useRef(false);
+  const isCheckingDate = useRef(false);
 
   async function handleDateChangeIfNeeded() {
-    const dateChanged = await checkDateChanged(db);
-    if (dateChanged) {
-      
-      // Get yesterday's date (the day that just ended)
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const year = yesterday.getFullYear();
-      const month = String(yesterday.getMonth() + 1).padStart(2, '0');
-      const day = String(yesterday.getDate()).padStart(2, '0');
-      const yesterdayDate = `${year}-${month}-${day}`;
-      
-      // Save yesterday's step data with yesterday's date
-      const state = useStepStore.getState();
-      const goalMet = state.todaySteps >= state.dailyGoal ? 1 : 0;
-      const now = Date.now();
-      
-      try {
-        await db.runAsync(
-          `INSERT OR REPLACE INTO daily_steps (date, steps, distance_m, calories, goal, goal_met, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, 
-             COALESCE((SELECT created_at FROM daily_steps WHERE date = ?), ?),
-             ?)`,
-          [yesterdayDate, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, yesterdayDate, now, now]
-        );
-      } catch (error) {
-      }
-      
-      // Reset step counter in store
-      useStepStore.setState({ todaySteps: 0, todayDistance: 0, todayCalories: 0 });
-
-      // Reset water in store
-      useWaterStore.setState({ todayTotal: 0, logs: [], undoStack: [] });
-
-      // Tell native step service to reset
-      if (StepServiceModule) {
+    // Prevent concurrent date checks
+    if (isCheckingDate.current) return;
+    isCheckingDate.current = true;
+    
+    try {
+      const dateChanged = await checkDateChanged(db);
+      if (dateChanged) {
+        
+        // Get yesterday's date (the day that just ended)
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const year = yesterday.getFullYear();
+        const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+        const day = String(yesterday.getDate()).padStart(2, '0');
+        const yesterdayDate = `${year}-${month}-${day}`;
+        
+        // Save yesterday's step data with yesterday's date
+        const state = useStepStore.getState();
+        const goalMet = state.todaySteps >= state.dailyGoal ? 1 : 0;
+        const now = Date.now();
+        
         try {
-          await StepServiceModule.sendAction('reset');
+          await db.runAsync(
+            `INSERT OR REPLACE INTO daily_steps (date, steps, distance_m, calories, goal, goal_met, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, 
+               COALESCE((SELECT created_at FROM daily_steps WHERE date = ?), ?),
+               ?)`,
+            [yesterdayDate, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, yesterdayDate, now, now]
+          );
         } catch (error) {
         }
+        
+        // Reset step counter in store
+        useStepStore.setState({ todaySteps: 0, todayDistance: 0, todayCalories: 0 });
+
+        // Reset water in store
+        useWaterStore.setState({ todayTotal: 0, logs: [], undoStack: [] });
+
+        // Tell native step service to reset
+        if (StepServiceModule) {
+          try {
+            await StepServiceModule.sendAction('reset');
+          } catch (error) {
+          }
+        }
+        
+        // Re-hydrate to load new day data
+        await hydrateAll();
       }
-      
-      // Re-hydrate to load new day data
-      await hydrateAll();
+    } finally {
+      isCheckingDate.current = false;
     }
   }
 
   async function hydrateAll() {
+    // Prevent concurrent hydrations
+    if (isHydrating.current) return;
+    isHydrating.current = true;
+    
     try {
       await Promise.all([
         hydrateStepStore(db),
@@ -87,6 +103,8 @@ export function useAppHydration(): { isReady: boolean } {
       ]);
     } catch (e) {
       // Silent fail - app will retry on next focus
+    } finally {
+      isHydrating.current = false;
     }
   }
 

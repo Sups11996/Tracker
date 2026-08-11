@@ -207,6 +207,7 @@ class StepCounterService : Service(), SensorEventListener {
     }
 
     private fun emitSteps() {
+        val reactContext = getReactContext() ?: return
         val distance = todaySteps * STEP_LENGTH_M
         val calories = todaySteps * CAL_PER_STEP
         val json = JSONObject().apply {
@@ -214,15 +215,24 @@ class StepCounterService : Service(), SensorEventListener {
             put("distance", distance)
             put("calories", calories)
         }.toString()
-        getReactContext()
-            ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-            ?.emit("STEP_UPDATE", json)
+        try {
+            reactContext
+                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                ?.emit("STEP_UPDATE", json)
+        } catch (e: Exception) {
+            // React context not ready
+        }
     }
 
     private fun emitStatus(status: String) {
-        getReactContext()
-            ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-            ?.emit("STEP_STATUS", status)
+        val reactContext = getReactContext() ?: return
+        try {
+            reactContext
+                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                ?.emit("STEP_STATUS", status)
+        } catch (e: Exception) {
+            // React context not ready
+        }
     }
 
     // ── Notification ──────────────────────────────────────────────────────────
