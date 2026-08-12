@@ -164,7 +164,8 @@ class StepCounterService : Service(), SensorEventListener {
         latestSensorValue = rawValue
         
         // Check if date changed (do this even when paused to reset at midnight)
-        val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        // Use UTC to avoid timezone-change issues (user traveling across timezones)
+        val today = LocalDate.now(java.time.ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE)
         if (today != currentDate) {
             synchronized(this) {
                 // Double-check inside sync block
@@ -324,7 +325,8 @@ class StepCounterService : Service(), SensorEventListener {
     }
 
     private fun loadPersistedState() {
-        val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        // Use UTC to avoid timezone-change issues
+        val today = LocalDate.now(java.time.ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE)
         val savedDate = prefs.getString(PREF_DATE, "")
         
         synchronized(this) {
