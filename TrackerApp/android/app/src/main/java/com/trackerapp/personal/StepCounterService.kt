@@ -51,7 +51,8 @@ class StepCounterService : Service(), SensorEventListener {
     private var latestSensorValue = -1L  // tracks sensor value even when paused
     private var lastUpdateTime = 0L  // timestamp of last step update (for rate limiting)
     private var currentDate = ""
-    private var isPaused = false
+    @Volatile private var isPaused = false  // Volatile for thread-safe reads
+    @Volatile private var isDestroyed = false  // Track if service is being destroyed
 
     private val prefs get() = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
 
@@ -59,6 +60,15 @@ class StepCounterService : Service(), SensorEventListener {
         super.onCreate()
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
+        
+        // Check if step sensor is available
+        if (stepSensor == null) {
+            // Device doesn't have step counter sensor
+            // Stop service gracefully
+            stopSelf()
+            return
+        }
+        
         createNotificationChannel()
         acquireWakeLock()
         loadPersistedState()
@@ -74,12 +84,14 @@ class StepCounterService : Service(), SensorEventListener {
                 updateNotification()
             }
             ACTION_RESUME -> { 
-                isPaused = false
-                
-                // Reset baseline to latest sensor value to discard steps accumulated during pause
-                if (latestSensorValue >= 0) {
-                    preRebootSteps = todaySteps  // Save current steps before resetting baseline
-                    sensorBase = latestSensorValue
+                synchronized(this) {
+                    isPaused = false
+                    
+                    // Reset baseline to latest sensor value to discard steps accumulated during pause
+                    if (latestSensorValue >= 0) {
+                        preRebootSteps = todaySteps  // Save current steps before resetting baseline
+                        sensorBase = latestSensorValue
+                    }
                 }
                 
                 updateDatabasePauseState(false)
@@ -88,6 +100,12 @@ class StepCounterService : Service(), SensorEventListener {
             }
             ACTION_RESET  -> resetSteps()
             else -> {
+                // Check if step sensor is still available (might have been removed)
+                if (stepSensor == null) {
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
+                
                 startForeground(NOTIFICATION_ID, buildNotification())
                 registerSensor()
                 loadPauseStateFromDatabase()
@@ -98,6 +116,7 @@ class StepCounterService : Service(), SensorEventListener {
 
     override fun onDestroy() {
         super.onDestroy()
+        isDestroyed = true
         sensorManager.unregisterListener(this)
         wakeLock?.release()
         emitStatus("paused")
@@ -108,10 +127,19 @@ class StepCounterService : Service(), SensorEventListener {
     // ── Sensor ────────────────────────────────────────────────────────────────
 
     override fun onSensorChanged(event: SensorEvent?) {
+        // Quick exit if service is being destroyed
+        if (isDestroyed) return
+        
         event ?: return
         if (event.sensor.type != Sensor.TYPE_STEP_COUNTER) return
 
         val rawValue = event.values[0].toLong()
+        
+        // Sanity check: sensor should never return negative values
+        if (rawValue < 0) {
+            // Sensor malfunction - ignore this reading
+            return
+        }
         
         // Always track the latest sensor value, even when paused
         latestSensorValue = rawValue
@@ -124,6 +152,8 @@ class StepCounterService : Service(), SensorEventListener {
             todaySteps = 0
             preRebootSteps = 0
             sensorResetDetected = false
+            lastUpdateTime = 0  // Reset rate limiting timer for new day
+            latestSensorValue = rawValue  // Reset to current value for new day
             saveState()
             emitSteps()  // Emit zero steps for new day
             updateNotification()
@@ -241,6 +271,7 @@ class StepCounterService : Service(), SensorEventListener {
         preRebootSteps = 0
         sensorBase = -1L
         sensorResetDetected = false
+        lastUpdateTime = 0  // Reset rate limiting timer
         saveState()
         emitSteps()
         updateNotification()
@@ -278,20 +309,24 @@ class StepCounterService : Service(), SensorEventListener {
     }
 
     private fun emitSteps() {
-        val reactContext = getReactContext() ?: return
-        val distance = todaySteps * STEP_LENGTH_M
-        val calories = todaySteps * CAL_PER_STEP
-        val json = JSONObject().apply {
-            put("steps", todaySteps)
-            put("distance", distance)
-            put("calories", calories)
-        }.toString()
         try {
+            val reactContext = getReactContext() ?: return
+            
+            // Prevent overflow and invalid calculations
+            val safeSteps = todaySteps.coerceIn(0, Int.MAX_VALUE)
+            val distance = (safeSteps * STEP_LENGTH_M).coerceAtLeast(0f)
+            val calories = (safeSteps * CAL_PER_STEP).coerceAtLeast(0f)
+            
+            val json = JSONObject().apply {
+                put("steps", safeSteps)
+                put("distance", distance.toDouble())
+                put("calories", calories.toDouble())
+            }.toString()
             reactContext
                 .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
                 ?.emit("STEP_UPDATE", json)
         } catch (e: Exception) {
-            // React context not ready
+            // React context not ready or JSON error - silently fail
         }
     }
 
@@ -357,42 +392,50 @@ class StepCounterService : Service(), SensorEventListener {
     }
 
     private fun acquireWakeLock() {
-        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(
-            PowerManager.PARTIAL_WAKE_LOCK,
-            "TrackerApp::StepCounterWakeLock"
-        ).apply { 
-            acquire()  // Acquire indefinitely - will be released in onDestroy
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "TrackerApp::StepCounterWakeLock"
+            ).apply { 
+                acquire()  // Acquire indefinitely - will be released in onDestroy
+            }
+        } catch (e: Exception) {
+            // WakeLock acquisition failed - continue without it
+            // Service will still work but may be killed more aggressively
         }
     }
 
     // ── Database Sync ─────────────────────────────────────────────────────────
 
     private fun loadPauseStateFromDatabase() {
+        var db: android.database.sqlite.SQLiteDatabase? = null
+        var cursor: android.database.Cursor? = null
         try {
             val dbPath = getDatabasePath("tracker.db")
             if (!dbPath.exists()) return
             
-            val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+            db = android.database.sqlite.SQLiteDatabase.openDatabase(
                 dbPath.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
             )
             
-            val cursor = db.rawQuery(
+            cursor = db.rawQuery(
                 "SELECT is_paused FROM step_tracking_state WHERE id = 1", null
             )
             
             if (cursor.moveToFirst()) {
                 isPaused = cursor.getInt(0) == 1
             }
-            
-            cursor.close()
-            db.close()
         } catch (e: Exception) {
             // Silently fail
+        } finally {
+            cursor?.close()
+            db?.close()
         }
     }
 
     private fun updateDatabasePauseState(paused: Boolean) {
+        var db: android.database.sqlite.SQLiteDatabase? = null
         try {
             val appFilesDir = applicationContext.filesDir
             val possiblePaths = mutableListOf<java.io.File>()
@@ -426,7 +469,7 @@ class StepCounterService : Service(), SensorEventListener {
             
             if (dbPath == null) return
             
-            val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+            db = android.database.sqlite.SQLiteDatabase.openDatabase(
                 dbPath.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE
             )
             
@@ -434,10 +477,10 @@ class StepCounterService : Service(), SensorEventListener {
                 "UPDATE step_tracking_state SET is_paused = ? WHERE id = 1",
                 arrayOf(if (paused) 1 else 0)
             )
-            
-            db.close()
         } catch (e: Exception) {
             // Silently fail
+        } finally {
+            db?.close()
         }
     }
 }
