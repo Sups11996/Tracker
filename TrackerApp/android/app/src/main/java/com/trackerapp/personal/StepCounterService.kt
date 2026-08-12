@@ -562,8 +562,10 @@ class StepCounterService : Service(), SensorEventListener {
                 dbPath.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE
             )
             
+            // Use INSERT OR REPLACE to ensure row exists
+            // This handles both creating the row and updating it
             db.execSQL(
-                "UPDATE step_tracking_state SET is_paused = ? WHERE id = 1",
+                "INSERT OR REPLACE INTO step_tracking_state (id, is_paused) VALUES (1, ?)",
                 arrayOf(if (paused) 1 else 0)
             )
         } catch (e: Exception) {
