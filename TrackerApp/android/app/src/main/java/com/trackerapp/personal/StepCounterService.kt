@@ -49,7 +49,7 @@ class StepCounterService : Service(), SensorEventListener {
     private var preRebootSteps = 0  // steps before sensor reset (preserved across reboot)
     private var sensorResetDetected = false  // flag to skip first reading after reset
     private var latestSensorValue = -1L  // tracks sensor value even when paused
-    private var lastSensorValue = -1L  // tracks previous sensor value for spike detection
+    private var lastUpdateTime = 0L  // timestamp of last step update (for rate limiting)
     private var currentDate = ""
     private var isPaused = false
 
@@ -188,45 +188,42 @@ class StepCounterService : Service(), SensorEventListener {
             saveState()
             return
         }
-        
-        // Detect sensor batching spike (common after being idle)
-        // If we jump more than 30 steps in a single reading, it's likely batched events
-        // Spread the steps gradually over multiple updates to avoid UI spikes
-        if (lastSensorValue > 0 && lastSensorValue != rawValue) {
-            val jumpSize = (rawValue - lastSensorValue).toInt()
-            if (jumpSize > 30) {
-                // Batch detected! Add steps gradually
-                // Add max 15 steps per reading, save remainder for next time
-                val newStepsFromSensor = (rawValue - sensorBase).toInt().coerceAtLeast(0)
-                val totalSteps = preRebootSteps + newStepsFromSensor
-                val stepIncrease = totalSteps - todaySteps
-                
-                if (stepIncrease > 15) {
-                    // Gradual increase: add only 15 steps now
-                    todaySteps += 15
-                    // Update lastSensorValue to track progress, but don't set it to rawValue yet
-                    // This allows gradual catch-up in subsequent readings
-                    saveState()
-                    emitSteps()
-                    updateNotification()
-                    return
-                }
-            }
-        }
-        
-        lastSensorValue = rawValue
 
         // Calculate new steps: pre-reboot steps + steps since new baseline
         val newStepsFromSensor = (rawValue - sensorBase).toInt().coerceAtLeast(0)
         val totalSteps = preRebootSteps + newStepsFromSensor
         
-        // Only update if steps increased (prevent sensor noise from decreasing count)
-        if (totalSteps > todaySteps) {
-            todaySteps = totalSteps
+        // Smooth out sensor batching spikes using time-based rate limiting
+        // Problem: After idle period, Android batches sensor events causing sudden spikes
+        // Solution: Limit step increase based on time elapsed since last update
+        val currentTime = System.currentTimeMillis()
+        val stepIncrease = totalSteps - todaySteps
+        
+        if (stepIncrease > 0) {
+            if (lastUpdateTime > 0) {
+                val timeSinceLastUpdate = currentTime - lastUpdateTime  // milliseconds
+                
+                // If last update was < 5 seconds ago, limit step increase
+                // Normal walking: ~2 steps/second, running: ~3 steps/second
+                // Allow up to 20 steps per update as reasonable maximum
+                if (timeSinceLastUpdate < 5000 && stepIncrease > 20) {
+                    // Likely a batched spike - limit to 20 steps
+                    todaySteps += 20
+                } else {
+                    // Either enough time passed, or reasonable increase - accept all
+                    todaySteps = totalSteps
+                }
+            } else {
+                // First update - accept all steps
+                todaySteps = totalSteps
+            }
+            
+            lastUpdateTime = currentTime
             saveState()
             emitSteps()
             updateNotification()
         }
+        // If stepIncrease <= 0, no update (prevents decreasing)
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
