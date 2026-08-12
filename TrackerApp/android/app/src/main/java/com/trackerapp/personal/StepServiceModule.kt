@@ -12,11 +12,17 @@ class StepServiceModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun startService(promise: Promise) {
         try {
-            val intent = StepCounterService.getIntent(reactApplicationContext)
+            val context = reactApplicationContext
+            if (context == null) {
+                promise.reject("CONTEXT_ERROR", "React context not available")
+                return
+            }
+            
+            val intent = StepCounterService.getIntent(context)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                reactApplicationContext.startForegroundService(intent)
+                context.startForegroundService(intent)
             } else {
-                reactApplicationContext.startService(intent)
+                context.startService(intent)
             }
             promise.resolve(true)
         } catch (e: Exception) {
@@ -27,8 +33,14 @@ class StepServiceModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun stopService(promise: Promise) {
         try {
-            val intent = StepCounterService.getIntent(reactApplicationContext)
-            reactApplicationContext.stopService(intent)
+            val context = reactApplicationContext
+            if (context == null) {
+                promise.reject("CONTEXT_ERROR", "React context not available")
+                return
+            }
+            
+            val intent = StepCounterService.getIntent(context)
+            context.stopService(intent)
             promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("STOP_ERROR", e.message, e)
@@ -38,13 +50,19 @@ class StepServiceModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun sendAction(action: String, promise: Promise) {
         try {
-            val intent = StepCounterService.getIntent(reactApplicationContext).apply {
+            val context = reactApplicationContext
+            if (context == null) {
+                promise.reject("CONTEXT_ERROR", "React context not available")
+                return
+            }
+            
+            val intent = StepCounterService.getIntent(context).apply {
                 this.action = action
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                reactApplicationContext.startForegroundService(intent)
+                context.startForegroundService(intent)
             } else {
-                reactApplicationContext.startService(intent)
+                context.startService(intent)
             }
             promise.resolve(true)
         } catch (e: Exception) {

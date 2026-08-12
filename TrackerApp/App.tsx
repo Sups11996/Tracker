@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { AppBackground } from './src/components/ui/AppBackground';
 import { AlertProvider } from './src/hooks/useCustomAlert';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { initDatabase, DATABASE_NAME } from './src/lib';
 
 // Set default notification handler
@@ -34,19 +35,21 @@ export default function App() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        {/* Gradient + ambient orbs — lives behind every screen */}
-        <AppBackground />
-        <SQLiteProvider databaseName={DATABASE_NAME} onInit={initDatabase}>
-          <NavigationContainer>
-            <AlertProvider>
-              <StatusBar style="light" />
-              <RootNavigator />
-            </AlertProvider>
-          </NavigationContainer>
-        </SQLiteProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          {/* Gradient + ambient orbs — lives behind every screen */}
+          <AppBackground />
+          <SQLiteProvider databaseName={DATABASE_NAME} onInit={initDatabase}>
+            <NavigationContainer>
+              <AlertProvider>
+                <StatusBar style="light" />
+                <RootNavigator />
+              </AlertProvider>
+            </NavigationContainer>
+          </SQLiteProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }

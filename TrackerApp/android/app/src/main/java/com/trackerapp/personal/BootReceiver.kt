@@ -13,8 +13,13 @@ class BootReceiver : BroadcastReceiver() {
     
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            // Check database to see if user had step tracking enabled
-            var shouldRestart = false
+            // Check database to see if service should restart
+            // Default to true (always restart unless explicitly paused)
+            var shouldRestart = true
+            
+            var db: android.database.sqlite.SQLiteDatabase? = null
+            var cursor: android.database.Cursor? = null
+            
             try {
                 val appFilesDir = context.filesDir
                 val possiblePaths = mutableListOf<java.io.File>()
@@ -47,28 +52,36 @@ class BootReceiver : BroadcastReceiver() {
                 }
                 
                 if (dbPath != null && dbPath.exists()) {
-                    val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+                    db = android.database.sqlite.SQLiteDatabase.openDatabase(
                         dbPath.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
                     )
                     
-                    val cursor = db.rawQuery(
-                        "SELECT is_tracking FROM step_tracking_state WHERE id = 1", null
+                    // Check is_paused column (matches StepCounterService)
+                    // If paused = 1, don't restart; otherwise restart
+                    cursor = db.rawQuery(
+                        "SELECT is_paused FROM step_tracking_state WHERE id = 1", null
                     )
                     
                     if (cursor.moveToFirst()) {
-                        shouldRestart = cursor.getInt(0) == 1
-                    } else {
-                        shouldRestart = true
+                        val isPaused = cursor.getInt(0) == 1
+                        shouldRestart = !isPaused  // Only restart if NOT paused
                     }
-                    
-                    cursor.close()
-                    db.close()
-                } else {
-                    shouldRestart = true
                 }
             } catch (e: Exception) {
-                // If we can't check the database, restart the service anyway
+                // If we can't check the database, restart the service anyway (safe default)
                 shouldRestart = true
+            } finally {
+                // Always cleanup resources
+                try {
+                    cursor?.close()
+                } catch (e: Exception) {
+                    // Ignore close errors
+                }
+                try {
+                    db?.close()
+                } catch (e: Exception) {
+                    // Ignore close errors
+                }
             }
             
             if (shouldRestart) {
@@ -81,7 +94,7 @@ class BootReceiver : BroadcastReceiver() {
                         context.startService(serviceIntent)
                     }
                 } catch (e: Exception) {
-                    // Service start failed
+                    // Service start failed - silently fail
                 }
             }
         }

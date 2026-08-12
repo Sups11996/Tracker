@@ -85,6 +85,14 @@ export async function hydrateWaterStore(db: SQLiteDatabase): Promise<void> {
       dailyGoal: profile?.water_goal_ml ?? 2400,
     });
   } catch (error) {
+    console.error('[WaterStore] Hydration failed:', error);
+    // Set safe defaults on error - app continues to work
+    useWaterStore.setState({
+      containers: [],
+      logs: [],
+      todayTotal: 0,
+      dailyGoal: 2400,
+    });
   }
 }
 
@@ -145,7 +153,9 @@ export async function logWater(
       undoTimer: timer,
     });
   } catch (error) {
-    throw error;
+    console.error('[WaterStore] Log water failed:', error);
+    // Re-throw for UI to handle (show error message)
+    throw new Error('Failed to log water intake');
   }
 }
 
@@ -172,6 +182,8 @@ export async function undoLastLog(db: SQLiteDatabase): Promise<void> {
       undoStack: newStack,
     });
   } catch (error) {
-    throw error;
+    console.error('[WaterStore] Undo failed:', error);
+    // Re-throw for UI to handle
+    throw new Error('Failed to undo water log');
   }
 }
