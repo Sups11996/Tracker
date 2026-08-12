@@ -10,6 +10,7 @@ import android.hardware.SensorManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import com.facebook.react.ReactApplication
 import com.facebook.react.bridge.ReactContext
@@ -78,7 +79,9 @@ class StepCounterService : Service(), SensorEventListener {
         val action = intent?.action
         when (action) {
             ACTION_PAUSE  -> { 
-                isPaused = true
+                synchronized(this) {
+                    isPaused = true
+                }
                 updateDatabasePauseState(true)
                 emitStatus("paused")
                 updateNotification()
@@ -117,8 +120,19 @@ class StepCounterService : Service(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         isDestroyed = true
-        sensorManager.unregisterListener(this)
-        wakeLock?.release()
+        
+        try {
+            sensorManager.unregisterListener(this)
+        } catch (e: Exception) {
+            // Ignore unregister errors
+        }
+        
+        try {
+            wakeLock?.release()
+        } catch (e: Exception) {
+            // Ignore release errors
+        }
+        
         emitStatus("paused")
     }
 
@@ -211,8 +225,9 @@ class StepCounterService : Service(), SensorEventListener {
         
         // Detect massive forward jump (sensor glitch, not normal walking)
         // A jump of >50000 steps is impossible in one reading (would need 6+ hours of continuous walking)
-        val stepsSinceLastReading = (rawValue - sensorBase).toInt()
-        if (stepsSinceLastReading > 50000) {
+        // Check as Long to prevent integer overflow
+        val stepsSinceLastReadingLong = rawValue - sensorBase
+        if (stepsSinceLastReadingLong > 50000) {
             // Treat as sensor glitch - reset baseline to current value without adding steps
             sensorBase = rawValue
             saveState()
@@ -221,12 +236,25 @@ class StepCounterService : Service(), SensorEventListener {
 
         // Calculate new steps: pre-reboot steps + steps since new baseline
         val newStepsFromSensor = (rawValue - sensorBase).toInt().coerceAtLeast(0)
-        val totalSteps = preRebootSteps + newStepsFromSensor
+        
+        // Check for overflow in totalSteps calculation
+        val totalStepsLong = preRebootSteps.toLong() + newStepsFromSensor.toLong()
+        if (totalStepsLong > Int.MAX_VALUE) {
+            // Overflow protection - cap at Int.MAX_VALUE
+            // This would take walking ~1 billion steps per day (impossible)
+            // But handle gracefully just in case
+            todaySteps = Int.MAX_VALUE
+            saveState()
+            emitSteps()
+            updateNotification()
+            return
+        }
+        val totalSteps = totalStepsLong.toInt()
         
         // Smooth out sensor batching spikes using time-based rate limiting
         // Problem: After idle period, Android batches sensor events causing sudden spikes
         // Solution: Limit step increase based on time elapsed since last update
-        val currentTime = System.currentTimeMillis()
+        val currentTime = SystemClock.elapsedRealtime()  // Use monotonic clock (immune to time changes)
         val stepIncrease = totalSteps - todaySteps
         
         if (stepIncrease > 0) {
@@ -368,8 +396,12 @@ class StepCounterService : Service(), SensorEventListener {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val statusText = if (isPaused) "Paused" else "$todaySteps steps today"
-        val actionLabel = if (isPaused) "Resume" else "Pause"
+        // Thread-safe read of volatile variables
+        val paused = isPaused
+        val steps = todaySteps  // Read once to avoid inconsistency
+        
+        val statusText = if (paused) "Paused" else "$steps steps today"
+        val actionLabel = if (paused) "Resume" else "Pause"
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
@@ -387,8 +419,14 @@ class StepCounterService : Service(), SensorEventListener {
     }
 
     private fun updateNotification() {
-        getSystemService(NotificationManager::class.java)
-            ?.notify(NOTIFICATION_ID, buildNotification())
+        if (isDestroyed) return  // Don't update if service is destroyed
+        
+        try {
+            getSystemService(NotificationManager::class.java)
+                ?.notify(NOTIFICATION_ID, buildNotification())
+        } catch (e: Exception) {
+            // Service destroyed or notification manager unavailable
+        }
     }
 
     private fun acquireWakeLock() {
