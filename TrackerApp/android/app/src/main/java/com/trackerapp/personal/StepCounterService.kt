@@ -32,6 +32,7 @@ class StepCounterService : Service(), SensorEventListener {
         const val PREF_DATE = "date"
         const val PREF_SENSOR_BASE = "sensor_base"
         const val PREF_PRE_REBOOT_STEPS = "pre_reboot_steps"
+        const val PREF_LATEST_SENSOR_VALUE = "latest_sensor_value"
         // Average step length: 0.762m, calories per step: 0.04 kcal
         const val STEP_LENGTH_M = 0.762f
         const val CAL_PER_STEP = 0.04f
@@ -331,10 +332,12 @@ class StepCounterService : Service(), SensorEventListener {
                 todaySteps = prefs.getInt(PREF_STEPS, 0)
                 sensorBase = prefs.getLong(PREF_SENSOR_BASE, -1L)
                 preRebootSteps = prefs.getInt(PREF_PRE_REBOOT_STEPS, 0)
+                latestSensorValue = prefs.getLong(PREF_LATEST_SENSOR_VALUE, -1L)
             } else {
                 todaySteps = 0
                 sensorBase = -1L
                 preRebootSteps = 0
+                latestSensorValue = -1L
             }
             currentDate = today
         }
@@ -346,6 +349,7 @@ class StepCounterService : Service(), SensorEventListener {
             .putString(PREF_DATE, currentDate)
             .putLong(PREF_SENSOR_BASE, sensorBase)
             .putInt(PREF_PRE_REBOOT_STEPS, preRebootSteps)
+            .putLong(PREF_LATEST_SENSOR_VALUE, latestSensorValue)
             .apply()
     }
 
