@@ -55,7 +55,12 @@ class StepCounterService : Service(), SensorEventListener {
     @Volatile private var isPaused = false  // Volatile for thread-safe reads
     @Volatile private var isDestroyed = false  // Track if service is being destroyed
 
-    private val prefs get() = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    private val prefs get() = try {
+        getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    } catch (e: Exception) {
+        // SharedPreferences unavailable - storage failure
+        null
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -310,7 +315,13 @@ class StepCounterService : Service(), SensorEventListener {
                                 // Likely a batched spike - limit to 20 steps this update
                                 // The remaining steps will be added in subsequent sensor readings
                                 // as the sensor continues to fire and timeSinceLastUpdate grows
-                                todaySteps += 20
+                                // Check for overflow before adding
+                                val newStepsLong = todaySteps.toLong() + 20
+                                if (newStepsLong > Int.MAX_VALUE) {
+                                    todaySteps = Int.MAX_VALUE
+                                } else {
+                                    todaySteps += 20
+                                }
                                 lastUpdateTime = currentTime
                             } else {
                                 // Either enough time passed (>5 sec), or reasonable increase (<=20 steps) - accept all
@@ -365,14 +376,16 @@ class StepCounterService : Service(), SensorEventListener {
             // Clock error - use empty string, will force reset
             ""
         }
-        val savedDate = prefs.getString(PREF_DATE, "")
+        
+        val prefsInstance = prefs ?: return  // Exit if prefs unavailable
+        val savedDate = prefsInstance.getString(PREF_DATE, "") ?: ""
         
         synchronized(this) {
-            if (savedDate == today) {
-                todaySteps = prefs.getInt(PREF_STEPS, 0)
-                sensorBase = prefs.getLong(PREF_SENSOR_BASE, -1L)
-                preRebootSteps = prefs.getInt(PREF_PRE_REBOOT_STEPS, 0)
-                latestSensorValue = prefs.getLong(PREF_LATEST_SENSOR_VALUE, -1L)
+            if (savedDate == today && savedDate.isNotEmpty()) {
+                todaySteps = prefsInstance.getInt(PREF_STEPS, 0)
+                sensorBase = prefsInstance.getLong(PREF_SENSOR_BASE, -1L)
+                preRebootSteps = prefsInstance.getInt(PREF_PRE_REBOOT_STEPS, 0)
+                latestSensorValue = prefsInstance.getLong(PREF_LATEST_SENSOR_VALUE, -1L)
             } else {
                 todaySteps = 0
                 sensorBase = -1L
@@ -384,13 +397,18 @@ class StepCounterService : Service(), SensorEventListener {
     }
 
     private fun saveState() {
-        prefs.edit()
-            .putInt(PREF_STEPS, todaySteps)
-            .putString(PREF_DATE, currentDate)
-            .putLong(PREF_SENSOR_BASE, sensorBase)
-            .putInt(PREF_PRE_REBOOT_STEPS, preRebootSteps)
-            .putLong(PREF_LATEST_SENSOR_VALUE, latestSensorValue)
-            .apply()
+        val prefsInstance = prefs ?: return  // Exit if prefs unavailable
+        try {
+            prefsInstance.edit()
+                .putInt(PREF_STEPS, todaySteps)
+                .putString(PREF_DATE, currentDate)
+                .putLong(PREF_SENSOR_BASE, sensorBase)
+                .putInt(PREF_PRE_REBOOT_STEPS, preRebootSteps)
+                .putLong(PREF_LATEST_SENSOR_VALUE, latestSensorValue)
+                .apply()
+        } catch (e: Exception) {
+            // Save failed - continue without persisting
+        }
     }
 
     private fun getReactContext(): ReactContext? {
@@ -516,14 +534,17 @@ class StepCounterService : Service(), SensorEventListener {
                 // PowerManager not available
                 return
             }
-            wakeLock = pm.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK,
-                "TrackerApp::StepCounterWakeLock"
-            ).apply { 
-                // Acquire indefinitely - foreground service doesn't need timeout
-                // Will be released properly in onDestroy
-                // Android won't kill foreground service, so no crash risk
-                acquire()
+            // Only acquire if not already held to prevent reference count leak
+            if (wakeLock == null || wakeLock?.isHeld == false) {
+                wakeLock = pm.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK,
+                    "TrackerApp::StepCounterWakeLock"
+                ).apply { 
+                    // Acquire indefinitely - foreground service doesn't need timeout
+                    // Will be released properly in onDestroy
+                    // Android won't kill foreground service, so no crash risk
+                    acquire()
+                }
             }
         } catch (e: Exception) {
             // WakeLock acquisition failed - continue without it
