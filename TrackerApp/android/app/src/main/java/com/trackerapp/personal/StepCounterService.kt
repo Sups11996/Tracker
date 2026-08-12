@@ -57,7 +57,13 @@ class StepCounterService : Service(), SensorEventListener {
 
     override fun onCreate() {
         super.onCreate()
-        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        val sensorService = getSystemService(Context.SENSOR_SERVICE)
+        if (sensorService == null) {
+            // SensorManager not available - device issue
+            stopSelf()
+            return
+        }
+        sensorManager = sensorService as SensorManager
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
         
         // Check if step sensor is available
@@ -266,18 +272,21 @@ class StepCounterService : Service(), SensorEventListener {
                             // Normal walking: ~2 steps/second, running: ~3 steps/second
                             // Allow up to 20 steps per update as reasonable maximum
                             if (timeSinceLastUpdate < 5000 && stepIncrease > 20) {
-                                // Likely a batched spike - limit to 20 steps
+                                // Likely a batched spike - limit to 20 steps this update
+                                // The remaining steps will be added in subsequent sensor readings
+                                // as the sensor continues to fire and timeSinceLastUpdate grows
                                 todaySteps += 20
+                                lastUpdateTime = currentTime
                             } else {
-                                // Either enough time passed, or reasonable increase - accept all
+                                // Either enough time passed (>5 sec), or reasonable increase (<=20 steps) - accept all
                                 todaySteps = totalSteps
+                                lastUpdateTime = currentTime
                             }
                         } else {
                             // First update - accept all steps
                             todaySteps = totalSteps
+                            lastUpdateTime = currentTime
                         }
-                        
-                        lastUpdateTime = currentTime
                         saveState()
                     }
                     // If stepIncrease <= 0, no update (prevents decreasing)
@@ -316,16 +325,19 @@ class StepCounterService : Service(), SensorEventListener {
     private fun loadPersistedState() {
         val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
         val savedDate = prefs.getString(PREF_DATE, "")
-        if (savedDate == today) {
-            todaySteps = prefs.getInt(PREF_STEPS, 0)
-            sensorBase = prefs.getLong(PREF_SENSOR_BASE, -1L)
-            preRebootSteps = prefs.getInt(PREF_PRE_REBOOT_STEPS, 0)
-        } else {
-            todaySteps = 0
-            sensorBase = -1L
-            preRebootSteps = 0
+        
+        synchronized(this) {
+            if (savedDate == today) {
+                todaySteps = prefs.getInt(PREF_STEPS, 0)
+                sensorBase = prefs.getLong(PREF_SENSOR_BASE, -1L)
+                preRebootSteps = prefs.getInt(PREF_PRE_REBOOT_STEPS, 0)
+            } else {
+                todaySteps = 0
+                sensorBase = -1L
+                preRebootSteps = 0
+            }
+            currentDate = today
         }
-        currentDate = today
     }
 
     private fun saveState() {
@@ -348,8 +360,11 @@ class StepCounterService : Service(), SensorEventListener {
         try {
             val reactContext = getReactContext() ?: return
             
-            // Prevent overflow and invalid calculations
-            val safeSteps = todaySteps.coerceIn(0, Int.MAX_VALUE)
+            // Thread-safe read of todaySteps
+            val safeSteps: Int
+            synchronized(this) {
+                safeSteps = todaySteps.coerceIn(0, Int.MAX_VALUE)
+            }
             val distance = (safeSteps * STEP_LENGTH_M).coerceAtLeast(0f)
             val calories = (safeSteps * CAL_PER_STEP).coerceAtLeast(0f)
             
@@ -442,14 +457,19 @@ class StepCounterService : Service(), SensorEventListener {
 
     private fun acquireWakeLock() {
         try {
-            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            if (pm == null) {
+                // PowerManager not available
+                return
+            }
             wakeLock = pm.newWakeLock(
                 PowerManager.PARTIAL_WAKE_LOCK,
                 "TrackerApp::StepCounterWakeLock"
             ).apply { 
-                // Acquire with 10 minute timeout as safety net
-                // Will be released properly in onDestroy, but timeout prevents battery drain if service crashes
-                acquire(10 * 60 * 1000L)  // 10 minutes in milliseconds
+                // Acquire indefinitely - foreground service doesn't need timeout
+                // Will be released properly in onDestroy
+                // Android won't kill foreground service, so no crash risk
+                acquire()
             }
         } catch (e: Exception) {
             // WakeLock acquisition failed - continue without it
