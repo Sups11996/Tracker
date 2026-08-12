@@ -473,9 +473,8 @@ class StepCounterService : Service(), SensorEventListener {
         val statusText = if (paused) "Paused" else "$steps steps today"
         val actionLabel = if (paused) "Resume" else "Pause"
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setLargeIcon(android.graphics.BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher))
             .setColor(0xFF12141C.toInt())
             .setColorized(false)
             .setContentTitle("Tracker")
@@ -485,7 +484,18 @@ class StepCounterService : Service(), SensorEventListener {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .build()
+
+        // Try to set large icon, but handle failure gracefully
+        try {
+            val largeIcon = android.graphics.BitmapFactory.decodeResource(resources, R.mipmap.ic_launcher)
+            if (largeIcon != null) {
+                builder.setLargeIcon(largeIcon)
+            }
+        } catch (e: Exception) {
+            // Resource not found or decoding failed - continue without large icon
+        }
+
+        return builder.build()
     }
 
     private fun updateNotification() {
