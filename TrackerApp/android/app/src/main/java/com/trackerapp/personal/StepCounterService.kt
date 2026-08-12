@@ -43,6 +43,7 @@ class StepCounterService : Service(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private var stepSensor: Sensor? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private var sensorManagerInitialized = false  // Track if lateinit sensorManager is safe to use
 
     private var todaySteps = 0
     private var sensorBase = -1L   // raw sensor value at service start or reset
@@ -65,6 +66,7 @@ class StepCounterService : Service(), SensorEventListener {
             return
         }
         sensorManager = sensorService as SensorManager
+        sensorManagerInitialized = true  // Mark as safe to use
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
         
         // Check if step sensor is available
@@ -116,7 +118,14 @@ class StepCounterService : Service(), SensorEventListener {
             ACTION_RESET  -> resetSteps()
             else -> {
                 // Default start: begin foreground service and register sensor
-                startForeground(NOTIFICATION_ID, buildNotification())
+                try {
+                    startForeground(NOTIFICATION_ID, buildNotification())
+                } catch (e: Exception) {
+                    // startForeground can fail due to permission issues or system state
+                    // Stop service gracefully if we can't start foreground
+                    stopSelf()
+                    return START_NOT_STICKY
+                }
                 registerSensor()
                 loadPauseStateFromDatabase()
             }
@@ -128,10 +137,13 @@ class StepCounterService : Service(), SensorEventListener {
         super.onDestroy()
         isDestroyed = true
         
-        try {
-            sensorManager.unregisterListener(this)
-        } catch (e: Exception) {
-            // Ignore unregister errors
+        // Only access sensorManager if it was successfully initialized
+        if (sensorManagerInitialized) {
+            try {
+                sensorManager.unregisterListener(this)
+            } catch (e: Exception) {
+                // Ignore unregister errors
+            }
         }
         
         try {
@@ -174,7 +186,12 @@ class StepCounterService : Service(), SensorEventListener {
         
         // Check if date changed (do this even when paused to reset at midnight)
         // Use UTC to avoid timezone-change issues (user traveling across timezones)
-        val today = LocalDate.now(java.time.ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val today = try {
+            LocalDate.now(java.time.ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE)
+        } catch (e: Exception) {
+            // Clock error or DateTimeException - keep current date
+            currentDate
+        }
         if (today != currentDate) {
             synchronized(this) {
                 // Double-check inside sync block
@@ -342,7 +359,12 @@ class StepCounterService : Service(), SensorEventListener {
 
     private fun loadPersistedState() {
         // Use UTC to avoid timezone-change issues
-        val today = LocalDate.now(java.time.ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val today = try {
+            LocalDate.now(java.time.ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE)
+        } catch (e: Exception) {
+            // Clock error - use empty string, will force reset
+            ""
+        }
         val savedDate = prefs.getString(PREF_DATE, "")
         
         synchronized(this) {
