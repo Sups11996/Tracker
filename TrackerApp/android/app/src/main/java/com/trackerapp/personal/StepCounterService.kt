@@ -48,7 +48,7 @@ class StepCounterService : Service(), SensorEventListener {
     private var sensorBase = -1L   // raw sensor value at service start or reset
     private var preRebootSteps = 0  // steps before sensor reset (preserved across reboot)
     private var sensorResetDetected = false  // flag to skip first reading after reset
-    private var latestSensorValue = -1L  // tracks sensor value even when paused
+    @Volatile private var latestSensorValue = -1L  // tracks sensor value even when paused (written by sensor thread, read by command thread)
     private var lastUpdateTime = 0L  // timestamp of last step update (for rate limiting)
     private var currentDate = ""
     @Volatile private var isPaused = false  // Volatile for thread-safe reads
@@ -222,7 +222,14 @@ class StepCounterService : Service(), SensorEventListener {
                     return
                 }
                 
-                todaySteps = preRebootSteps + stepsDuringReset
+                // Check for overflow when adding to preRebootSteps
+                val todayStepsLong = preRebootSteps.toLong() + stepsDuringReset.toLong()
+                if (todayStepsLong > Int.MAX_VALUE) {
+                    // Overflow protection - cap at Int.MAX_VALUE
+                    todaySteps = Int.MAX_VALUE
+                } else {
+                    todaySteps = todayStepsLong.toInt()
+                }
                 
                 // Update preRebootSteps to the new total for future calculations
                 preRebootSteps = todaySteps
