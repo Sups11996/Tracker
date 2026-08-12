@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Animated, Easing 
 import { useSQLiteContext } from 'expo-sqlite';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useStepStore, hydrateStepStore } from '../../stores/stepStore';
+import { getTodayLocal } from '../../lib/dateUtils';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { BarChart } from './BarChart';
@@ -58,7 +59,7 @@ export function StepDashboard() {
   }, [isLoading]);
 
   // Add today's data
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayLocal();  // Use local timezone instead of UTC
   const todayRecord = {
     date: today,
     steps: todaySteps,
@@ -407,7 +408,7 @@ function calculateMonthStats(monthData: any[], dailyGoal: number) {
     avgSteps: daysWithSteps.length > 0 
       ? Math.round(monthData.reduce((sum, d) => sum + d.steps, 0) / daysWithSteps.length)
       : 0,
-    mostSteps: daysWithSteps.length > 0 ? Math.max(...monthData.map(d => d.steps)) : 0,
+    mostSteps: daysWithSteps.length > 0 ? Math.max(...daysWithSteps.map(d => d.steps)) : 0,
     leastSteps: daysWithSteps.length > 0 ? Math.min(...daysWithSteps.map(d => d.steps)) : 0,
     goalReached: monthData.filter(d => d.goal_met).length,
     goalMissed: daysWithSteps.length - monthData.filter(d => d.goal_met).length,

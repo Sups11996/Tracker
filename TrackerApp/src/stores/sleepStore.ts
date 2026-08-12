@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { Platform } from 'react-native';
 import { requireNativeModule } from 'expo-modules-core';
+import { getTodayLocal } from '../lib/dateUtils';
 
 const SleepServiceModule = (() => {
   if (Platform.OS !== 'android') return null;
@@ -147,6 +148,17 @@ export async function hydrateSleepStore(db: SQLiteDatabase): Promise<void> {
     }
     
   } catch (error) {
+    console.error('[SleepStore] Hydration failed:', error);
+    // Set safe defaults
+    useSleepStore.setState({
+      isActive: false,
+      sessionStartTime: null,
+      elapsedMinutes: 0,
+      lastNightDuration: null,
+      lastNightQuality: null,
+      recentSessions: [],
+      goalMinutes: 480,
+    });
   }
 }
 
@@ -156,7 +168,7 @@ export async function hydrateSleepStore(db: SQLiteDatabase): Promise<void> {
  */
 export async function startSleepSession(db: SQLiteDatabase): Promise<void> {
   const now = Date.now();
-  const date = new Date(now).toISOString().split('T')[0];
+  const date = getTodayLocal();  // Use local timezone instead of UTC
   const goalMinutes = useSleepStore.getState().goalMinutes;
   
   try {
@@ -175,7 +187,8 @@ export async function startSleepSession(db: SQLiteDatabase): Promise<void> {
     }
     
   } catch (error) {
-    throw error;
+    console.error('[SleepStore] Start session failed:', error);
+    throw new Error('Failed to start sleep session');
   }
 }
 
@@ -219,6 +232,7 @@ export async function endSleepSession(
     }
     
   } catch (error) {
-    throw error;
+    console.error('[SleepStore] End session failed:', error);
+    throw new Error('Failed to end sleep session');
   }
 }

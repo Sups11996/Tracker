@@ -70,7 +70,10 @@ export function subscribeToStepEvents() {
           data.distance ?? 0,
           data.calories ?? 0
         );
-      } catch (_) {}
+      } catch (error) {
+        // JSON parse failed - native sent invalid data
+        // Don't log (fires 60x/min) - next update will succeed
+      }
     });
 
     // Don't accept status events from native service
@@ -145,6 +148,17 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
     useStepStore.getState().setMonthlyData(monthly);
 
   } catch (e) {
+    console.error('[StepStore] Hydration failed:', e);
+    // Set safe defaults - app continues to work
+    useStepStore.setState({
+      todaySteps: 0,
+      todayDistance: 0,
+      todayCalories: 0,
+      dailyGoal: 8000,
+      status: 'unavailable',
+      weeklyData: [],
+      monthlyData: [],
+    });
   }
 }
 
@@ -197,5 +211,7 @@ export async function saveStepData(db: SQLite.SQLiteDatabase, dateOverride?: str
     useStepStore.getState().setMonthlyData(monthly);
     
   } catch (error) {
+    console.error('[StepStore] Save step data failed:', error);
+    // Don't throw - app continues without saving this update
   }
 }

@@ -89,6 +89,18 @@ export async function hydrateAbcStore(db: SQLiteDatabase): Promise<void> {
       undoEntry: null,
     });
   } catch (error) {
+    console.error('[AbcStore] Hydration failed:', error);
+    // Set safe defaults
+    useAbcStore.setState({
+      todayCount: 0,
+      lastLoggedAt: null,
+      yesterdayCount: 0,
+      entries: [],
+      dailyGoal: 3,
+      undoStack: [],
+      undoEntry: null,
+      undoTimer: null,
+    });
   }
 }
 
@@ -148,7 +160,8 @@ export async function logAbc(db: SQLiteDatabase): Promise<void> {
       [today, newCount, now, now, newCount, now]
     );
   } catch (error) {
-    throw error;
+    console.error('[AbcStore] Log ABC failed:', error);
+    throw new Error('Failed to log ABC entry');
   }
 }
 
@@ -215,6 +228,7 @@ export async function undoLastAbc(db: SQLiteDatabase): Promise<void> {
       );
     }
   } catch (error) {
-    throw error;
+    console.error('[AbcStore] Undo ABC failed:', error);
+    throw new Error('Failed to undo ABC entry');
   }
 }

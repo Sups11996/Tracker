@@ -64,6 +64,8 @@ export function useAppHydration(): { isReady: boolean } {
             [yesterdayDate, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, yesterdayDate, now, now]
           );
         } catch (error) {
+          console.error('[AppHydration] Save yesterday step data failed:', error);
+          // Continue with reset even if save fails
         }
         
         // Reset step counter in store
@@ -77,6 +79,8 @@ export function useAppHydration(): { isReady: boolean } {
           try {
             await StepServiceModule.sendAction('reset');
           } catch (error) {
+            console.error('[AppHydration] Native reset failed:', error);
+            // Continue - not critical
           }
         }
         
@@ -102,6 +106,7 @@ export function useAppHydration(): { isReady: boolean } {
         profile?.uses_abc ? hydrateAbcStore(db) : Promise.resolve(),
       ]);
     } catch (e) {
+      console.error('[AppHydration] Hydrate all stores failed:', e);
       // Silent fail - app will retry on next focus
     } finally {
       isHydrating.current = false;
@@ -158,6 +163,8 @@ export function useAppHydration(): { isReady: boolean } {
             useStepStore.getState().setStatus(newStatus);
           }
         } catch (error) {
+          console.error('[AppHydration] Reload tracking status failed:', error);
+          // Continue with hydration even if status load fails
         }
         
         await handleDateChangeIfNeeded();

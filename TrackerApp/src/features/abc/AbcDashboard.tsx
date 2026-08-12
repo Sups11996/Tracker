@@ -117,7 +117,10 @@ export function AbcDashboard() {
         data.push({ date: dateStr, count, goal: dailyGoal, goal_met: count >= dailyGoal && count > 0 });
       }
       setSelectedMonthData(data);
-    } catch (e) { }
+    } catch (e) {
+      console.error('[AbcDashboard] Load selected month failed:', e);
+      setSelectedMonthData([]);
+    }
   }
 
   // Derived values

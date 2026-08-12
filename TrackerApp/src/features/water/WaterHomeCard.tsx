@@ -52,11 +52,21 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   }, [hasUndo]);
 
   async function handleLog(container: typeof containers[0]) {
-    try { await logWater(db, container); } catch (e) {}
+    try { 
+      await logWater(db, container); 
+    } catch (e) {
+      console.error('[WaterHomeCard] Log water failed:', e);
+      // Error is already user-friendly from waterStore
+    }
   }
 
   async function handleUndo() {
-    try { await undoLastLog(db); } catch (e) {}
+    try { 
+      await undoLastLog(db); 
+    } catch (e) {
+      console.error('[WaterHomeCard] Undo failed:', e);
+      // Error is already user-friendly from waterStore
+    }
   }
 
   function openCustomInput() {

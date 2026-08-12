@@ -48,39 +48,49 @@ export async function saveWorkoutReminderSettings(
   db: SQLite.SQLiteDatabase,
   settings: WorkoutReminderSettings
 ): Promise<void> {
-  await db.runAsync(
-    'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
-    ['workout_reminder_enabled', settings.enabled ? '1' : '0']
-  );
-  await db.runAsync(
-    'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
-    ['workout_reminder_hour', settings.hour.toString()]
-  );
-  await db.runAsync(
-    'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
-    ['workout_reminder_minute', settings.minute.toString()]
-  );
+  try {
+    await db.runAsync(
+      'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+      ['workout_reminder_enabled', settings.enabled ? '1' : '0']
+    );
+    await db.runAsync(
+      'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+      ['workout_reminder_hour', settings.hour.toString()]
+    );
+    await db.runAsync(
+      'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+      ['workout_reminder_minute', settings.minute.toString()]
+    );
+  } catch (error) {
+    console.error('[WorkoutReminders] Save settings failed:', error);
+    throw new Error('Failed to save workout reminder settings');
+  }
 }
 
 export async function applyWorkoutReminderSettings(
   settings: WorkoutReminderSettings
 ): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(WORKOUT_NOTIFICATION_ID);
-  if (!settings.enabled) return;
+  try {
+    await Notifications.cancelScheduledNotificationAsync(WORKOUT_NOTIFICATION_ID);
+    if (!settings.enabled) return;
 
-  await Notifications.scheduleNotificationAsync({
-    identifier: WORKOUT_NOTIFICATION_ID,
-    content: {
-      title: '💪 Workout time!',
-      body: "Don't forget to log today's workout.",
-      sound: true,
-      android: { channelId: 'default', smallIcon: 'ic_notification' },
-    },
-    trigger: {
-      type: 'daily',
-      hour: settings.hour,
-      minute: settings.minute,
-      repeats: true,
-    },
-  });
+    await Notifications.scheduleNotificationAsync({
+      identifier: WORKOUT_NOTIFICATION_ID,
+      content: {
+        title: '💪 Workout time!',
+        body: "Don't forget to log today's workout.",
+        sound: true,
+        android: { channelId: 'default', smallIcon: 'ic_notification' },
+      },
+      trigger: {
+        type: 'daily',
+        hour: settings.hour,
+        minute: settings.minute,
+        repeats: true,
+      },
+    });
+  } catch (error) {
+    console.error('[WorkoutReminders] Apply settings failed:', error);
+    throw new Error('Failed to apply workout reminder settings');
+  }
 }

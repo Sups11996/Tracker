@@ -62,11 +62,9 @@ export function HomeScreen() {
     async function startTrackingIfEnabled() {
       if (Platform.OS !== 'android') return;
       if (!StepServiceModule) return;
+      if (!isReady) return; // Wait for app hydration to complete
 
       try {
-        // Wait for database initialization to complete
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
         // Check if tracking is enabled in DB
         const state = await db.getFirstAsync<{ is_tracking: number }>(
           'SELECT is_tracking FROM step_tracking_state WHERE id = 1'
@@ -80,12 +78,13 @@ export function HomeScreen() {
 
         await StepServiceModule.startService();
       } catch (error) {
+        console.error('[HomeScreen] Start tracking service failed:', error);
         // Step service failed to start - silently continue
       }
     }
 
     startTrackingIfEnabled();
-  }, [db]);
+  }, [db, isReady]);
 
   const hour = new Date().getHours();
   const greeting =

@@ -57,6 +57,7 @@ export async function loadSleepReminderSettings(
 
     return settings;
   } catch (error) {
+    console.error('[SleepReminders] Load settings failed:', error);
     return DEFAULT_SETTINGS;
   }
 }
@@ -92,7 +93,8 @@ export async function saveSleepReminderSettings(
       ['sleep_reminder_wake_minute', settings.wakeMinute.toString()]
     );
   } catch (error) {
-    throw error;
+    console.error('[SleepReminders] Save settings failed:', error);
+    throw new Error('Failed to save sleep reminder settings');
   }
 }
 
@@ -134,7 +136,8 @@ export async function scheduleBedtimeReminder(
       },
     });
   } catch (error) {
-    throw error;
+    console.error('[SleepReminders] Schedule bedtime reminder failed:', error);
+    throw new Error('Failed to schedule bedtime reminder');
   }
 }
 
@@ -176,7 +179,8 @@ export async function scheduleWakeReminder(
       },
     });
   } catch (error) {
-    throw error;
+    console.error('[SleepReminders] Schedule wake reminder failed:', error);
+    throw new Error('Failed to schedule wake reminder');
   }
 }
 
@@ -187,6 +191,8 @@ export async function cancelBedtimeReminder(): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(BEDTIME_NOTIFICATION_ID);
   } catch (error) {
+    console.error('[SleepReminders] Cancel bedtime reminder failed:', error);
+    // Don't throw - not critical if cancel fails
   }
 }
 
@@ -197,6 +203,8 @@ export async function cancelWakeReminder(): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(WAKE_NOTIFICATION_ID);
   } catch (error) {
+    console.error('[SleepReminders] Cancel wake reminder failed:', error);
+    // Don't throw - not critical if cancel fails
   }
 }
 

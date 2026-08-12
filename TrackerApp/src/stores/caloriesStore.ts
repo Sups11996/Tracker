@@ -107,6 +107,15 @@ export async function hydrateCaloriesStore(db: SQLiteDatabase): Promise<void> {
       dailyGoal,
     });
   } catch (error) {
+    console.error('[CaloriesStore] Hydration failed:', error);
+    // Set safe defaults
+    useCaloriesStore.setState({
+      walkingCalories: 0,
+      workoutCalories: 0,
+      totalCalories: 0,
+      workoutLogs: [],
+      dailyGoal: 0,
+    });
   }
 }
 
@@ -153,7 +162,8 @@ export async function logWorkout(
       totalCalories: Math.round(state.walkingCalories + workoutCal),
     });
   } catch (error) {
-    throw error;
+    console.error('[CaloriesStore] Log workout failed:', error);
+    throw new Error('Failed to log workout');
   }
 }
 
@@ -177,6 +187,7 @@ export async function deleteWorkout(
       totalCalories: Math.round(state.walkingCalories + workoutCal),
     });
   } catch (error) {
-    throw error;
+    console.error('[CaloriesStore] Delete workout failed:', error);
+    throw new Error('Failed to delete workout');
   }
 }
