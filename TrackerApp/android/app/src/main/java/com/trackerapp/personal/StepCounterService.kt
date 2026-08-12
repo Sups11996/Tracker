@@ -70,7 +70,7 @@ class StepCounterService : Service(), SensorEventListener {
         // Check if step sensor is available
         if (stepSensor == null) {
             // Device doesn't have step counter sensor
-            // Stop service gracefully
+            // Stop service gracefully and don't proceed
             stopSelf()
             return
         }
@@ -81,6 +81,13 @@ class StepCounterService : Service(), SensorEventListener {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Safety check: if sensor unavailable, service should not have started
+        // This handles race condition where onCreate called stopSelf() but onStartCommand still fires
+        if (stepSensor == null) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        
         val action = intent?.action
         when (action) {
             ACTION_PAUSE  -> { 
@@ -108,12 +115,7 @@ class StepCounterService : Service(), SensorEventListener {
             }
             ACTION_RESET  -> resetSteps()
             else -> {
-                // Check if step sensor is still available (might have been removed)
-                if (stepSensor == null) {
-                    stopSelf()
-                    return START_NOT_STICKY
-                }
-                
+                // Default start: begin foreground service and register sensor
                 startForeground(NOTIFICATION_ID, buildNotification())
                 registerSensor()
                 loadPauseStateFromDatabase()
@@ -152,11 +154,18 @@ class StepCounterService : Service(), SensorEventListener {
         event ?: return
         if (event.sensor.type != Sensor.TYPE_STEP_COUNTER) return
 
+        // Validate sensor data array
+        if (event.values.isEmpty()) {
+            // Malformed sensor event - ignore
+            return
+        }
+
         val rawValue = event.values[0].toLong()
         
-        // Sanity check: sensor should never return negative values
-        if (rawValue < 0) {
-            // Sensor malfunction - ignore this reading
+        // Sanity check: sensor should never return negative values or special float values
+        // NaN.toLong() = 0, Infinity.toLong() = Long.MAX_VALUE
+        if (rawValue < 0 || rawValue == Long.MAX_VALUE) {
+            // Sensor malfunction or special value - ignore this reading
             return
         }
         
