@@ -574,6 +574,12 @@ class StepCounterService : Service(), SensorEventListener {
                 synchronized(this) {
                     isPaused = pausedFromDb
                 }
+                
+                // Delay emission to give React Native time to subscribe
+                // Use a handler to emit after a short delay
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    emitStatus(if (pausedFromDb) "paused" else "tracking")
+                }, 500)  // 500ms delay
             }
         } catch (e: Exception) {
             // Silently fail
@@ -622,11 +628,15 @@ class StepCounterService : Service(), SensorEventListener {
                 dbPath.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE
             )
             
+            // Get current timestamp in milliseconds
+            val now = System.currentTimeMillis()
+            
             // Use INSERT OR REPLACE to ensure row exists
+            // Set is_tracking=1 to indicate tracking is enabled (just paused/resumed)
             // This handles both creating the row and updating it
             db.execSQL(
-                "INSERT OR REPLACE INTO step_tracking_state (id, is_paused) VALUES (1, ?)",
-                arrayOf(if (paused) 1 else 0)
+                "INSERT OR REPLACE INTO step_tracking_state (id, is_tracking, is_paused, updated_at) VALUES (1, 1, ?, ?)",
+                arrayOf(if (paused) 1 else 0, now)
             )
         } catch (e: Exception) {
             // Silently fail

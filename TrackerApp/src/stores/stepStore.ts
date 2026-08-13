@@ -76,10 +76,13 @@ export function subscribeToStepEvents() {
       }
     });
 
-    // Don't accept status events from native service
-    // Status is controlled by database only to prevent race conditions
+    // Listen to status events from native service (notification actions)
     statusSub = DeviceEventEmitter.addListener('STEP_STATUS', (status: string) => {
-      // Ignore - status is managed by DB and UI actions only
+      // Update store when notification actions change status
+      const newStatus = status as TrackingStatus;
+      if (newStatus === 'paused' || newStatus === 'tracking') {
+        useStepStore.getState().setStatus(newStatus);
+      }
     });
   } catch (_) {}
 }
