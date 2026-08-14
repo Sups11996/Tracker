@@ -55,6 +55,11 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             setPressedIndex(index);
           };
 
+          const onPressOut = () => {
+            // Clear pressed state if finger leaves button
+            setPressedIndex(null);
+          };
+
           const onPress = () => {
             const event = navigation.emit({
               type: 'tabPress',
@@ -73,6 +78,9 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             if (!isFocused && !event.defaultPrevented) {
               navigation.navigate(route.name);
             }
+            
+            // Clear pressed state after navigation
+            setPressedIndex(null);
           };
 
           // Get icon and label
@@ -97,6 +105,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel}
               onPressIn={onPressIn}
+              onPressOut={onPressOut}
               onPress={onPress}
               style={styles.tabButton}
               activeOpacity={1}
