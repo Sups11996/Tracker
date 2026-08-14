@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('🔧 Patching native modules for Android NDK 27...\n');
+console.log('Patching native modules for Android NDK 27...\n');
 
 // Patch react-native-gesture-handler
 const gestureHandlerCMake = path.join(__dirname, '../node_modules/react-native-gesture-handler/android/src/main/jni/CMakeLists.txt');
@@ -19,12 +19,12 @@ if (fs.existsSync(gestureHandlerCMake)) {
       '$1\n  c++_shared'
     );
     fs.writeFileSync(gestureHandlerCMake, content);
-    console.log('✓ Patched react-native-gesture-handler');
+    console.log('* Patched react-native-gesture-handler');
   } else {
     console.log('- react-native-gesture-handler already patched');
   }
 } else {
-  console.log('⚠ react-native-gesture-handler CMakeLists.txt not found');
+  console.log('! react-native-gesture-handler CMakeLists.txt not found');
 }
 
 // Patch expo-modules-core jsi.cmake
@@ -38,12 +38,12 @@ if (fs.existsSync(expoModulesJsiCMake)) {
       '$1\n\n# Link c++_shared for PCH compilation\ntarget_link_libraries(\n  expo-modules-jsi\n  PRIVATE\n  c++_shared\n)'
     );
     fs.writeFileSync(expoModulesJsiCMake, content);
-    console.log('✓ Patched expo-modules-core/jsi.cmake');
+    console.log('* Patched expo-modules-core/jsi.cmake');
   } else {
     console.log('- expo-modules-core/jsi.cmake already patched');
   }
 } else {
-  console.log('⚠ expo-modules-core/jsi.cmake not found');
+  console.log('! expo-modules-core/jsi.cmake not found');
 }
 
-console.log('\n✅ Native module patching complete!\n');
+console.log('\nNative module patching complete!\n');

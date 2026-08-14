@@ -19,13 +19,16 @@ A personal health tracking app for Android. Track steps, sleep, water intake, ca
 
 ## Screenshots
 
-<p align="center">
-  <img src="screenshots/home.jpeg" width="200" alt="Home Screen" />
-  <img src="screenshots/steps.jpeg" width="200" alt="Steps Dashboard" />
-  <img src="screenshots/sleep.jpeg" width="200" alt="Sleep Tracking" />
-  <img src="screenshots/water.jpeg" width="200" alt="Water Intake" />
-  <img src="screenshots/calorie.jpeg" width="200" alt="Calorie Tracking" />
-  <img src="screenshots/settings.jpeg" width="200" alt="Settings" />
+<p align="center" style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+  <img src="screenshots/home.jpeg" width="30%" alt="Home Screen" />
+  <img src="screenshots/steps.jpeg" width="30%" alt="Steps Dashboard" />
+  <img src="screenshots/sleep.jpeg" width="30%" alt="Sleep Tracking" />
+</p>
+
+<p align="center" style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+  <img src="screenshots/water.jpeg" width="30%" alt="Water Intake" />
+  <img src="screenshots/calorie.jpeg" width="30%" alt="Calorie Tracking" />
+  <img src="screenshots/settings.jpeg" width="30%" alt="Settings" />
 </p>
 
 ### Demo

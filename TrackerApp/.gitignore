@@ -42,9 +42,6 @@ temp_build/
 build/
 dist/
 
-# internal
-BUILDPLAN.md
-
 # generated native folders
 /ios
 /android
