@@ -35,12 +35,19 @@ export function useAppHydration(): { isReady: boolean } {
 
   async function handleDateChangeIfNeeded() {
     // Prevent concurrent date checks
-    if (isCheckingDate.current) return;
+    if (isCheckingDate.current) return false;
     isCheckingDate.current = true;
     
     try {
+      // Make sure database is available
+      if (!db) {
+        console.error('[AppHydration] Database not available');
+        return false;
+      }
+
       const dateChanged = await checkDateChanged(db);
       if (dateChanged) {
+        console.log('[AppHydration] Date changed detected, resetting daily data');
         
         // Get yesterday's date (the day that just ended)
         const yesterday = new Date();
@@ -51,11 +58,11 @@ export function useAppHydration(): { isReady: boolean } {
         const yesterdayDate = `${year}-${month}-${day}`;
         
         // Save yesterday's step data with yesterday's date
-        const state = useStepStore.getState();
-        const goalMet = state.todaySteps >= state.dailyGoal ? 1 : 0;
-        const now = Date.now();
-        
         try {
+          const state = useStepStore.getState();
+          const goalMet = state.todaySteps >= state.dailyGoal ? 1 : 0;
+          const now = Date.now();
+          
           await db.runAsync(
             `INSERT OR REPLACE INTO daily_steps (date, steps, distance_m, calories, goal, goal_met, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?, 
@@ -84,9 +91,12 @@ export function useAppHydration(): { isReady: boolean } {
           }
         }
         
-        // Re-hydrate to load new day data
-        await hydrateAll();
+        return true; // Indicate that date changed
       }
+      return false; // No date change
+    } catch (error) {
+      console.error('[AppHydration] Date change check failed:', error);
+      return false;
     } finally {
       isCheckingDate.current = false;
     }
@@ -98,13 +108,20 @@ export function useAppHydration(): { isReady: boolean } {
     isHydrating.current = true;
     
     try {
-      await Promise.all([
-        hydrateStepStore(db),
-        hydrateSleepStore(db),
-        hydrateWaterStore(db),
-        hydrateCaloriesStore(db),
-        profile?.uses_abc ? hydrateAbcStore(db) : Promise.resolve(),
-      ]);
+      // Make sure database is available
+      if (!db) {
+        console.error('[AppHydration] Database not available for hydration');
+        return;
+      }
+
+      // Run sequentially to avoid SQLite conflicts
+      await hydrateStepStore(db);
+      await hydrateSleepStore(db);
+      await hydrateWaterStore(db);
+      await hydrateCaloriesStore(db);
+      if (profile?.uses_abc) {
+        await hydrateAbcStore(db);
+      }
     } catch (e) {
       console.error('[AppHydration] Hydrate all stores failed:', e);
       // Silent fail - app will retry on next focus
@@ -118,9 +135,16 @@ export function useAppHydration(): { isReady: boolean } {
     if (!hasHydratedOnce.current) {
       hasHydratedOnce.current = true;
       (async () => {
-        await handleDateChangeIfNeeded();
-        await hydrateAll();
-        setIsReady(true);
+        try {
+          await handleDateChangeIfNeeded();
+          // Always hydrate after date check (whether date changed or not)
+          await hydrateAll();
+          setIsReady(true);
+        } catch (error) {
+          console.error('[AppHydration] Initial hydration failed:', error);
+          // Set ready anyway to prevent infinite loading
+          setIsReady(true);
+        }
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
