@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2025-01-27
+
+### Removed
+- Removed streak tracking feature (StreakCard component and streakUtils)
+- Removed seed data section from settings (development-only feature)
+- Cleaned up demo data components for production release
+
+### Fixed
+- Fixed SQLite parallel execution conflicts causing database errors
+- Fixed tab bar touch issue where swiping during press would change color without switching tabs
+- Fixed date change crash when opening app after midnight
+- Fixed import functionality to handle both nested and flat JSON export formats
+- Fixed double hydration on app startup after date change
+
+### Changed
+- Replaced Promise.all with sequential execution for all database operations
+- Added error handling and validation to date change detection
+- Simplified backup/restore UI with single "Backup & Restore" section
+- Export now uses single "Export All Data" button (removed separate backup options)
+- Import messages clarified: "Merge" and "Replace" options explained clearly
+- Seed data buttons now use month names (June, May, April) with auto-reload after import
+
+### Technical
+- Sequential database hydration prevents SQLite "shared object already released" errors
+- Added database validation checks before hydration
+- Improved error context logging across all database operations
+- Removed unused streak calculation code
+- Version bumped to 1.4.0 for production distribution
+
 ## [1.3.0] - 2024-08-13
 
 ### Fixed
