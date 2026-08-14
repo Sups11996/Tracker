@@ -83,7 +83,7 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   async function confirmCustom() {
     const ml = parseInt(customMl, 10);
     if (!isNaN(ml) && ml > 0) {
-      await logWater(db, { id: -1, name: 'Custom', capacity_ml: ml });
+      await logWater(db, { id: -1, name: 'Custom', capacity_ml: ml, sort_order: 999 });
     }
     setCustomMl('');
     setShowCustomInput(false);

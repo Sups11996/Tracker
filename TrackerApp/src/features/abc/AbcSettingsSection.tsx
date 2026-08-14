@@ -15,14 +15,17 @@ const SUMMARY_MINUTE = 0;
 
 async function scheduleAbcSummary() {
   await Notifications.cancelScheduledNotificationAsync(ABC_SUMMARY_NOTIFICATION_ID);
+  // @ts-ignore - expo-notifications API version compatibility
   await Notifications.scheduleNotificationAsync({
     identifier: ABC_SUMMARY_NOTIFICATION_ID,
     content: {
-      title: '📊 ABC Daily Summary',
+      title: 'ABC Daily Summary',
       body: "Check today's ABC progress before the day ends.",
       sound: true,
+      // @ts-ignore
       android: { channelId: 'default', smallIcon: 'ic_notification' },
     },
+    // @ts-ignore
     trigger: {
       type: 'daily',
       hour: SUMMARY_HOUR,
