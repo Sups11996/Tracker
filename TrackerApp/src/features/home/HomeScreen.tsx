@@ -100,14 +100,16 @@ export function HomeScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        hydrateStepStore(db),
-        hydrateSleepStore(db),
-        hydrateWaterStore(db),
-        hydrateCaloriesStore(db),
-        profile?.uses_abc ? hydrateAbcStore(db) : Promise.resolve(),
-      ]);
+      // Run sequentially to avoid SQLite conflicts
+      await hydrateStepStore(db);
+      await hydrateSleepStore(db);
+      await hydrateWaterStore(db);
+      await hydrateCaloriesStore(db);
+      if (profile?.uses_abc) {
+        await hydrateAbcStore(db);
+      }
     } catch (e) {
+      console.error('[HomeScreen] Refresh failed:', e);
     } finally {
       setRefreshing(false);
     }
@@ -152,6 +154,7 @@ export function HomeScreen() {
             <SkeletonCard lines={3} height={130} />
             <SkeletonCard lines={3} height={120} />
             <SkeletonCard lines={3} height={130} />
+            <SkeletonCard lines={2} height={100} />
           </>
         ) : (
           <>
