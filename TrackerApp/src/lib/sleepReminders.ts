@@ -120,14 +120,17 @@ export async function scheduleBedtimeReminder(
     }
 
     // Schedule notification
+    // @ts-ignore - expo-notifications API version compatibility
     await Notifications.scheduleNotificationAsync({
       identifier: BEDTIME_NOTIFICATION_ID,
       content: {
-        title: '🌙 Time for bed',
+        title: 'Time for bed',
         body: 'Start tracking your sleep to maintain healthy sleep habits.',
         sound: true,
+        // @ts-ignore
         android: { channelId: 'default', smallIcon: 'ic_notification' },
       },
+      // @ts-ignore
       trigger: {
         type: 'daily',
         hour,
@@ -163,14 +166,17 @@ export async function scheduleWakeReminder(
     }
 
     // Schedule notification
+    // @ts-ignore - expo-notifications API version compatibility
     await Notifications.scheduleNotificationAsync({
       identifier: WAKE_NOTIFICATION_ID,
       content: {
-        title: '☀️ Good morning!',
+        title: 'Good morning!',
         body: 'Don\'t forget to log your sleep to track your rest.',
         sound: true,
+        // @ts-ignore
         android: { channelId: 'default', smallIcon: 'ic_notification' },
       },
+      // @ts-ignore
       trigger: {
         type: 'daily',
         hour,

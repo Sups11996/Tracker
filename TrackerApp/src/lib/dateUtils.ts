@@ -72,10 +72,10 @@ export async function checkDateChanged(db: any): Promise<boolean> {
     const today = getTodayLocal();
     
     // Get last known date from database
-    const row = await db.getFirstAsync<{ value: string }>(
+    const row = await db.getFirstAsync(
       'SELECT value FROM kv_store WHERE key = ?',
       ['last_known_date']
-    );
+    ) as { value: string } | null;
     
     if (!row) {
       // First launch - store current date
