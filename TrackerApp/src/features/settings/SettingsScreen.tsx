@@ -36,6 +36,7 @@ import { SleepSettingsSection } from '../sleep/SleepSettingsSection';
 import { WaterSettingsSection } from '../water/WaterSettingsSection';
 import { CaloriesSettingsSection } from '../calories/CaloriesSettingsSection';
 import { AbcSettingsSection } from '../abc/AbcSettingsSection';
+import { ExportSection } from './ExportSection';
 import { SkeletonCard } from '../../components/ui/SkeletonCard';
 import { AnimatedCard } from '../../components/ui/AnimatedCard';
 import {
@@ -337,9 +338,10 @@ export function SettingsScreen() {
         <AnimatedCard index={4}><CaloriesSettingsSection /></AnimatedCard>
         <AnimatedCard index={5}><AbcSettingsSection /></AnimatedCard>
         <AnimatedCard index={6}><PermissionsSection /></AnimatedCard>
+        <AnimatedCard index={7}><ExportSection /></AnimatedCard>
         
         {/* Data Management Section */}
-        <AnimatedCard index={7}>
+        <AnimatedCard index={8}>
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Data Management</Text>
