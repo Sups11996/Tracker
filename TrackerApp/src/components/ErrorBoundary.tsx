@@ -100,12 +100,12 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     width: '100%',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.glassBorder,
   },
   title: {
     fontSize: TYPOGRAPHY.size.xl,
     fontWeight: '700',
-    color: COLORS.text,
+    color: COLORS.textPrimary,
     marginBottom: SPACING.md,
     textAlign: 'center',
   },
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
     maxHeight: 200,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: COLORS.glassBorder,
   },
   errorText: {
     fontSize: TYPOGRAPHY.size.sm,
@@ -133,11 +133,11 @@ const styles = StyleSheet.create({
   },
   stackText: {
     fontSize: TYPOGRAPHY.size.xs,
-    color: COLORS.textTertiary,
+    color: COLORS.textSecondary,
     fontFamily: 'monospace',
   },
   button: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: COLORS.steps,
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
