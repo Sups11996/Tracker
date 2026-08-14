@@ -25,6 +25,8 @@ A personal health tracking app for Android. Track steps, sleep, water intake, ca
   <img src="screenshots/sleep.jpeg" width="30%" alt="Sleep Tracking" />
 </p>
 
+<br/>
+
 <p align="center" style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
   <img src="screenshots/water.jpeg" width="30%" alt="Water Intake" />
   <img src="screenshots/calorie.jpeg" width="30%" alt="Calorie Tracking" />
