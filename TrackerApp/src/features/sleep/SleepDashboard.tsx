@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   monthButtonDisabled: {
-    backgroundColor: COLORS.cardSecondary,
+    backgroundColor: COLORS.glass,
   },
   monthButtonText: {
     fontSize: TYPOGRAPHY.size.xl,
