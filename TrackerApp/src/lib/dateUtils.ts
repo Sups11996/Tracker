@@ -78,7 +78,7 @@ export async function checkDateChanged(db: any): Promise<boolean> {
     ) as { value: string } | null;
     
     if (!row) {
-      // First launch - store current date
+      // First launch - store current date and return false (no date change on first launch)
       await db.runAsync(
         'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
         ['last_known_date', today]
@@ -86,16 +86,9 @@ export async function checkDateChanged(db: any): Promise<boolean> {
       return false;
     }
     
-    if (row.value !== today) {
-      // Date changed - update stored date
-      await db.runAsync(
-        'UPDATE kv_store SET value = ? WHERE key = ?',
-        [today, 'last_known_date']
-      );
-      return true;
-    }
-    
-    return false;
+    // Return true if date changed, but DON'T update it here
+    // Caller is responsible for updating after successful data save
+    return row.value !== today;
   } catch (error) {
     return false;
   }

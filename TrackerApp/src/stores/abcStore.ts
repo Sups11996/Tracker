@@ -77,7 +77,7 @@ export async function hydrateAbcStore(db: SQLiteDatabase): Promise<void> {
     const goalRow = await db.getFirstAsync<{ value: string }>(
       `SELECT value FROM kv_store WHERE key = 'abc_daily_goal'`
     );
-    const dailyGoal = goalRow ? parseInt(goalRow.value, 10) : 10;
+    const dailyGoal = goalRow ? parseInt(goalRow.value, 10) : 3;
 
     useAbcStore.setState({
       todayCount,
