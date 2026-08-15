@@ -162,10 +162,6 @@ export function CaloriesDashboard() {
   // Stats card
   const avgCal = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.total, 0) / allDays.length) : 0;
   const lowCal = allDays.length ? Math.min(...allDays.map(d => d.total)) : 0;
-  let streak = 0;
-  for (const d of [...allDays].sort((a, b) => b.date.localeCompare(a.date))) {
-    if (d.total > 0) streak++; else break;
-  }
 
   function goToPreviousMonth() {
     setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -189,7 +185,8 @@ export function CaloriesDashboard() {
   const todayStr = getTodayStr();
   const displayCal = selectedBar ? selectedBar.total : totalCalories;
   const displayDate = selectedBar ? selectedBar.date : todayStr;
-  const cardTitle = displayDate === todayStr ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
+  const isToday = displayDate === todayStr;
+  const cardTitle = isToday ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
 
   // Show skeleton while loading
   if (isLoading) {
@@ -329,8 +326,7 @@ export function CaloriesDashboard() {
           <StatCard label="Best Day" value={`${highCal} kcal`} accentColor={COLORS.calories} />
         </View>
         <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
-          <StatCard label="Lowest Day" value={lowCal > 0 ? `${lowCal} kcal` : '—'} accentColor={COLORS.textSecondary} />
-          <StatCard label="Active Streak" value={`${streak} days`} accentColor={streak > 0 ? COLORS.success : COLORS.textSecondary} />
+          <StatCard label="Lowest Day" value={lowCal > 0 ? `${lowCal} kcal` : '—'} accentColor={COLORS.textSecondary} fullWidth />
         </View>
       </Card>
 
