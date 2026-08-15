@@ -80,7 +80,7 @@ export function AbcDashboard() {
       const week: DayAbc[] = [];
       for (const dateStr of weekDates) {
         const count = await getCountForDate(dateStr, todayStr);
-        week.push({ date: dateStr, count, goal: dailyGoal, goal_met: count >= dailyGoal && count > 0 });
+        week.push({ date: dateStr, count, goal: dailyGoal, goal_met: count <= dailyGoal });
       }
       setThisWeekData(week);
 
@@ -89,7 +89,7 @@ export function AbcDashboard() {
       const month: DayAbc[] = [];
       for (const dateStr of monthDates) {
         const count = await getCountForDate(dateStr, todayStr);
-        month.push({ date: dateStr, count, goal: dailyGoal, goal_met: count >= dailyGoal && count > 0 });
+        month.push({ date: dateStr, count, goal: dailyGoal, goal_met: count <= dailyGoal });
       }
       setCurrentMonthData(month);
 
@@ -114,7 +114,7 @@ export function AbcDashboard() {
       for (let day = 1; day <= lastDay; day++) {
         const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const count = await getCountForDate(dateStr, todayStr);
-        data.push({ date: dateStr, count, goal: dailyGoal, goal_met: count >= dailyGoal && count > 0 });
+        data.push({ date: dateStr, count, goal: dailyGoal, goal_met: count <= dailyGoal });
       }
       setSelectedMonthData(data);
     } catch (e) {
@@ -134,10 +134,6 @@ export function AbcDashboard() {
   const avgCount = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.count, 0) / allDays.length) : 0;
   const lowCount = allDays.length ? Math.min(...allDays.map(d => d.count)) : 0;
   const goalDays = allDays.filter(d => d.goal_met).length;
-  let streak = 0;
-  for (const d of [...allDays].sort((a, b) => b.date.localeCompare(a.date))) {
-    if (d.goal_met) streak++; else break;
-  }
 
   function goToPreviousMonth() {
     setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -164,7 +160,8 @@ export function AbcDashboard() {
   const displayDate = selectedBar ? selectedBar.date : todayStr;
   const displayProgress = displayGoal > 0 ? Math.min(100, Math.round((displayCount / displayGoal) * 100)) : 0;
   const displayRemaining = Math.max(0, displayGoal - displayCount);
-  const cardTitle = displayDate === todayStr ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
+  const isToday = displayDate === todayStr;
+  const cardTitle = isToday ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
 
   // Show skeleton while loading
   if (isLoading) {
@@ -293,11 +290,10 @@ export function AbcDashboard() {
         </View>
         <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
           <StatCard label="Lowest Day" value={lowCount > 0 ? lowCount.toString() : '—'} accentColor={COLORS.textSecondary} />
-          <StatCard label="Goal Streak" value={`${streak} days`} accentColor={streak > 0 ? COLORS.success : COLORS.textSecondary} />
+          <StatCard label="Goal Days" value={`${goalDays} days`} accentColor={COLORS.abc} />
         </View>
         <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
-          <StatCard label="Goal Days" value={`${goalDays} days`} accentColor={COLORS.abc} />
-          <StatCard label="Monthly Tot" value={allDays.reduce((s, d) => s + d.count, 0).toString()} accentColor={COLORS.abc} />
+          <StatCard label="Monthly Tot" value={allDays.reduce((s, d) => s + d.count, 0).toString()} accentColor={COLORS.abc} fullWidth />
         </View>
       </Card>
         </Animated.View>
