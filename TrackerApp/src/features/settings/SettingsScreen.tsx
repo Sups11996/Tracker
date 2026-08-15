@@ -8,6 +8,7 @@ import {
   Platform,
   PermissionsAndroid,
   NativeModules,
+  AppState,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import * as Notifications from 'expo-notifications';
@@ -1043,19 +1044,29 @@ function PermissionsSection() {
           const result = await PermissionsAndroid.check(
             PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION
           );
-          // If denied, check if it was ever requested (use unknown if never requested)
-          setActivityStatus(result ? 'granted' : 'unknown');
+          // Only set to granted or unknown, never reset denied status
+          if (result) {
+            setActivityStatus('granted');
+          } else {
+            // Only set to unknown if current status is not already denied
+            setActivityStatus(prev => prev === 'denied' ? 'denied' : 'unknown');
+          }
         } catch {
-          setActivityStatus('unknown');
+          setActivityStatus(prev => prev === 'denied' ? 'denied' : 'unknown');
         }
       }
 
       // Notifications
       try {
         const { status } = await Notifications.getPermissionsAsync();
-        setNotifStatus(status === 'granted' ? 'granted' : 'unknown');
+        if (status === 'granted') {
+          setNotifStatus('granted');
+        } else {
+          // Only set to unknown if current status is not already denied
+          setNotifStatus(prev => prev === 'denied' ? 'denied' : 'unknown');
+        }
       } catch {
-        setNotifStatus('unknown');
+        setNotifStatus(prev => prev === 'denied' ? 'denied' : 'unknown');
       }
 
       // Battery optimization
@@ -1073,31 +1084,128 @@ function PermissionsSection() {
     }
   }, [isFocused]);
 
+  // Re-check when app comes to foreground (for battery optimization, activity recognition, and notifications)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && isFocused) {
+        (async () => {
+          // Check battery optimization
+          try {
+            const ignored = await isBatteryOptimizationIgnored();
+            setBatteryStatus(ignored ? 'granted' : 'unknown');
+          } catch {
+            setBatteryStatus('unknown');
+          }
+          
+          // Check activity recognition
+          if (Platform.OS === 'android') {
+            try {
+              const result = await PermissionsAndroid.check(
+                PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION
+              );
+              // Only update if granted, don't reset denied status
+              if (result) {
+                setActivityStatus('granted');
+              }
+            } catch {
+              // Don't change status on error
+            }
+          }
+          
+          // Check notifications
+          try {
+            const { status } = await Notifications.getPermissionsAsync();
+            // Only update if granted, don't reset denied status
+            if (status === 'granted') {
+              setNotifStatus('granted');
+            }
+          } catch {
+            // Don't change status on error
+          }
+        })();
+      }
+    });
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [isFocused]);
+
   async function handleRequestActivity() {
     if (Platform.OS !== 'android') return;
+    
+    // If already denied permanently, open app settings
+    if (activityStatus === 'denied') {
+      openAppSettings();
+      return;
+    }
+    
+    // Check current permission status before requesting
     try {
-      const result = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION,
-        {
-          title: 'Physical Activity Permission',
-          message: 'Tracker needs access to count your steps.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
-        }
+      const hasPermission = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION
       );
-      const granted = result === PermissionsAndroid.RESULTS.GRANTED;
-      // If not granted after asking, set to 'denied' (user explicitly refused)
-      setActivityStatus(granted ? 'granted' : 'denied');
+      
+      if (hasPermission) {
+        setActivityStatus('granted');
+        return;
+      }
+      
+      // Try to request permission
+      const result = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACTIVITY_RECOGNITION
+      );
+      
+      if (result === PermissionsAndroid.RESULTS.GRANTED) {
+        setActivityStatus('granted');
+      } else if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+        // User selected "Don't ask again" - permanently denied
+        setActivityStatus('denied');
+      } else if (result === PermissionsAndroid.RESULTS.DENIED) {
+        // User clicked "Deny" but can ask again - keep as unknown
+        setActivityStatus('unknown');
+      } else {
+        setActivityStatus('denied');
+      }
     } catch {
       setActivityStatus('denied');
     }
   }
 
   async function handleRequestNotifications() {
-    const { status } = await Notifications.requestPermissionsAsync();
-    // If not granted after asking, set to 'denied'
-    setNotifStatus(status === 'granted' ? 'granted' : 'denied');
+    // If already denied permanently, open app settings
+    if (notifStatus === 'denied') {
+      openAppSettings();
+      return;
+    }
+    
+    // Check current permission status before requesting
+    try {
+      const { status: currentStatus, canAskAgain } = await Notifications.getPermissionsAsync();
+      
+      if (currentStatus === 'granted') {
+        setNotifStatus('granted');
+        return;
+      }
+      
+      // Try to request permission
+      const { status, canAskAgain: canAskAgainAfter } = await Notifications.requestPermissionsAsync();
+      
+      if (status === 'granted') {
+        setNotifStatus('granted');
+      } else if (canAskAgainAfter === false) {
+        // User selected "Don't ask again" or permanently denied
+        setNotifStatus('denied');
+      } else if (status === 'denied') {
+        // User denied but can ask again - keep as unknown
+        setNotifStatus('unknown');
+      } else {
+        // Other cases - assume permanently denied
+        setNotifStatus('denied');
+      }
+    } catch {
+      setNotifStatus('denied');
+    }
   }
 
   function handleRequestBattery() {
@@ -1148,9 +1256,12 @@ function PermRow({
   onPress: () => void;
   actionLabel?: string;
 }) {
-  // Show actionLabel for both 'unknown' and 'denied' when permission is not granted
+  // For Physical Activity and Notifications: show "Allow" when unknown, "Open Settings" when denied
+  // For Battery: always show actionLabel
   const buttonText = status === 'granted' ? null : (
-    status === 'unknown' ? actionLabel : 'Retry'
+    status === 'unknown' ? actionLabel : (
+      (label === 'Physical Activity' || label === 'Notifications') ? 'Open Settings' : 'Retry'
+    )
   );
   
   return (
