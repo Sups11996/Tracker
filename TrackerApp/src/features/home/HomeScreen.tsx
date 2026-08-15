@@ -155,6 +155,7 @@ export function HomeScreen() {
             <SkeletonCard lines={3} height={120} />
             <SkeletonCard lines={3} height={130} />
             <SkeletonCard lines={2} height={100} />
+            <SkeletonCard lines={5} height={180} />
           </>
         ) : (
           <>
