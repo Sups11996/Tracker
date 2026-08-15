@@ -7,7 +7,7 @@ import { hydrateSleepStore } from '../stores/sleepStore';
 import { hydrateWaterStore, useWaterStore } from '../stores/waterStore';
 import { hydrateCaloriesStore } from '../stores/caloriesStore';
 import { hydrateAbcStore } from '../stores/abcStore';
-import { checkDateChanged, getTodayLocal } from '../lib/dateUtils';
+import { checkDateChanged, getTodayLocal, getYesterdayLocal } from '../lib/dateUtils';
 
 const StepServiceModule = Platform.OS === 'android' ? NativeModules.StepServiceModule : null;
 
@@ -47,15 +47,8 @@ export function useAppHydration(): { isReady: boolean } {
 
       const dateChanged = await checkDateChanged(db);
       if (dateChanged) {
-        console.log('[AppHydration] Date changed detected, resetting daily data');
-        
         // Get yesterday's date (the day that just ended)
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const year = yesterday.getFullYear();
-        const month = String(yesterday.getMonth() + 1).padStart(2, '0');
-        const day = String(yesterday.getDate()).padStart(2, '0');
-        const yesterdayDate = `${year}-${month}-${day}`;
+        const yesterdayDate = getYesterdayLocal();
         
         // Save yesterday's step data with yesterday's date
         try {
@@ -70,8 +63,15 @@ export function useAppHydration(): { isReady: boolean } {
                ?)`,
             [yesterdayDate, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, yesterdayDate, now, now]
           );
+          
+          // IMPORTANT: Only update last_known_date AFTER successful save
+          // This prevents data loss if app crashes during save
+          await db.runAsync(
+            'UPDATE kv_store SET value = ? WHERE key = ?',
+            [getTodayLocal(), 'last_known_date']
+          );
         } catch (error) {
-          console.error('[AppHydration] Save yesterday step data failed:', error);
+          console.error('[AppHydration] Save yesterday data failed:', error);
           // Continue with reset even if save fails
         }
         
