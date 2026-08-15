@@ -90,26 +90,29 @@ npm install
 
 **What happens during `npm install`:**
 - Downloads all Node.js dependencies
-- Automatically runs `postinstall` script that patches native modules
-- Patches:
-  - `react-native-gesture-handler` - adds C++ stdlib linking
-  - `expo-modules-core` - adds C++ stdlib linking to JSI module
+- Automatically runs `postinstall` script that:
+  - **Patches** 8 native modules for NDK 27 compatibility (adds C++ standard library linking)
+  - **Cleans** corrupted build artifacts from previous builds (`.cxx` and `build` directories)
+- Patched modules:
+  - `react-native-gesture-handler`
+  - `react-native-screens`
+  - `react-native-worklets`
+  - `react-native-reanimated`
+  - `react-native-svg`
+  - `react-native-safe-area-context`
+  - `expo-sqlite`
+  - `expo-modules-core` (jsi.cmake)
 
-### Step 3: Clean Build (Recommended for first build)
+**After `npm install` completes, you're ready to build!**
+
+### Step 3: Build Release APK
 
 ```bash
 cd android
-rm -rf app/.cxx
-rm -rf .gradle
-rm -rf app/build
-./gradlew clean
-```
-
-### Step 4: Build Release APK
-
-```bash
 ./gradlew assembleRelease
 ```
+
+**No need to clean manually!** The postinstall script already cleaned everything during `npm install`.
 
 **Build time:** 
 - First build: ~8-10 minutes
@@ -121,7 +124,7 @@ BUILD SUCCESSFUL in ...
 ... actionable tasks: ... executed, ... up-to-date
 ```
 
-### Step 5: Locate the APK
+### Step 4: Locate the APK
 
 The unsigned release APK will be at:
 ```
@@ -172,16 +175,20 @@ ld.lld: error: undefined symbol: std::__ndk1::...
 ```
 
 **Solution:**
-1. Verify postinstall script ran during `npm install`
-2. Manually run the patch script:
+1. Re-run the postinstall script manually:
+   ```bash
+   npm install
+   ```
+   This will re-patch modules and clean build artifacts.
+
+2. If the issue persists, manually run the patch script:
    ```bash
    node scripts/patch-native-modules.js
    ```
-3. Clean and rebuild:
+
+3. Then rebuild:
    ```bash
    cd android
-   rm -rf app/.cxx app/build .gradle
-   ./gradlew clean
    ./gradlew assembleRelease
    ```
 
@@ -217,7 +224,23 @@ org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m
 
 ### Why These Patches Are Needed
 
-Android NDK 27 requires explicit linking of `c++_shared` library. Some React Native modules don't include this in their CMakeLists.txt. The postinstall script adds `c++_shared` to `target_link_libraries`.
+Android NDK 27 requires explicit linking of the `c++_shared` standard library. Many React Native modules' CMakeLists.txt files don't include this linkage, causing undefined symbol errors during build. The postinstall script automatically adds `c++_shared` to the `target_link_libraries` section of these modules:
+
+- `react-native-gesture-handler` - Core gesture handling
+- `react-native-screens` - Navigation screen management
+- `react-native-worklets` - High-performance JS execution
+- `react-native-reanimated` - Animation engine (depends on worklets)
+- `react-native-svg` - SVG rendering
+- `react-native-safe-area-context` - Safe area insets
+- `expo-sqlite` - Local database
+- `expo-modules-core` - Expo's JSI integration
+
+Without these patches, the linker fails with errors like:
+```
+ld.lld: error: undefined symbol: operator new(unsigned long)
+ld.lld: error: undefined symbol: operator delete(void*)
+ld.lld: error: undefined symbol: std::__ndk1::...
+```
 
 ### Build Configuration
 
