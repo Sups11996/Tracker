@@ -6,7 +6,7 @@
 # 1. Clone and install
 git clone https://github.com/Sups11996/Tracker.git
 cd Tracker/TrackerApp
-npm install  # Auto-patches native modules
+npm install  # Auto-patches native modules AND cleans build artifacts
 
 # 2. Build APK
 cd android
@@ -20,6 +20,8 @@ adb install app/build/outputs/apk/release/app-release.apk
 ```
 
 **Output:** `android/app/build/outputs/apk/release/app-release.apk`
+
+**That's it!** No need to manually clean or run additional scripts.
 
 ## Requirements
 
@@ -58,19 +60,35 @@ adb install app/build/outputs/apk/release/app-release.apk
 
 ## What Happens During `npm install`
 
-The `postinstall` script automatically patches native modules for Android NDK 27 compatibility:
-- `react-native-gesture-handler/android/src/main/jni/CMakeLists.txt`
-- `expo-modules-core/android/cmake/jsi.cmake`
+The `postinstall` script automatically:
+
+**1. Patches 8 native modules** for Android NDK 27 compatibility by adding C++ standard library (`c++_shared`) linking:
+- `react-native-gesture-handler`
+- `react-native-screens`
+- `react-native-worklets`
+- `react-native-reanimated`
+- `react-native-svg`
+- `react-native-safe-area-context`
+- `expo-sqlite`
+- `expo-modules-core` (jsi.cmake)
+
+**2. Cleans build artifacts** to prevent build errors:
+- Removes `.cxx` directories (CMake build cache)
+- Removes `build` directories from native modules
+- Removes `android/app/.cxx` and `android/app/build`
+
+**Result:** Fresh, clean environment ready to build!
 
 ## Troubleshooting
 
 ### Build fails with C++ linking errors?
 ```bash
-cd ~/Tracker/TrackerApp
-node scripts/patch-native-modules.js  # Re-run patches manually
+# Simply re-run npm install (it will re-patch and clean)
+cd TrackerApp
+npm install
+
+# Then build
 cd android
-rm -rf app/.cxx app/build .gradle     # Clean build caches
-./gradlew clean
 ./gradlew assembleRelease
 ```
 
