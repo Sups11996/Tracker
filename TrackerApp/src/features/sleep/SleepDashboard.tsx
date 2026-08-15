@@ -143,10 +143,6 @@ export function SleepDashboard() {
   const avgSleep = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.duration, 0) / allDays.length) : 0;
   const lowSleep = allDays.length ? Math.min(...allDays.map(d => d.duration)) : 0;
   const goalDays = allDays.filter(d => d.goal_met).length;
-  let streak = 0;
-  for (const d of [...allDays].sort((a, b) => b.date.localeCompare(a.date))) {
-    if (d.goal_met) streak++; else break;
-  }
 
   // Today's sleep
   const todayStr = getTodayStr();
@@ -178,7 +174,8 @@ export function SleepDashboard() {
   const displayDate = selectedBar ? selectedBar.date : todayStr;
   const displayProgress = displayGoal > 0 ? Math.min(100, Math.round((displayDuration / displayGoal) * 100)) : 0;
   const displayRemaining = Math.max(0, displayGoal - displayDuration);
-  const cardTitle = displayDate === todayStr ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
+  const isToday = displayDate === todayStr;
+  const cardTitle = isToday ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
 
   // Show skeleton while data is loading
   if (isLoading) {
@@ -307,11 +304,10 @@ export function SleepDashboard() {
         </View>
         <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
           <StatCard label="Shortest" value={lowSleep > 0 ? formatDuration(lowSleep) : '—'} accentColor={COLORS.textSecondary} />
-          <StatCard label="Goal Streak" value={`${streak} days`} accentColor={streak > 0 ? COLORS.success : COLORS.textSecondary} />
+          <StatCard label="Goal Days" value={`${goalDays} days`} accentColor={COLORS.sleep} />
         </View>
         <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
-          <StatCard label="Goal Days" value={`${goalDays} days`} accentColor={COLORS.sleep} />
-          <StatCard label="Nights Logged" value={`${allDays.length}`} accentColor={COLORS.sleep} />
+          <StatCard label="Nights Logged" value={`${allDays.length}`} accentColor={COLORS.sleep} fullWidth />
         </View>
       </Card>
         </Animated.View>

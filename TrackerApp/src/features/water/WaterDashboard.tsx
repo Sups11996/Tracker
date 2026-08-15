@@ -149,10 +149,6 @@ export function WaterDashboard() {
   const avgMl = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.total_ml, 0) / allDays.length) : 0;
   const lowMl = allDays.length ? Math.min(...allDays.map(d => d.total_ml)) : 0;
   const goalDays = allDays.filter(d => d.goal_met).length;
-  let streak = 0;
-  for (const d of [...allDays].sort((a, b) => b.date.localeCompare(a.date))) {
-    if (d.goal_met) streak++; else break;
-  }
 
   function goToPreviousMonth() {
     setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -178,7 +174,8 @@ export function WaterDashboard() {
   const displayDate = selectedBar ? selectedBar.date : todayStr;
   const displayProgress = Math.min(100, Math.round((displayMl / dailyGoal) * 100));
   const displayRemaining = Math.max(0, dailyGoal - displayMl);
-  const cardTitle = displayDate === todayStr ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
+  const isToday = displayDate === todayStr;
+  const cardTitle = isToday ? 'Today' : formatDate(displayDate) + ' · ' + formatDay(displayDate);
 
   // Show skeleton while loading
   if (isLoading) {
@@ -307,11 +304,10 @@ export function WaterDashboard() {
         </View>
         <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
           <StatCard label="Lowest Day" value={lowMl > 0 ? formatMl(lowMl) : '—'} accentColor={COLORS.textSecondary} />
-          <StatCard label="Goal Streak" value={`${streak} days`} accentColor={streak > 0 ? COLORS.success : COLORS.textSecondary} />
+          <StatCard label="Goal Days" value={`${goalDays} days`} accentColor={COLORS.water} />
         </View>
         <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
-          <StatCard label="Goal Days" value={`${goalDays} days`} accentColor={COLORS.water} />
-          <StatCard label="Monthly Tot" value={formatMl(allDays.reduce((s, d) => s + d.total_ml, 0))} accentColor={COLORS.water} />
+          <StatCard label="Monthly Tot" value={formatMl(allDays.reduce((s, d) => s + d.total_ml, 0))} accentColor={COLORS.water} fullWidth />
         </View>
       </Card>
         </Animated.View>

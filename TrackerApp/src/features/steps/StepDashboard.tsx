@@ -117,14 +117,6 @@ export function StepDashboard() {
   const goalDays  = allDays.filter((d) => d.goal_met).length;
   const totalDist = allDays.reduce((s, d) => s + d.distance_m, 0);
   const totalCal  = allDays.reduce((s, d) => s + d.calories, 0);
-
-  // Streak
-  let streak = 0;
-  const sorted = [...allDays].sort((a, b) => b.date.localeCompare(a.date));
-  for (const d of sorted) {
-    if (d.goal_met) streak++;
-    else break;
-  }
   
   function goToPreviousMonth() {
     setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -289,14 +281,11 @@ export function StepDashboard() {
         </View>
         <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
           <StatCard label="Lowest Day"   value={lowSteps > 0 ? lowSteps.toLocaleString() : '—'} accentColor={COLORS.textSecondary} />
-          <StatCard label="Goal Streak"  value={`${streak} days`} accentColor={streak > 0 ? COLORS.success : COLORS.textSecondary} />
-        </View>
-        <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
           <StatCard label="Goal Days"    value={`${goalDays} days`}           accentColor={COLORS.steps} />
-          <StatCard label="Total Dist"   value={`${(totalDist / 1000).toFixed(1)} km`} accentColor={COLORS.steps} />
         </View>
         <View style={[styles.statRow, { marginTop: SPACING.sm }]}>
-          <StatCard label="Total Cal"    value={`${Math.round(totalCal)} kcal`} accentColor={COLORS.calories} fullWidth />
+          <StatCard label="Total Dist"   value={`${(totalDist / 1000).toFixed(1)} km`} accentColor={COLORS.steps} />
+          <StatCard label="Total Cal"    value={`${Math.round(totalCal)} kcal`} accentColor={COLORS.calories} />
         </View>
       </Card>
         </Animated.View>
