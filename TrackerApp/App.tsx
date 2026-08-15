@@ -11,6 +11,7 @@ import { AppBackground } from './src/components/ui/AppBackground';
 import { AlertProvider } from './src/hooks/useCustomAlert';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { initDatabase, DATABASE_NAME } from './src/lib';
+import { runMigrations } from './src/lib/migrations';
 
 // Set default notification handler
 Notifications.setNotificationHandler({
@@ -42,7 +43,13 @@ export default function App() {
         <SafeAreaProvider>
           {/* Gradient + ambient orbs — lives behind every screen */}
           <AppBackground />
-          <SQLiteProvider databaseName={DATABASE_NAME} onInit={initDatabase}>
+          <SQLiteProvider 
+            databaseName={DATABASE_NAME} 
+            onInit={async (db) => {
+              await initDatabase(db);
+              await runMigrations(db);
+            }}
+          >
             <NavigationContainer>
               <AlertProvider>
                 <StatusBar style="light" />
