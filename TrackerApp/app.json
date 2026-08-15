@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tracker",
     "slug": "TrackerApp",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "dark",
