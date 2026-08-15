@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Alert,
+  AppState,
   Linking,
   Platform,
   StyleSheet,
@@ -16,6 +17,7 @@ import { OnboardingLayout } from '../components/OnboardingLayout';
 import { Button } from '../../../components/ui/Button';
 import {
   requestIgnoreBatteryOptimizations,
+  isBatteryOptimizationIgnored,
   openUsageAccessSettings,
 } from '../../../lib/permissions';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../../../constants';
@@ -30,6 +32,28 @@ export function PermissionsScreen() {
   const [activityStatus, setActivityStatus] = useState<PermStatus>('idle');
   const [notifStatus, setNotifStatus] = useState<PermStatus>('idle');
   const [batteryStatus, setBatteryStatus] = useState<PermStatus>('idle');
+
+  // Check battery optimization status when app becomes active
+  useEffect(() => {
+    const checkBatteryStatus = async () => {
+      const ignored = await isBatteryOptimizationIgnored();
+      if (ignored) {
+        setBatteryStatus('granted');
+      }
+    };
+
+    checkBatteryStatus();
+
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkBatteryStatus();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   async function requestActivity() {
     if (Platform.OS === 'android') {
@@ -71,7 +95,7 @@ export function PermissionsScreen() {
   function requestBatteryOptimization() {
     if (Platform.OS === 'android') {
       requestIgnoreBatteryOptimizations();
-      setBatteryStatus('granted');
+      // Status will be checked when app becomes active again (via AppState listener)
     }
   }
 
