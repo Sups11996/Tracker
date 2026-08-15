@@ -2,14 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.4.0] - 2025-01-27
-
-### Removed
-- Removed streak tracking feature (StreakCard component and streakUtils)
-- Removed seed data section from settings (development-only feature)
-- Cleaned up demo data components for production release
+## [1.4.1] - 2025-01-27
 
 ### Fixed
+- Fixed Physical Activity permission not updating in real-time when granted from Android Settings
+- Fixed Physical Activity permission flow: first request shows system dialog, subsequent denials show "Open Settings" button
+- Fixed Notification permission flow: proper detection of "Don't ask again" state using canAskAgain property
+- Fixed permission status preservation when navigating away and back to Settings screen
+- Fixed Battery Optimization permission check to update in real-time when app returns to foreground
+- Fixed Battery Optimization permission in onboarding screen showing checkmark even when denied
+
+### Changed
+- Improved permission handling for Physical Activity and Notifications to properly detect permanent denial
+- Permission buttons now show appropriate text: "Allow" for first request, "Open Settings" after permanent denial
+- All three permissions (Physical Activity, Notifications, Battery Optimization) now update status in real-time when app becomes active
+
+### Technical
+- Added AppState listener to check permission status when app returns to foreground
+- Implemented proper state preservation for denied permissions across screen navigation
+- Used PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN for Activity permission detection
+- Used Notifications.canAskAgain property for proper notification permission state detection
+
+## [1.4.0] - 2025-01-27
+
+### Fixed
+- **Critical**: Fixed data loss vulnerability during midnight date change if app crashes
+  - Implemented atomic operations: date marker updates only AFTER successful data save
+  - Ensures data safety even if app crashes mid-transition
+  - Added comprehensive error recovery
 - Fixed SQLite parallel execution conflicts causing database errors
 - Fixed tab bar touch issue where swiping during press would change color without switching tabs
 - Fixed date change crash when opening app after midnight
@@ -22,14 +42,18 @@ All notable changes to this project will be documented in this file.
 - Simplified backup/restore UI with single "Backup & Restore" section
 - Export now uses single "Export All Data" button (removed separate backup options)
 - Import messages clarified: "Merge" and "Replace" options explained clearly
-- Seed data buttons now use month names (June, May, April) with auto-reload after import
+
+### Removed
+- Removed all streak tracking functionality (StreakCard, streak text, streak calculations)
+- Removed seed data generation feature (development-only tool)
+- Cleaned up database migrations (removed streak-related migration logs)
 
 ### Technical
 - Sequential database hydration prevents SQLite "shared object already released" errors
 - Added database validation checks before hydration
 - Improved error context logging across all database operations
-- Removed unused streak calculation code
-- Version bumped to 1.4.0 for production distribution
+- Cleaned up unused imports and style definitions
+- Version 1.4.0 for production distribution
 
 ## [1.3.0] - 2024-08-13
 
