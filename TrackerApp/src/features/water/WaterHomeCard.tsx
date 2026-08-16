@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
+  Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -8,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
+import { BlurView } from 'expo-blur';
 import { Droplets } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -72,7 +75,6 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   function openCustomInput() {
     setCustomMl('');
     setShowCustomInput(true);
-    setTimeout(() => inputRef.current?.focus(), 100);
   }
 
   function cancelCustom() {
@@ -94,66 +96,32 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   const visibleContainers = containers;
 
   return (
-    <TouchableOpacity onPress={showCustomInput ? undefined : onPress} activeOpacity={0.85} disabled={showCustomInput}>
-      <Card style={styles.card}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.titleRow}>
-            <Droplets size={18} color={COLORS.water} />
-            <Text style={styles.title}>Water</Text>
-          </View>
-          <Text style={styles.total}>
-            {formatMl(todayTotal)}
-            <Text style={styles.goal}> / {formatMl(dailyGoal)}</Text>
-          </Text>
-        </View>
-
-        {/* Progress bar */}
-        <View style={styles.trackBg}>
-          <View style={[styles.trackFill, { width: `${progress * 100}%` }]} />
-        </View>
-
-        {/* Remaining */}
-        <Text style={styles.remaining}>
-          {remaining > 0 ? `${formatMl(remaining)} remaining` : 'Goal reached!'}
-        </Text>
-
-        {/* Custom input OR Container buttons */}
-        {showCustomInput ? (
-          <View style={styles.customInputSection}>
-            <TextInput
-              ref={inputRef}
-              value={customMl}
-              onChangeText={setCustomMl}
-              keyboardType="number-pad"
-              placeholder="Amount in ml"
-              placeholderTextColor={COLORS.textMuted}
-              maxLength={5}
-              returnKeyType="done"
-              onSubmitEditing={confirmCustom}
-              autoFocus
-              style={styles.customInput}
-            />
-            <View style={styles.customBtns}>
-              <Button
-                label="Log"
-                onPress={confirmCustom}
-                variant="primary"
-                size="sm"
-                accentColor={COLORS.water}
-                style={{ flex: 1 }}
-              />
-              <Button
-                label="Cancel"
-                onPress={cancelCustom}
-                variant="ghost"
-                size="sm"
-                accentColor={COLORS.water}
-                style={{ flex: 1 }}
-              />
+    <>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
+        <Card style={styles.card}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.titleRow}>
+              <Droplets size={18} color={COLORS.water} />
+              <Text style={styles.title}>Water</Text>
             </View>
+            <Text style={styles.total}>
+              {formatMl(todayTotal)}
+              <Text style={styles.goal}> / {formatMl(dailyGoal)}</Text>
+            </Text>
           </View>
-        ) : (
+
+          {/* Progress bar */}
+          <View style={styles.trackBg}>
+            <View style={[styles.trackFill, { width: `${progress * 100}%` }]} />
+          </View>
+
+          {/* Remaining */}
+          <Text style={styles.remaining}>
+            {remaining > 0 ? `${formatMl(remaining)} remaining` : 'Goal reached!'}
+          </Text>
+
+          {/* Container buttons */}
           <View style={styles.buttons}>
             {visibleContainers.map((c) => (
               <TouchableOpacity
@@ -175,32 +143,89 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
               <Text style={styles.containerBtnName}>Custom</Text>
             </TouchableOpacity>
           </View>
-        )}
 
-        {/* Undo toast */}
-        {toastMounted && (
-          <Animated.View
-            style={[
-              styles.toast,
-              {
-                opacity: toastAnim,
-                transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
-              },
-            ]}
-            pointerEvents={hasUndo ? 'auto' : 'none'}
+          {/* Undo toast */}
+          {toastMounted && (
+            <Animated.View
+              style={[
+                styles.toast,
+                {
+                  opacity: toastAnim,
+                  transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+                },
+              ]}
+              pointerEvents={hasUndo ? 'auto' : 'none'}
+            >
+              <Text style={styles.toastText}>
+                {undoStack.length === 1
+                  ? 'Water logged'
+                  : `${undoStack.length} logs (${undoStack.reduce((sum, e) => sum + e.amount, 0)}ml)`}
+              </Text>
+              <TouchableOpacity onPress={handleUndo} hitSlop={8}>
+                <Text style={styles.toastUndo}>Undo</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+        </Card>
+      </TouchableOpacity>
+
+      {/* Custom Input Modal */}
+      <Modal
+        visible={showCustomInput}
+        transparent
+        animationType="fade"
+        onRequestClose={cancelCustom}
+        statusBarTranslucent
+        onShow={() => {
+          // Focus input after modal is shown
+          setTimeout(() => inputRef.current?.focus(), 50);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop} 
+            activeOpacity={1} 
+            onPress={cancelCustom}
           >
-            <Text style={styles.toastText}>
-              {undoStack.length === 1
-                ? 'Water logged'
-                : `${undoStack.length} logs (${undoStack.reduce((sum, e) => sum + e.amount, 0)}ml)`}
-            </Text>
-            <TouchableOpacity onPress={handleUndo} hitSlop={8}>
-              <Text style={styles.toastUndo}>Undo</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-      </Card>
-    </TouchableOpacity>
+            <View>
+              <BlurView intensity={80} tint="dark" style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Custom Amount</Text>
+                <TextInput
+                  ref={inputRef}
+                  value={customMl}
+                  onChangeText={setCustomMl}
+                  keyboardType="number-pad"
+                  placeholder="Amount in ml"
+                  placeholderTextColor={COLORS.textMuted}
+                  maxLength={5}
+                  returnKeyType="done"
+                  onSubmitEditing={confirmCustom}
+                  style={styles.modalInput}
+                />
+                <View style={styles.modalButtons}>
+                  <Button
+                    label="Log"
+                    onPress={confirmCustom}
+                    variant="primary"
+                    size="sm"
+                    accentColor={COLORS.water}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    label="Cancel"
+                    onPress={cancelCustom}
+                    variant="ghost"
+                    size="sm"
+                    accentColor={COLORS.water}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </BlurView>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -245,25 +270,6 @@ const styles = StyleSheet.create({
     backgroundColor: `${COLORS.water}08`,
     gap: 2,
   },
-  // Custom input section (inline, replaces buttons)
-  customInputSection: {
-    gap: SPACING.md,
-  },
-  customInput: {
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.glassBorder,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    fontSize: TYPOGRAPHY.size.md,
-    color: COLORS.textPrimary,
-    fontWeight: TYPOGRAPHY.weight.semibold,
-  },
-  customBtns: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
   toast: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -277,4 +283,49 @@ const styles = StyleSheet.create({
   },
   toastText: { fontSize: TYPOGRAPHY.size.sm, color: COLORS.textPrimary },
   toastUndo: { fontSize: TYPOGRAPHY.size.sm, fontWeight: TYPOGRAPHY.weight.bold, color: COLORS.water },
+  
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+  },
+  modalBackdrop: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    paddingBottom: 200,
+  },
+  modalContent: {
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    width: 300,
+    gap: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+    overflow: 'hidden',
+  },
+  modalTitle: {
+    fontSize: TYPOGRAPHY.size.lg,
+    fontWeight: TYPOGRAPHY.weight.bold,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+  },
+  modalInput: {
+    backgroundColor: COLORS.background,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    fontSize: TYPOGRAPHY.size.lg,
+    color: COLORS.textPrimary,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
 });
