@@ -43,12 +43,10 @@ export async function pickBackupFile(): Promise<string | null> {
 /**
  * Validate backup file structure
  */
-function validateBackup(data: any): boolean {
+function validateBackup(data: unknown): boolean {
   if (!data || typeof data !== 'object') return false;
-  
-  // Check for backup_info (full backup) or export_info (data export)
-  if (!data.backup_info && !data.export_info) return false;
-  
+  const d = data as Record<string, unknown>;
+  if (!d.backup_info && !d.export_info) return false;
   return true;
 }
 
@@ -125,12 +123,14 @@ export async function importFullBackup(
       if (sleepData.length > 0) {
         for (const record of sleepData) {
           if (record.is_active === 1) continue; // Skip active sessions
-          
+
+          // Include id so INSERT OR REPLACE can match on primary key and avoid duplicates
           await db.runAsync(
             `INSERT OR REPLACE INTO sleep_sessions 
-             (date, start_time, end_time, session_duration, latency_mins, actual_duration, goal_mins, goal_met, is_active, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+             (id, date, start_time, end_time, session_duration, latency_mins, actual_duration, goal_mins, goal_met, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
             [
+              record.id || null,
               record.date,
               record.start_time,
               record.end_time,
@@ -168,6 +168,28 @@ export async function importFullBackup(
         }
       }
 
+      // Import individual water_logs from backup (full backup format only)
+      const waterLogs = backup.water?.logs || [];
+      if (Array.isArray(waterLogs) && waterLogs.length > 0) {
+        for (const log of waterLogs) {
+          await db.runAsync(
+            `INSERT OR REPLACE INTO water_logs
+             (id, date, logged_at, container_id, container_name, capacity_ml, running_total, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              log.id || null,
+              log.date,
+              log.logged_at || Date.now(),
+              log.container_id || null,
+              log.container_name || null,
+              log.capacity_ml || 0,
+              log.running_total || 0,
+              log.created_at || Date.now(),
+            ]
+          );
+        }
+      }
+
       // Import Calories (handle both export and backup formats)
       const caloriesData = backup.calories?.daily_summary || backup.calories_summary || [];
       if (Array.isArray(caloriesData) && caloriesData.length > 0) {
@@ -189,9 +211,43 @@ export async function importFullBackup(
         }
       }
 
+      // Import workout_logs (present in export format)
+      const workoutLogs = backup.workout_logs || backup.calories?.workout_logs || [];
+      if (Array.isArray(workoutLogs) && workoutLogs.length > 0) {
+        for (const record of workoutLogs) {
+          await db.runAsync(
+            `INSERT OR REPLACE INTO workout_logs
+             (id, date, logged_at, duration_mins, intensity, calories, note, weight_kg_snap, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              record.id || null,
+              record.date,
+              record.logged_at || Date.now(),
+              record.duration_mins || 0,
+              record.intensity || 'moderate',
+              record.calories || 0,
+              record.note || '',
+              record.weight_kg_snap || null,
+              record.created_at || Date.now(),
+              record.updated_at || Date.now(),
+            ]
+          );
+          // Don't double-count: workout_logs are part of calories data,
+          // itemsImported.calories already counted calories_daily_summary rows
+        }
+      }
+
       // Import ABC (handle both export and backup formats)
       const abcData = backup.abc?.daily_summary || backup.abc || [];
       if (Array.isArray(abcData) && abcData.length > 0) {
+        // Build a lookup of real log timestamps from full backup if available
+        const abcLogsByDate: Record<string, number[]> = {};
+        const realAbcLogs = backup.abc?.logs || [];
+        for (const log of realAbcLogs) {
+          if (!abcLogsByDate[log.date]) abcLogsByDate[log.date] = [];
+          abcLogsByDate[log.date].push(log.logged_at || log.created_at || Date.now());
+        }
+
         for (const record of abcData) {
           await db.runAsync(
             `INSERT OR REPLACE INTO abc_daily_summary 
@@ -204,6 +260,20 @@ export async function importFullBackup(
               record.updated_at || Date.now(),
             ]
           );
+
+          // Sync abc_logs: use real timestamps from backup.abc.logs when available,
+          // fall back to synthetic timestamps only when logs aren't present
+          await db.runAsync('DELETE FROM abc_logs WHERE date = ?', [record.date]);
+          const realTimestamps = abcLogsByDate[record.date] || [];
+          const count = record.count || 0;
+          for (let i = 0; i < count; i++) {
+            const ts = realTimestamps[i] ?? (record.created_at || Date.now()) + i;
+            await db.runAsync(
+              'INSERT INTO abc_logs (date, logged_at, created_at) VALUES (?, ?, ?)',
+              [record.date, ts, ts]
+            );
+          }
+
           itemsImported.abc++;
         }
       }
@@ -257,13 +327,27 @@ export async function getBackupInfo(fileUri: string): Promise<{
       return { isValid: false };
     }
 
-    const itemCounts: any = {};
+    const itemCounts: { steps?: number; sleep?: number; water?: number; calories?: number; abc?: number } = {};
     
-    if (data.steps?.daily_data) itemCounts.steps = data.steps.daily_data.length;
+    // Handle both full backup format (data.steps.daily_data) and export format (data.steps flat array)
+    const stepsData = data.steps?.daily_data || (Array.isArray(data.steps) ? data.steps : null);
+    if (stepsData) itemCounts.steps = stepsData.length;
+
     if (data.sleep) itemCounts.sleep = Array.isArray(data.sleep) ? data.sleep.length : 0;
-    if (data.water?.daily_summary) itemCounts.water = data.water.daily_summary.length;
-    if (data.calories?.daily_summary) itemCounts.calories = data.calories.daily_summary.length;
-    if (data.abc?.daily_summary) itemCounts.abc = data.abc.daily_summary.length;
+
+    // Handle both full backup format (data.water.daily_summary) and export format (data.water flat array)
+    const waterData = data.water?.daily_summary || (Array.isArray(data.water) ? data.water : null);
+    if (waterData) itemCounts.water = waterData.length;
+
+    // Handle both full backup format (data.calories.daily_summary) and export format (data.calories_summary)
+    const caloriesData = data.calories?.daily_summary || (Array.isArray(data.calories_summary) ? data.calories_summary : null);
+    const workoutData = data.workout_logs || data.calories?.workout_logs;
+    const caloriesCount = (caloriesData?.length || 0) + (Array.isArray(workoutData) ? workoutData.length : 0);
+    if (caloriesCount > 0) itemCounts.calories = caloriesCount;
+
+    // Handle both full backup format (data.abc.daily_summary) and export format (data.abc flat array)
+    const abcData = data.abc?.daily_summary || (Array.isArray(data.abc) ? data.abc : null);
+    if (abcData) itemCounts.abc = abcData.length;
 
     return {
       isValid: true,

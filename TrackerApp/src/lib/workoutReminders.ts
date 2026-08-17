@@ -9,7 +9,7 @@ export interface WorkoutReminderSettings {
 
 const DEFAULT_SETTINGS: WorkoutReminderSettings = {
   enabled: false,
-  hour: 18, // 6:00 PM
+  hour: 18,
   minute: 0,
 };
 
@@ -22,7 +22,6 @@ export async function loadWorkoutReminderSettings(
     const rows = await db.getAllAsync<{ key: string; value: string }>(
       `SELECT key, value FROM kv_store WHERE key LIKE 'workout_reminder_%'`
     );
-
     const settings = { ...DEFAULT_SETTINGS };
     rows.forEach((row) => {
       switch (row.key) {
@@ -37,7 +36,6 @@ export async function loadWorkoutReminderSettings(
           break;
       }
     });
-
     return settings;
   } catch (error) {
     return DEFAULT_SETTINGS;
@@ -75,7 +73,7 @@ export async function applyWorkoutReminderSettings(
     if (!settings.enabled) return;
 
     // @ts-ignore - expo-notifications API version compatibility
-  await Notifications.scheduleNotificationAsync({
+    await Notifications.scheduleNotificationAsync({
       identifier: WORKOUT_NOTIFICATION_ID,
       content: {
         title: 'Workout time!',

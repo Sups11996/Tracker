@@ -32,7 +32,11 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@react-native/jest-preset": "^0.86.2",
+    "@types/jest": "^29.5.14",
     "@types/react": "~19.2.4",
+    "jest": "^29.7.0",
+    "jest-expo": "~57.0.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -40,7 +44,21 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "test": "jest --runInBand --forceExit",
     "postinstall": "node scripts/patch-native-modules.js"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "testMatch": [
+      "**/__tests__/**/*.test.ts",
+      "**/__tests__/**/*.test.tsx"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
+    ],
+    "moduleNameMapper": {
+      "expo-sqlite": "<rootDir>/src/__mocks__/expo-sqlite.ts"
+    }
   },
   "private": true
 }
