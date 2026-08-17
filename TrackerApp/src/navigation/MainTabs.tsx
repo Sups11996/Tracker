@@ -55,11 +55,6 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             setPressedIndex(index);
           };
 
-          const onPressOut = () => {
-            // Clear pressed state if finger leaves button
-            setPressedIndex(null);
-          };
-
           const onPress = () => {
             const event = navigation.emit({
               type: 'tabPress',
@@ -67,12 +62,9 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               canPreventDefault: true,
             });
 
-            // Save step data when switching TO Dashboard from Home or Settings
+            // Save step data when switching TO Dashboard from any tab
             if (route.name === 'Dashboard' && !isFocused) {
-              const currentTab = state.routes[state.index]?.name;
-              if (currentTab === 'Home' || currentTab === 'Settings') {
-                DeviceEventEmitter.emit('SAVE_STEPS_NOW');
-              }
+              DeviceEventEmitter.emit('SAVE_STEPS_NOW');
             }
 
             if (!isFocused && !event.defaultPrevented) {
@@ -105,7 +97,6 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel}
               onPressIn={onPressIn}
-              onPressOut={onPressOut}
               onPress={onPress}
               style={styles.tabButton}
               activeOpacity={1}

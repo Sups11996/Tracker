@@ -149,3 +149,59 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 });
+
+// ── CardErrorBoundary ─────────────────────────────────────────────────────────
+// Wraps an individual home card. On error shows a small inline fallback
+// instead of crashing the whole screen.
+
+interface CardBoundaryState {
+  hasError: boolean;
+}
+
+export class CardErrorBoundary extends Component<{ children: ReactNode }, CardBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): CardBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[CardErrorBoundary] Card crashed:', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <TouchableOpacity
+          onPress={() => this.setState({ hasError: false })}
+          activeOpacity={0.7}
+          style={cardStyles.fallback}
+        >
+          <Text style={cardStyles.fallbackText}>This card had an error. Tap to retry.</Text>
+        </TouchableOpacity>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const cardStyles = StyleSheet.create({
+  fallback: {
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+    backgroundColor: COLORS.glass,
+    padding: SPACING.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 72,
+  },
+  fallbackText: {
+    fontSize: TYPOGRAPHY.size.sm,
+    color: COLORS.textMuted,
+    textAlign: 'center',
+  },
+});

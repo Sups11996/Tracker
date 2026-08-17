@@ -81,11 +81,11 @@ export function CustomAlert({
   };
 
   const handleActionPress = (action: AlertAction) => {
+    // Dismiss first so the alert is gone before any onPress side-effects fire
+    onDismiss?.();
     if (action.onPress) {
       action.onPress();
     }
-    // Always dismiss after any action press
-    onDismiss?.();
   };
 
   const handleBackdropPress = () => {

@@ -26,6 +26,7 @@ import { CaloriesHomeCard } from '../calories/CaloriesHomeCard';
 import { AbcHomeCard } from '../abc/AbcHomeCard';
 import { AnimatedCard } from '../../components/ui/AnimatedCard';
 import { SkeletonCard } from '../../components/ui/SkeletonCard';
+import { CardErrorBoundary } from '../../components/ErrorBoundary';
 import { useAppReady } from '../../contexts/AppReadyContext';
 import { useSQLiteContext } from 'expo-sqlite';
 import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
@@ -159,14 +160,14 @@ export function HomeScreen() {
           </>
         ) : (
           <>
-            <AnimatedCard index={0}><StepHomeCard onPress={() => goToDashboard('steps')} /></AnimatedCard>
-            <AnimatedCard index={1}><SleepHomeCard onPress={() => goToDashboard('sleep')} /></AnimatedCard>
-            <AnimatedCard index={2}><WaterHomeCard onPress={() => goToDashboard('water')} /></AnimatedCard>
-            {profile?.uses_gym !== false && (
-              <AnimatedCard index={3}><CaloriesHomeCard onPress={() => goToDashboard('calories')} /></AnimatedCard>
+            <AnimatedCard index={0}><CardErrorBoundary><StepHomeCard onPress={() => goToDashboard('steps')} /></CardErrorBoundary></AnimatedCard>
+            <AnimatedCard index={1}><CardErrorBoundary><SleepHomeCard onPress={() => goToDashboard('sleep')} /></CardErrorBoundary></AnimatedCard>
+            <AnimatedCard index={2}><CardErrorBoundary><WaterHomeCard onPress={() => goToDashboard('water')} /></CardErrorBoundary></AnimatedCard>
+            {profile?.uses_gym === true && (
+              <AnimatedCard index={3}><CardErrorBoundary><CaloriesHomeCard onPress={() => goToDashboard('calories')} /></CardErrorBoundary></AnimatedCard>
             )}
             {!!profile?.uses_abc && (
-              <AnimatedCard index={4}><AbcHomeCard onPress={() => goToDashboard('abc')} /></AnimatedCard>
+              <AnimatedCard index={4}><CardErrorBoundary><AbcHomeCard onPress={() => goToDashboard('abc')} /></CardErrorBoundary></AnimatedCard>
             )}
           </>
         )}
