@@ -10,7 +10,7 @@ import {
   NativeModules,
   AppState,
 } from 'react-native';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
 import * as Notifications from 'expo-notifications';
 import {
   AlertCircle,
@@ -108,6 +108,7 @@ export function SettingsScreen() {
     age: profile?.age?.toString() || '',
     height_ft_in: cmToFtIn(profile?.height_cm || 0),
     weight_kg: profile?.weight_kg?.toString() || '',
+    gender: profile?.gender || 'male' as 'male' | 'female' | 'other',
   });
 
   const handleUpdateProfile = useCallback(async () => {
@@ -123,16 +124,26 @@ export function SettingsScreen() {
       isNaN(height) || height < 100 || height > 250 ||
       isNaN(weight) || weight < 30 || weight > 300
     ) {
-      showError('Invalid input', 'Enter height as ft.in (e.g. 5.9 for 5\'9\")');
+      let errorMsg = '';
+      if (!profileForm.username.trim()) {
+        errorMsg = 'Please enter a username';
+      } else if (isNaN(age) || age < 1 || age > 120) {
+        errorMsg = 'Age must be between 1 and 120';
+      } else if (isNaN(height) || height < 100 || height > 250) {
+        errorMsg = 'Enter height as ft.in (e.g. 5.9 for 5\'9\")';
+      } else if (isNaN(weight) || weight < 30 || weight > 300) {
+        errorMsg = 'Weight must be between 30 and 300 kg';
+      }
+      showError('Invalid input', errorMsg);
       return;
     }
 
     try {
       await db.runAsync(
         `UPDATE user_profile 
-         SET username = ?, age = ?, height_cm = ?, weight_kg = ?, updated_at = ? 
+         SET username = ?, age = ?, height_cm = ?, weight_kg = ?, gender = ?, updated_at = ? 
          WHERE id = 1`,
-        [profileForm.username.trim(), age, height, weight, new Date().toISOString()]
+        [profileForm.username.trim(), age, height, weight, profileForm.gender, Date.now()]
       );
 
       const updated = {
@@ -141,6 +152,7 @@ export function SettingsScreen() {
         age,
         height_cm: height,
         weight_kg: weight,
+        gender: profileForm.gender,
       };
       setProfile(updated);
       setEditingProfile(false);
@@ -156,6 +168,7 @@ export function SettingsScreen() {
       age: profile?.age?.toString() || '',
       height_ft_in: cmToFtIn(profile?.height_cm || 0),
       weight_kg: profile?.weight_kg?.toString() || '',
+      gender: profile?.gender || 'male',
     });
     setEditingProfile(false);
   }, [profile]);
@@ -221,15 +234,15 @@ export function SettingsScreen() {
                         key={option}
                         style={[
                           styles.genderChip,
-                          profile.gender === option && styles.genderChipActive
+                          profileForm.gender === option && styles.genderChipActive
                         ]}
                         onPress={() => {
-                          setProfile({ ...profile, gender: option });
+                          setProfileForm(prev => ({ ...prev, gender: option }));
                         }}
                       >
                         <Text style={[
                           styles.genderChipText,
-                          profile.gender === option && styles.genderChipTextActive
+                          profileForm.gender === option && styles.genderChipTextActive
                         ]}>
                           {option.charAt(0).toUpperCase() + option.slice(1)}
                         </Text>
@@ -541,7 +554,6 @@ export function SettingsScreen() {
                   await db.runAsync('DELETE FROM abc_logs WHERE date = ?', [today]);
                   await db.runAsync('DELETE FROM abc_daily_summary WHERE date = ?', [today]);
                   await hydrateAbcStore(db);
-                  useAbcStore.getState().setTodayCount(0);
                 }}
                 onClearExceptToday={async () => {
                   const today = getTodayLocal();
@@ -553,7 +565,6 @@ export function SettingsScreen() {
                   await db.runAsync('DELETE FROM abc_logs');
                   await db.runAsync('DELETE FROM abc_daily_summary');
                   await hydrateAbcStore(db);
-                  useAbcStore.getState().setTodayCount(0);
                 }}
               />
             </View>
@@ -626,16 +637,25 @@ export function SettingsScreen() {
           try { await NativeModules.StepServiceModule.sendAction('reset'); } catch (_) {}
         }
 
+        // Stop sleep foreground service if a session is active
+        if (Platform.OS === 'android' && useSleepStore.getState().isActive) {
+          try {
+            const { requireNativeModule } = require('expo-modules-core');
+            const SleepServiceModule = requireNativeModule('SleepServiceModule');
+            SleepServiceModule.stopService();
+          } catch (_) {}
+        }
+
         // Reset all in-memory stores
         useStepStore.setState({ todaySteps: 0, todayDistance: 0, todayCalories: 0, weeklyData: [], monthlyData: [] });
         useWaterStore.setState({ todayTotal: 0, logs: [], undoStack: [] });
         useCaloriesStore.setState({ walkingCalories: 0, workoutCalories: 0, totalCalories: 0, workoutLogs: [] });
-        useSleepStore.setState({ lastNightDuration: null, lastNightQuality: null, recentSessions: [], isActive: false, sessionStartTime: null, elapsedMinutes: 0 });
-        useAbcStore.getState().setTodayCount(0);
+        useSleepStore.setState({ lastNightDuration: null, lastNightQuality: null, recentSessions: [], isActive: false, sessionId: null, sessionStartTime: null, elapsedMinutes: 0 });
+        useAbcStore.setState({ todayCount: 0, entries: [], lastLoggedAt: null, undoStack: [], undoEntry: null });
 
       } else {
         await db.runAsync('DELETE FROM daily_steps WHERE date < ?', [today]);
-        await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0');
+        await db.runAsync('DELETE FROM sleep_sessions WHERE is_active = 0 AND date < ?', [today]);
         await db.runAsync('DELETE FROM water_logs WHERE date < ?', [today]);
         await db.runAsync('DELETE FROM water_daily_summary WHERE date < ?', [today]);
         await db.runAsync('DELETE FROM workout_logs WHERE date < ?', [today]);
@@ -665,7 +685,7 @@ export function SettingsScreen() {
 }
 
 interface DataClearButtonProps {
-  db: any;
+  db: SQLiteDatabase;
   label: string;
   description: string;
   color: string;

@@ -8,6 +8,8 @@ import { StatCard } from '../../components/ui/StatCard';
 import { BarChart } from '../steps/BarChart';
 import { SkeletonCard } from '../../components/ui/SkeletonCard';
 import { useCaloriesStore, deleteWorkout, type WorkoutLog } from '../../stores/caloriesStore';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { getTodayLocal } from '../../lib/dateUtils';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 interface DayCalories {
@@ -20,6 +22,7 @@ export function CaloriesDashboard() {
   const db = useSQLiteContext();
   const { totalCalories, workoutLogs, dailyGoal } = useCaloriesStore();
   const tabBarHeight = useBottomTabBarHeight();
+  const { showConfirm } = useCustomAlert();
 
   const [isLoading, setIsLoading] = useState(true);
   const [thisWeekData, setThisWeekData] = useState<DayCalories[]>([]);
@@ -56,7 +59,7 @@ export function CaloriesDashboard() {
   useEffect(() => {
     loadWeekAndMonth();
     loadRecentWorkouts();
-  }, [totalCalories, workoutLogs, db]);
+  }, [totalCalories, db]);
 
   useEffect(() => {
     loadSelectedMonth(selectedMonth);
@@ -76,14 +79,14 @@ export function CaloriesDashboard() {
   async function loadWeekAndMonth() {
     try {
       setIsLoading(true);
-      const todayStr = getTodayStr();
+      const todayStr = getTodayLocal();
 
       // ── This week ────────────────────────────────────────────────────────
       const weekDates = getThisWeekDates();
       const week: DayCalories[] = [];
       for (const dateStr of weekDates) {
         const total = await getDayCalories(dateStr, todayStr);
-        week.push({ date: dateStr, total, goal_met: dailyGoal > 0 ? total >= dailyGoal : total > 0 });
+        week.push({ date: dateStr, total, goal_met: dailyGoal > 0 && total >= dailyGoal });
       }
       setThisWeekData(week);
 
@@ -92,7 +95,7 @@ export function CaloriesDashboard() {
       const month: DayCalories[] = [];
       for (const dateStr of monthDates) {
         const total = await getDayCalories(dateStr, todayStr);
-        month.push({ date: dateStr, total, goal_met: dailyGoal > 0 ? total >= dailyGoal : total > 0 });
+        month.push({ date: dateStr, total, goal_met: dailyGoal > 0 && total >= dailyGoal });
       }
       setCurrentMonthData(month);
 
@@ -106,7 +109,7 @@ export function CaloriesDashboard() {
 
   async function loadSelectedMonth(month: Date) {
     try {
-      const todayStr = getTodayStr();
+      const todayStr = getTodayLocal();
       const year = month.getFullYear();
       const monthIndex = month.getMonth();
       const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -117,7 +120,7 @@ export function CaloriesDashboard() {
       for (let day = 1; day <= lastDay; day++) {
         const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const total = await getDayCalories(dateStr, todayStr);
-        data.push({ date: dateStr, total, goal_met: dailyGoal > 0 ? total >= dailyGoal : total > 0 });
+        data.push({ date: dateStr, total, goal_met: dailyGoal > 0 && total >= dailyGoal });
       }
       setSelectedMonthData(data);
     } catch (e) {
@@ -126,14 +129,18 @@ export function CaloriesDashboard() {
 
   async function loadRecentWorkouts() {
     try {
-      const todayStr = getTodayStr();
+      const todayStr = getTodayLocal();
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const startDate = `${sevenDaysAgo.getFullYear()}-${String(sevenDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(sevenDaysAgo.getDate()).padStart(2, '0')}`;
+      
       const workouts = await db.getAllAsync<WorkoutLog>(
         `SELECT id, date, logged_at, duration_mins, intensity, calories, note
          FROM workout_logs
-         WHERE date = ?
+         WHERE date >= ?
          ORDER BY logged_at DESC
          LIMIT 20`,
-        [todayStr]
+        [startDate]
       );
       setRecentWorkouts(workouts);
     } catch (e) {
@@ -141,14 +148,20 @@ export function CaloriesDashboard() {
   }
 
   async function handleDeleteWorkout(id: number) {
-    try {
-      await deleteWorkout(db, id);
-      setRecentWorkouts(prev => prev.filter(w => w.id !== id));
-      // Reload monthly data to update total
-      await loadWeekAndMonth();
-      await loadSelectedMonth(selectedMonth);
-    } catch (e) {
-    }
+    showConfirm(
+      'Delete Workout',
+      'Remove this workout entry?',
+      async () => {
+        try {
+          await deleteWorkout(db, id);
+          setRecentWorkouts(prev => prev.filter(w => w.id !== id));
+          await loadWeekAndMonth();
+          await loadSelectedMonth(selectedMonth);
+        } catch {}
+      },
+      'Delete',
+      true
+    );
   }
 
   // ── Derived values ──────────────────────────────────────────────────────────
@@ -157,10 +170,10 @@ export function CaloriesDashboard() {
   const allDays = currentMonthData.filter(d => d.total > 0);
   const highCal = allDays.length ? Math.max(...allDays.map(d => d.total)) : 0;
 
-  const selectedStats = calculateMonthStats(selectedMonthData);
+  const selectedStats = calculateMonthStats(selectedMonthData, dailyGoal);
 
-  // Stats card
-  const avgCal = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.total, 0) / allDays.length) : 0;
+  // Stats card — divide by calendar days, not active days
+  const avgCal = currentMonthData.length ? Math.round(currentMonthData.reduce((s, d) => s + d.total, 0) / currentMonthData.length) : 0;
   const lowCal = allDays.length ? Math.min(...allDays.map(d => d.total)) : 0;
 
   function goToPreviousMonth() {
@@ -182,7 +195,7 @@ export function CaloriesDashboard() {
     setSelectedBar({ date: d.date, total: d.total, chartId, barIndex });
   }
 
-  const todayStr = getTodayStr();
+  const todayStr = getTodayLocal();
   const displayCal = selectedBar ? selectedBar.total : totalCalories;
   const displayDate = selectedBar ? selectedBar.date : todayStr;
   const isToday = displayDate === todayStr;
@@ -350,7 +363,7 @@ export function CaloriesDashboard() {
                 <View style={styles.workoutRight}>
                   <Text style={styles.workoutCal}>{w.calories} kcal</Text>
                   <TouchableOpacity onPress={() => handleDeleteWorkout(w.id)} hitSlop={8}>
-                    <Trash2 size={16} color={COLORS.textMuted} />
+                    <Trash2 size={16} color={COLORS.error} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -377,11 +390,6 @@ function SectionTitle({ title, sub }: { title: string; sub?: string }) {
 
 // ── Helper functions ───────────────────────────────────────────────────────────
 
-function getTodayStr(): string {
-  const t = new Date();
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-}
-
 function getThisWeekDates(): string[] {
   const today = new Date();
   const dayOfWeek = today.getDay();
@@ -406,7 +414,7 @@ function getCurrentMonthDates(): string[] {
 
 function getWeeksInCurrentMonth(monthData: DayCalories[]) {
   if (monthData.length === 0) return [];
-  const weeks: any[] = [];
+  const weeks: { data: DayCalories[]; dateRange: string }[] = [];
   for (let i = 0; i < monthData.length; i += 7) {
     const weekData = monthData.slice(i, i + 7);
     if (weekData.length === 0) continue; // Skip if somehow empty
@@ -422,15 +430,18 @@ function getWeeksInCurrentMonth(monthData: DayCalories[]) {
   return weeks;
 }
 
-function calculateMonthStats(monthData: DayCalories[]) {
-  const days = monthData.filter(d => d.total > 0);
+function calculateMonthStats(monthData: DayCalories[], dailyGoal: number) {
+  const activeDays = monthData.filter(d => d.total > 0);
+  const goalReachedDays = dailyGoal > 0 ? activeDays.filter(d => d.goal_met).length : 0;
+  // Goal missed = days where we logged something but didn't hit goal (not empty days)
+  const goalMissedDays = dailyGoal > 0 ? activeDays.length - goalReachedDays : 0;
   return {
     totalCal: monthData.reduce((s, d) => s + d.total, 0),
-    avgCal: days.length ? Math.round(monthData.reduce((s, d) => s + d.total, 0) / days.length) : 0,
-    mostCal: days.length ? Math.max(...days.map(d => d.total)) : 0,
-    leastCal: days.length ? Math.min(...days.map(d => d.total)) : 0,
-    activeDays: days.length,
-    restDays: monthData.length - days.length,
+    avgCal: monthData.length ? Math.round(monthData.reduce((s, d) => s + d.total, 0) / monthData.length) : 0,
+    mostCal: activeDays.length ? Math.max(...activeDays.map(d => d.total)) : 0,
+    leastCal: activeDays.length ? Math.min(...activeDays.map(d => d.total)) : 0,
+    activeDays: dailyGoal > 0 ? goalReachedDays : activeDays.length,
+    restDays: dailyGoal > 0 ? goalMissedDays : 0,
   };
 }
 

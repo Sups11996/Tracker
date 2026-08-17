@@ -85,7 +85,7 @@ export function CaloriesSettingsSection() {
     try {
       await db.runAsync(
         'UPDATE user_profile SET uses_gym = ?, updated_at = ? WHERE id = 1',
-        [enabled ? 1 : 0, new Date().toISOString()]
+        [enabled ? 1 : 0, Date.now()]
       );
       if (profile) {
         useUserStore.getState().setProfile({ ...profile, uses_gym: enabled });

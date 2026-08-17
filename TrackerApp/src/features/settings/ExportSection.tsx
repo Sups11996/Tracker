@@ -11,6 +11,11 @@ import { exportData, ExportPresets, createFullBackup, type ExportFormat } from '
 import { pickBackupFile, importFullBackup, getBackupInfo, type ImportMode } from '../../lib/importUtils';
 import { getTodayLocal, getDaysAgoLocal } from '../../lib/dateUtils';
 import { useUserStore } from '../../stores/userStore';
+import { hydrateWaterStore } from '../../stores/waterStore';
+import { hydrateStepStore } from '../../stores/stepStore';
+import { hydrateSleepStore } from '../../stores/sleepStore';
+import { hydrateCaloriesStore } from '../../stores/caloriesStore';
+import { hydrateAbcStore } from '../../stores/abcStore';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 export function ExportSection() {
@@ -126,6 +131,17 @@ export function ExportSection() {
       const result = await importFullBackup(db, fileUri, mode);
       
       if (result.success) {
+        // Rehydrate all stores so UI reflects imported data immediately
+        // hydrateStepStore must complete before hydrateCaloriesStore
+        // so walking calories are read correctly from DB (not step store)
+        await hydrateStepStore(db);
+        await Promise.all([
+          hydrateSleepStore(db),
+          hydrateWaterStore(db),
+          hydrateCaloriesStore(db),
+          hydrateAbcStore(db),
+        ]);
+
         setTimeout(() => {
           showSuccess(
             'Import Complete',

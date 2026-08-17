@@ -9,7 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useIsFocused, type RouteProp } from '@react-navigation/native';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import { PanGestureHandler, State, type HandlerStateChangeEvent, type PanGestureHandlerEventPayload } from 'react-native-gesture-handler';
 import { StepDashboard } from '../steps/StepDashboard';
 import { SleepDashboard } from '../sleep/SleepDashboard';
 import { WaterDashboard } from '../water/WaterDashboard';
@@ -62,7 +62,7 @@ export function DashboardScreen() {
   const activeColor = ALL_TABS.find(t => t.key === activeTab)?.color ?? COLORS.textMuted;
 
   // Swipe gesture handler
-  const onSwipe = ({ nativeEvent }: any) => {
+  const onSwipe = ({ nativeEvent }: HandlerStateChangeEvent<PanGestureHandlerEventPayload>) => {
     if (nativeEvent.state === State.END) {
       const currentIndex = visibleTabs.findIndex(t => t.key === activeTab);
       
