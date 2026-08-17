@@ -1,7 +1,4 @@
-/**
- * Date utility functions for consistent local date handling across the app.
- * All dates are stored as YYYY-MM-DD in local timezone, not UTC.
- */
+import * as SQLite from 'expo-sqlite';
 
 /**
  * Get today's date in YYYY-MM-DD format using local timezone.
@@ -67,7 +64,7 @@ export function isYesterday(dateStr: string): boolean {
  * Store and check for date changes using SQLite database.
  * Returns true if the date has changed since last check.
  */
-export async function checkDateChanged(db: any): Promise<boolean> {
+export async function checkDateChanged(db: SQLite.SQLiteDatabase): Promise<boolean> {
   try {
     const today = getTodayLocal();
     

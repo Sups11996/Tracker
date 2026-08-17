@@ -4,12 +4,34 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { formatDateLocal } from './dateUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
+
+interface ExportPayload {
+  export_info: { date_range: { start: string; end: string }; exported_at: string; format: string };
+  steps?: Record<string, unknown>[];
+  sleep?: Record<string, unknown>[];
+  water?: Record<string, unknown>[];
+  calories_summary?: Record<string, unknown>[];
+  workout_logs?: Record<string, unknown>[];
+  abc?: Record<string, unknown>[];
+}
+
+interface BackupPayload {
+  backup_info: { version: string; created_at: string; type: string };
+  user_profile?: Record<string, unknown>;
+  settings?: Record<string, unknown>[];
+  steps?: { daily_data: Record<string, unknown>[]; tracking_state: Record<string, unknown> };
+  sleep?: Record<string, unknown>[];
+  water?: { containers: Record<string, unknown>[]; logs: Record<string, unknown>[]; daily_summary: Record<string, unknown>[] };
+  calories?: { workout_logs: Record<string, unknown>[]; daily_summary: Record<string, unknown>[] };
+  abc?: { logs: Record<string, unknown>[]; daily_summary: Record<string, unknown>[] };
+}
 
 export type ExportFormat = 'csv' | 'json';
 
@@ -227,7 +249,8 @@ export async function exportData(db: SQLiteDatabase, options: ExportOptions, use
         
         // Also export detailed workout logs
         const workoutCSV = await exportWorkoutLogs(db, startDate, endDate);
-        if (workoutCSV.split('\n').length > 2) { // Has data beyond header
+        // Check non-empty lines (header + at least 1 data row)
+        if (workoutCSV.split('\n').filter(l => l.trim()).length > 1) {
           sections.push('# WORKOUT LOGS (DETAILED)\n' + workoutCSV);
         }
       }
@@ -240,7 +263,7 @@ export async function exportData(db: SQLiteDatabase, options: ExportOptions, use
       fileContent = sections.join('\n\n');
     } else {
       // JSON export
-      const exportData: any = {
+      const exportData: ExportPayload = {
         export_info: {
           date_range: { start: startDate, end: endDate },
           exported_at: new Date().toISOString(),
@@ -330,6 +353,9 @@ export async function exportData(db: SQLiteDatabase, options: ExportOptions, use
             fileContent,
             { encoding: FileSystem.EncodingType.UTF8 }
           );
+
+          // Clean up temp file now that content is saved to user location
+          await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
           
           return; // Success - file saved to user's location
         } else {
@@ -353,6 +379,8 @@ export async function exportData(db: SQLiteDatabase, options: ExportOptions, use
         dialogTitle: 'Save Export File',
         UTI: format === 'csv' ? 'public.comma-separated-values-text' : 'public.json'
       });
+      // Clean up temp file after sharing
+      await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
     }
   } catch (error) {
     console.error('[ExportUtils] Export failed:', error);
@@ -371,9 +399,9 @@ export async function createFullBackup(db: SQLiteDatabase, username?: string): P
     const fileName = `${userPrefix}tracker_backup_${timestamp}.json`;
 
     // Export all data without date filtering
-    const backup: any = {
+    const backup: BackupPayload = {
       backup_info: {
-        version: '1.3.0',
+        version: Constants.expoConfig?.version ?? '1.4.1',
         created_at: new Date().toISOString(),
         type: 'full_backup'
       }
@@ -460,6 +488,9 @@ export async function createFullBackup(db: SQLiteDatabase, username?: string): P
             backupContent,
             { encoding: FileSystem.EncodingType.UTF8 }
           );
+
+          // Clean up temp file now that content is saved to user location
+          await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
           
           return; // Success - file saved to user's location
         } else {
@@ -483,6 +514,8 @@ export async function createFullBackup(db: SQLiteDatabase, username?: string): P
         dialogTitle: 'Save Backup File',
         UTI: 'public.json'
       });
+      // Clean up temp file after sharing
+      await FileSystem.deleteAsync(tempFileUri, { idempotent: true });
     }
   } catch (error) {
     console.error('[ExportUtils] Backup failed:', error);
@@ -498,14 +531,15 @@ export const ExportPresets = {
    * Export last 7 days, all categories
    */
   lastWeek: (endDate: string): ExportOptions => {
-    const end = new Date(endDate);
-    const start = new Date(end);
-    start.setDate(start.getDate() - 6);
+    // Parse as local date components to avoid UTC off-by-one in UTC+ timezones
+    const [ey, em, ed] = endDate.split('-').map(Number);
+    const end = new Date(ey, em - 1, ed);
+    const start = new Date(ey, em - 1, ed - 6);
     
     return {
       format: 'csv',
       startDate: formatDateLocal(start),
-      endDate: endDate,
+      endDate: formatDateLocal(end),
       includeSteps: true,
       includeSleep: true,
       includeWater: true,
@@ -518,14 +552,15 @@ export const ExportPresets = {
    * Export last 30 days, all categories
    */
   lastMonth: (endDate: string): ExportOptions => {
-    const end = new Date(endDate);
-    const start = new Date(end);
-    start.setDate(start.getDate() - 29);
+    // Parse as local date components to avoid UTC off-by-one in UTC+ timezones
+    const [ey, em, ed] = endDate.split('-').map(Number);
+    const end = new Date(ey, em - 1, ed);
+    const start = new Date(ey, em - 1, ed - 29);
     
     return {
       format: 'csv',
       startDate: formatDateLocal(start),
-      endDate: endDate,
+      endDate: formatDateLocal(end),
       includeSteps: true,
       includeSleep: true,
       includeWater: true,

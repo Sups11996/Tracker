@@ -71,8 +71,7 @@ export function WaterContainersScreen() {
     }
     setSaving(true);
     try {
-      const now = new Date().toISOString();
-      const ts  = Date.now();
+      const ts = Date.now();
 
       await db.runAsync(
         `INSERT OR REPLACE INTO user_profile
@@ -88,8 +87,8 @@ export function WaterContainersScreen() {
         parseInt(onboarding.water_goal_ml, 10),
         onboarding.uses_gym ? 1 : 0,
         onboarding.uses_abc ? 1 : 0,
-        now,
-        now
+        ts,
+        ts
       );
 
       await db.runAsync(
@@ -115,6 +114,8 @@ export function WaterContainersScreen() {
       if (saved) {
         setProfile({ ...saved, onboarding_complete: true, uses_gym: saved.uses_gym === 1, uses_abc: saved.uses_abc === 1 });
       }
+      // setSaving(false) not needed here — setProfile triggers RootNavigator
+      // to switch to MainTabs, unmounting this screen
     } catch (e) {
       showError('Error', 'Could not save. Please try again.');
       setSaving(false);

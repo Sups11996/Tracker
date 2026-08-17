@@ -34,7 +34,7 @@ export function GymQuestionScreen() {
           active={data.uses_gym === true}
           onPress={() => select(true)}
           accentColor={COLORS.calories}
-          icon={<Dumbbell size={28} color={data.uses_gym ? COLORS.calories : COLORS.textMuted} />}
+          icon={<Dumbbell size={28} color={data.uses_gym === true ? COLORS.calories : COLORS.textMuted} />}
         />
         <OptionCard
           label="No, I don't"

@@ -19,7 +19,9 @@ function ftInToCm(ftIn: string): number {
   const parsed = parseFloat(ftIn);
   if (isNaN(parsed)) return NaN;
   const feet = Math.floor(parsed);
-  const inches = Math.round((parsed - feet) * 10); // e.g. 5.7 → inches = 7
+  // Multiply by 100 then round to avoid floating-point drift
+  // e.g. 5.11 → (5.11 - 5) * 10 = 1.0999... without this fix → rounds to 1 (wrong)
+  const inches = Math.round(Math.round((parsed - feet) * 100) / 10);
   if (inches > 11) return NaN;
   return Math.round(feet * 30.48 + inches * 2.54);
 }
