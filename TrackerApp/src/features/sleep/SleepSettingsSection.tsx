@@ -27,6 +27,15 @@ export function SleepSettingsSection() {
   const [goalHoursInput, setGoalHoursInput] = useState(goalHours.toString());
   const [goalMinsInput, setGoalMinsInput] = useState(goalMins.toString());
   const [isEditing, setIsEditing] = useState(false);
+
+  // Keep inputs in sync with the store when not actively editing
+  // (covers the case where goalMinutes changed via another path e.g. data import)
+  useEffect(() => {
+    if (!isEditing) {
+      setGoalHoursInput(Math.floor(goalMinutes / 60).toString());
+      setGoalMinsInput((goalMinutes % 60).toString());
+    }
+  }, [goalMinutes, isEditing]);
   
   // Reminder settings
   const [reminderSettings, setReminderSettings] = useState<SleepReminderSettings>({
@@ -64,8 +73,10 @@ export function SleepSettingsSection() {
     const totalMins = hours * 60 + mins;
 
     if (totalMins < 60 || totalMins > 840) {
-      setGoalHoursInput(goalHours.toString());
-      setGoalMinsInput(goalMins.toString());
+      // Revert to live store value, not the stale render-time snapshot
+      const current = useSleepStore.getState().goalMinutes;
+      setGoalHoursInput(Math.floor(current / 60).toString());
+      setGoalMinsInput((current % 60).toString());
       setIsEditing(false);
       return;
     }
@@ -82,8 +93,9 @@ export function SleepSettingsSection() {
   }
 
   function handleCancelEdit() {
-    setGoalHoursInput(goalHours.toString());
-    setGoalMinsInput(goalMins.toString());
+    const current = useSleepStore.getState().goalMinutes;
+    setGoalHoursInput(Math.floor(current / 60).toString());
+    setGoalMinsInput((current % 60).toString());
     setIsEditing(false);
   }
 
@@ -111,7 +123,7 @@ export function SleepSettingsSection() {
     }
   }
 
-  async function handleBedtimeTimeChange(event: any, selectedDate?: Date) {
+  async function handleBedtimeTimeChange(_event: unknown, selectedDate?: Date) {
     if (Platform.OS === 'android') {
       setShowBedtimePicker(false);
       
@@ -138,7 +150,7 @@ export function SleepSettingsSection() {
     }
   }
 
-  async function handleWakeTimeChange(event: any, selectedDate?: Date) {
+  async function handleWakeTimeChange(_event: unknown, selectedDate?: Date) {
     if (Platform.OS === 'android') {
       setShowWakePicker(false);
       

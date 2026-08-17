@@ -87,7 +87,7 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
     status === 'tracking' ? 'Tracking' :
     status === 'paused'   ? 'Paused' : 'Unavailable';
 
-  function sendServiceAction(action: string) {
+  async function sendServiceAction(action: string) {
     
     try {
       // Optimistically update status so UI responds immediately
@@ -105,12 +105,14 @@ export function StepHomeCard({ onPress }: StepHomeCardProps) {
       
       // Update DB to persist the paused state (NOT is_tracking, only is_paused)
       const isPaused = action === 'pause' ? 1 : 0;
-      db.runAsync(
-        'UPDATE step_tracking_state SET is_paused = ?, updated_at = ? WHERE id = 1',
-        [isPaused, new Date().toISOString()]
-      ).then(() => {
-      }).catch((error) => {
-      });
+      try {
+        await db.runAsync(
+          'UPDATE step_tracking_state SET is_paused = ?, updated_at = ? WHERE id = 1',
+          [isPaused, Date.now()]
+        );
+      } catch (dbError) {
+        console.error('[StepHomeCard] Failed to persist paused state:', dbError);
+      }
       
     } catch (error) {
     }

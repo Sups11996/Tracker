@@ -10,6 +10,21 @@ import { BarChart } from './BarChart';
 import { SkeletonCard } from '../../components/ui/SkeletonCard';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
+interface DayStepData {
+  date: string;
+  steps: number;
+  distance_m: number;
+  calories: number;
+  goal: number;
+  goal_met: boolean;
+}
+
+interface WeekGroup {
+  data: DayStepData[];
+  dateRange: string;
+  weekNumber: number;
+}
+
 export function StepDashboard() {
   const db = useSQLiteContext();
   const { todaySteps, todayDistance, todayCalories, dailyGoal, weeklyData, monthlyData } = useStepStore();
@@ -27,6 +42,7 @@ export function StepDashboard() {
   const [selectedBar, setSelectedBar] = useState<{
     date: string;
     steps: number;
+    distance_m: number;
     goal: number;
     chartId: string;
     barIndex: number;
@@ -37,6 +53,58 @@ export function StepDashboard() {
     // Short delay for animation
     setTimeout(() => setIsLoading(false), 200);
   }, []);
+
+  const refreshThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Refresh historical data when today's steps change, throttled to once per 60s
+  useEffect(() => {
+    if (isLoading) return;
+    if (refreshThrottleRef.current) return; // already scheduled
+    refreshThrottleRef.current = setTimeout(() => {
+      refreshHistoricalData();
+      refreshThrottleRef.current = null;
+    }, 60000);
+    return () => {
+      if (refreshThrottleRef.current) {
+        clearTimeout(refreshThrottleRef.current);
+        refreshThrottleRef.current = null;
+      }
+    };
+  }, [todaySteps, db]);
+
+  async function refreshHistoricalData() {
+    try {
+      const today = getTodayLocal();
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+      const startOfWeek = `${sevenDaysAgo.getFullYear()}-${String(sevenDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(sevenDaysAgo.getDate()).padStart(2, '0')}`;
+      
+      const weekly = await db.getAllAsync<any>(
+        `SELECT * FROM daily_steps
+         WHERE date >= ? AND date <= ?
+         ORDER BY date ASC`,
+        [startOfWeek, today]
+      );
+
+      const currentDate = new Date();
+      const startOfMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
+      
+      const monthly = await db.getAllAsync<any>(
+        `SELECT * FROM daily_steps
+         WHERE date >= ? AND date <= ?
+         ORDER BY date ASC`,
+        [startOfMonth, today]
+      );
+
+      // Update just the historical data without full hydration
+      useStepStore.setState({ 
+        weeklyData: weekly, 
+        monthlyData: monthly 
+      });
+    } catch (error) {
+      // Silent fail - historical data refresh is not critical
+    }
+  }
 
   // Slide up + fade in when loading completes
   useEffect(() => {
@@ -80,7 +148,7 @@ export function StepDashboard() {
   const weeksInMonth = getWeeksInCurrentMonth(currentMonthData);
 
   // ─── SELECTED MONTH DATA (for month selector) ─────────────────────────────
-  const [selectedMonthData, setSelectedMonthData] = useState<any[]>([]);
+  const [selectedMonthData, setSelectedMonthData] = useState<DayStepData[]>([]);
   
   useEffect(() => {
     loadMonthData(selectedMonth);
@@ -131,7 +199,7 @@ export function StepDashboard() {
   const canGoNext = selectedMonth.getMonth() < new Date().getMonth() || selectedMonth.getFullYear() < new Date().getFullYear();
 
   // ── Bar tap handler ────────────────────────────────────────────────────────
-  function handleBarPress(chartId: string, barIndex: number, data: any[]) {
+  function handleBarPress(chartId: string, barIndex: number, data: DayStepData[]) {
     // If tapping the same bar again → deselect
     if (selectedBar?.chartId === chartId && selectedBar?.barIndex === barIndex) {
       setSelectedBar(null);
@@ -139,7 +207,7 @@ export function StepDashboard() {
     }
     const d = data[barIndex];
     if (!d) return;
-    setSelectedBar({ date: d.date, steps: d.steps || 0, goal: d.goal || dailyGoal, chartId, barIndex });
+    setSelectedBar({ date: d.date, steps: d.steps || 0, distance_m: d.distance_m || 0, goal: d.goal || dailyGoal, chartId, barIndex });
   }
 
   // ── Display values for the top card ───────────────────────────────────────
@@ -195,7 +263,7 @@ export function StepDashboard() {
           <StatCard
             label="Distance"
             value={selectedBar
-              ? `${((selectedBar.steps * 0.00078)).toFixed(2)} km`
+              ? `${(selectedBar.distance_m / 1000).toFixed(2)} km`
               : `${(todayDistance / 1000).toFixed(2)} km`}
             accentColor={COLORS.steps}
           />
@@ -225,14 +293,14 @@ export function StepDashboard() {
         <Card key={index} style={styles.section}>
           <SectionTitle title={`Week ${index + 1}`} sub={week.dateRange} />
           <BarChart
-            data={week.data.map((d: any) => ({
+            data={week.data.map((d: DayStepData) => ({
               label: formatDay(d.date),
               topLabel: formatDate(d.date),
               value: d.steps || 0,
               valueLabel: d.steps > 0 ? (d.steps >= 1000 ? `${(d.steps / 1000).toFixed(1)}k` : d.steps.toString()) : '',
               goalMet: d.steps >= (d.goal || dailyGoal) && d.steps > 0,
             }))}
-            maxValue={Math.max(week.data.length > 0 ? Math.max(...week.data.map((d: any) => d.goal || dailyGoal)) : dailyGoal, highSteps, 1)}
+            maxValue={Math.max(week.data.length > 0 ? Math.max(...week.data.map((d: DayStepData) => d.goal || dailyGoal)) : dailyGoal, highSteps, 1)}
             accentColor={COLORS.steps}
             selectedIndex={selectedBar?.chartId === `month-${index}` ? selectedBar.barIndex : undefined}
             onBarPress={(i) => handleBarPress(`month-${index}`, i, week.data)}
@@ -307,7 +375,7 @@ function SectionTitle({ title, sub }: { title: string; sub?: string }) {
  * Get this week's data (Sunday to today only — no future days)
  * Fills in empty past days with 0 values
  */
-function getThisWeekData(weeklyData: any[], todayRecord: any) {
+function getThisWeekData(weeklyData: DayStepData[], todayRecord: DayStepData) {
   const today = new Date();
   const dayOfWeek = today.getDay(); // 0 = Sunday, 6 = Saturday
   
@@ -345,7 +413,7 @@ function getThisWeekData(weeklyData: any[], todayRecord: any) {
 /**
  * Get current month's data (from day 1 to today) - ONLY current month
  */
-function getCurrentMonthData(monthlyData: any[], todayRecord: any) {
+function getCurrentMonthData(monthlyData: DayStepData[], todayRecord: DayStepData) {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth(); // 0-indexed (0 = January, 7 = August)
@@ -389,13 +457,15 @@ function getCurrentMonthData(monthlyData: any[], todayRecord: any) {
 /**
  * Calculate month statistics
  */
-function calculateMonthStats(monthData: any[], dailyGoal: number) {
+function calculateMonthStats(monthData: DayStepData[], dailyGoal: number) {
   const daysWithSteps = monthData.filter(d => d.steps > 0);
-  
+  // Divide by total calendar days (monthData.length) not just active days,
+  // so "Daily Avg" means average per calendar day
+  const totalSteps = monthData.reduce((sum, d) => sum + d.steps, 0);
   return {
-    totalSteps: monthData.reduce((sum, d) => sum + d.steps, 0),
-    avgSteps: daysWithSteps.length > 0 
-      ? Math.round(monthData.reduce((sum, d) => sum + d.steps, 0) / daysWithSteps.length)
+    totalSteps,
+    avgSteps: monthData.length > 0
+      ? Math.round(totalSteps / monthData.length)
       : 0,
     mostSteps: daysWithSteps.length > 0 ? Math.max(...daysWithSteps.map(d => d.steps)) : 0,
     leastSteps: daysWithSteps.length > 0 ? Math.min(...daysWithSteps.map(d => d.steps)) : 0,
@@ -408,11 +478,9 @@ function calculateMonthStats(monthData: any[], dailyGoal: number) {
  * Get all weeks in current month
  * Week 1 starts from day 1, then every 7 days after
  */
-function getWeeksInCurrentMonth(monthData: any[]) {
+function getWeeksInCurrentMonth(monthData: DayStepData[]): WeekGroup[] {
   if (monthData.length === 0) return [];
-  
-  // Use the actual data dates instead of reconstructing them
-  const weeks: any[] = [];
+  const weeks: WeekGroup[] = [];
   let weekNumber = 1;
   
   for (let i = 0; i < monthData.length; i += 7) {
@@ -441,16 +509,6 @@ function getWeeksInCurrentMonth(monthData: any[]) {
   }
   
   return weeks;
-}
-
-async function getMonthData(db: any, month: Date, todayRecord: any) {
-  // NOT USED ANYMORE
-  return [];
-}
-
-function getThisMonthData(monthlyData: any[], todayRecord: any) {
-  // NOT USED ANYMORE  
-  return [];
 }
 
 function formatDay(date: string): string {

@@ -1,22 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
-import { Moon, MoonStar, Play, Square } from 'lucide-react-native';
+import { Moon, MoonStar, Play, Square, PenLine, Trash2 } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { SleepLatencyPrompt } from './SleepLatencyPrompt';
+import { ManualSleepModal } from './ManualSleepModal';
 import {
   useSleepStore,
   hydrateSleepStore,
   startSleepSession,
   endSleepSession,
+  deleteSleepSession,
 } from '../../stores/sleepStore';
-import { COLORS, SPACING, TYPOGRAPHY } from '../../constants';
+import { getTodayLocal, getYesterdayLocal } from '../../lib/dateUtils';
+import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 interface SleepHomeCardProps {
   onPress?: () => void;
@@ -31,10 +35,19 @@ export function SleepHomeCard({ onPress }: SleepHomeCardProps) {
     lastNightDuration,
     lastNightQuality,
     goalMinutes,
+    recentSessions,
     updateElapsed,
   } = useSleepStore();
 
+  const today = getTodayLocal();
+  const yesterday = getYesterdayLocal();
+
+  // Sessions for today and yesterday only
+  const todaySessions = recentSessions.filter(s => s.date === today);
+  const yesterdaySessions = recentSessions.filter(s => s.date === yesterday);
+
   const [showLatencyPrompt, setShowLatencyPrompt] = useState(false);
+  const [showManualModal, setShowManualModal] = useState(false);
 
   useEffect(() => {
     hydrateSleepStore(db);
@@ -76,6 +89,20 @@ export function SleepHomeCard({ onPress }: SleepHomeCardProps) {
     setShowLatencyPrompt(false);
   }
 
+  async function handleDelete(sessionId: number) {
+    Alert.alert('Delete Session', 'Remove this sleep session?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteSleepSession(db, sessionId);
+          } catch {}
+        }
+      },
+    ]);
+  }
+
   const qualityColor =
     lastNightQuality === 'good' ? COLORS.success :
     lastNightQuality === 'fair' ? COLORS.water :
@@ -88,6 +115,15 @@ export function SleepHomeCard({ onPress }: SleepHomeCardProps) {
 
   const elapsedHours = Math.floor(elapsedMinutes / 60);
   const elapsedMins = elapsedMinutes % 60;
+
+  // Determine if last session is from today or yesterday for label
+  const lastSession = recentSessions.find(s => s.is_active === 0);
+  const lastSessionDate = lastSession?.date;
+  const lastNightLabel =
+    lastSessionDate === today ? "Today's Sleep" :
+    lastSessionDate === yesterday ? "Yesterday's Sleep" :
+    lastSessionDate ? `Sleep (${lastSessionDate})` :
+    "Last Sleep";
 
   return (
     <>
@@ -126,7 +162,7 @@ export function SleepHomeCard({ onPress }: SleepHomeCardProps) {
             {lastNightDuration !== null ? (
               <View style={styles.stats}>
                 <StatRow
-                  label="Last Night"
+                  label={lastNightLabel}
                   value={formatDuration(lastNightDuration)}
                 />
                 <StatRow
@@ -154,8 +190,14 @@ export function SleepHomeCard({ onPress }: SleepHomeCardProps) {
               accentColor={COLORS.sleep}
               style={styles.startButton}
             />
+            <TouchableOpacity style={styles.manualBtn} onPress={() => setShowManualModal(true)} activeOpacity={0.7}>
+              <PenLine size={14} color={COLORS.textMuted} />
+              <Text style={styles.manualBtnText}>Log past sleep / nap</Text>
+            </TouchableOpacity>
           </View>
         )}
+
+        {/* Today's + Yesterday's sleep logs removed — shown in Sleep Dashboard instead */}
       </Card>
     </TouchableOpacity>
 
@@ -163,6 +205,10 @@ export function SleepHomeCard({ onPress }: SleepHomeCardProps) {
       visible={showLatencyPrompt}
       onConfirm={handleLatencyConfirm}
       onCancel={handleLatencyCancel}
+    />
+    <ManualSleepModal
+      visible={showManualModal}
+      onClose={() => { setShowManualModal(false); hydrateSleepStore(db); }}
     />
   </>
   );
@@ -284,5 +330,16 @@ const styles = StyleSheet.create({
   },
   startButton: {
     marginTop: SPACING.sm,
+  },
+  manualBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.sm,
+  },
+  manualBtnText: {
+    fontSize: TYPOGRAPHY.size.sm,
+    color: COLORS.textMuted,
   },
 });

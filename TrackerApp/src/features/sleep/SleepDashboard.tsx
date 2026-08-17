@@ -2,11 +2,14 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ScrollView, StyleSheet, Text, View, TouchableOpacity, ActivityIndicator, Animated, Easing } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useSleepStore } from '../../stores/sleepStore';
+import { Trash2 } from 'lucide-react-native';
+import { useSleepStore, deleteSleepSession, hydrateSleepStore } from '../../stores/sleepStore';
+import { getTodayLocal, getYesterdayLocal } from '../../lib/dateUtils';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { BarChart } from '../steps/BarChart';
 import { SkeletonCard } from '../../components/ui/SkeletonCard';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 interface DaySleep {
@@ -18,8 +21,23 @@ interface DaySleep {
 
 export function SleepDashboard() {
   const db = useSQLiteContext();
-  const { goalMinutes, isActive, elapsedMinutes } = useSleepStore();
+  const { goalMinutes, isActive, elapsedMinutes, sessionStartTime, recentSessions } = useSleepStore();
   const tabBarHeight = useBottomTabBarHeight();
+  const { showConfirm } = useCustomAlert();
+  const today = getTodayLocal();
+  const yesterday = getYesterdayLocal();
+  
+  // Filter by logged_at (when it was logged), not by date (which sleep day it represents)
+  const todayLoggedSessions = recentSessions.filter(s => {
+    // Use local timezone date to avoid UTC off-by-one for UTC+ users
+    const d = new Date(s.created_at);
+    const loggedDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return loggedDate === today;
+  });
+  
+  // Separate today's logged sessions by their sleep date
+  const todaySessions = todayLoggedSessions.filter(s => s.date === today);
+  const yesterdaySessions = todayLoggedSessions.filter(s => s.date === yesterday);
 
   const [isLoading, setIsLoading] = useState(true);
   const [thisWeekData, setThisWeekData] = useState<DaySleep[]>([]);
@@ -34,7 +52,9 @@ export function SleepDashboard() {
 
   useEffect(() => {
     loadWeekAndMonth();
-  }, [isActive, elapsedMinutes, db]);
+    // recentSessions intentionally omitted — it's an array ref that changes on
+    // every hydration. isActive captures the meaningful session state change.
+  }, [isActive, db]);
 
   useEffect(() => {
     loadSelectedMonth(selectedMonth);
@@ -64,22 +84,24 @@ export function SleepDashboard() {
   }, [isLoading]);
 
   async function getSleepForDate(dateStr: string, todayStr: string): Promise<number> {
-    if (dateStr === todayStr && isActive && elapsedMinutes > 0) {
-      return elapsedMinutes;
+    // Show elapsed time for the active session on whichever date it started
+    if (isActive && elapsedMinutes > 0 && sessionStartTime) {
+      const sessionDate = new Date(sessionStartTime);
+      const sessionDateStr = `${sessionDate.getFullYear()}-${String(sessionDate.getMonth() + 1).padStart(2, '0')}-${String(sessionDate.getDate()).padStart(2, '0')}`;
+      if (dateStr === sessionDateStr) return elapsedMinutes;
     }
-    const row = await db.getFirstAsync<{ actual_duration: number }>(
-      `SELECT actual_duration FROM sleep_sessions
-       WHERE is_active = 0 AND actual_duration IS NOT NULL AND date = ?
-       ORDER BY end_time DESC LIMIT 1`,
+    const row = await db.getFirstAsync<{ total: number }>(
+      `SELECT SUM(actual_duration) as total FROM sleep_sessions
+       WHERE is_active = 0 AND actual_duration IS NOT NULL AND date = ?`,
       [dateStr]
     );
-    return row?.actual_duration || 0;
+    return row?.total || 0;
   }
 
   async function loadWeekAndMonth() {
     try {
       setIsLoading(true);
-      const todayStr = getTodayStr();
+      const todayStr = getTodayLocal();
 
       // ── This week ─────────────────────────────────────────────────────────
       const weekDates = getThisWeekDates();
@@ -109,7 +131,7 @@ export function SleepDashboard() {
 
   async function loadSelectedMonth(month: Date) {
     try {
-      const todayStr = getTodayStr();
+      const todayStr = getTodayLocal();
       const year = month.getFullYear();
       const monthIndex = month.getMonth();
       const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -139,16 +161,30 @@ export function SleepDashboard() {
 
   const selectedStats = calculateMonthStats(selectedMonthData, goalMinutes);
 
-  // Stats card
-  const avgSleep = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.duration, 0) / allDays.length) : 0;
+  // Stats card — divide by calendar days, not active days
+  const avgSleep = currentMonthData.length ? Math.round(currentMonthData.reduce((s, d) => s + d.duration, 0) / currentMonthData.length) : 0;
   const lowSleep = allDays.length ? Math.min(...allDays.map(d => d.duration)) : 0;
   const goalDays = allDays.filter(d => d.goal_met).length;
 
   // Today's sleep
-  const todayStr = getTodayStr();
+  const todayStr = getTodayLocal();
   const todaySleep = isActive && elapsedMinutes > 0
     ? elapsedMinutes
     : thisWeekData.find(d => d.date === todayStr)?.duration || 0;
+
+  async function handleDelete(sessionId: number) {
+    showConfirm(
+      'Delete Session',
+      'Remove this sleep session?',
+      async () => {
+        try {
+          await deleteSleepSession(db, sessionId);
+        } catch {}
+      },
+      'Delete',
+      true
+    );
+  }
 
   function goToPreviousMonth() {
     setSelectedMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -310,6 +346,56 @@ export function SleepDashboard() {
           <StatCard label="Nights Logged" value={`${allDays.length}`} accentColor={COLORS.sleep} fullWidth />
         </View>
       </Card>
+
+      {/* Today's + Yesterday's Logs */}
+      {(todaySessions.length > 0 || yesterdaySessions.length > 0) && (
+        <Card style={styles.section}>
+          <SectionTitle
+            title="Today's Logs"
+            sub={`${todaySessions.length + yesterdaySessions.length} session${todaySessions.length + yesterdaySessions.length === 1 ? '' : 's'}`}
+          />
+          {todaySessions.length > 0 && (
+            <>
+              <Text style={styles.logsDateLabel}>Today</Text>
+              {todaySessions.map(s => (
+                <View key={s.id} style={styles.logRow}>
+                  <View style={styles.logInfo}>
+                    <Text style={styles.logDuration}>{formatDuration(s.actual_duration || 0)}</Text>
+                    <Text style={styles.logTime}>
+                      {new Date(s.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                      {' → '}
+                      {s.end_time ? new Date(s.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => handleDelete(s.id)} hitSlop={8} style={styles.deleteBtn}>
+                    <Trash2 size={16} color={COLORS.error} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
+          {yesterdaySessions.length > 0 && (
+            <>
+              <Text style={styles.logsDateLabel}>Yesterday</Text>
+              {yesterdaySessions.map(s => (
+                <View key={s.id} style={styles.logRow}>
+                  <View style={styles.logInfo}>
+                    <Text style={styles.logDuration}>{formatDuration(s.actual_duration || 0)}</Text>
+                    <Text style={styles.logTime}>
+                      {new Date(s.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                      {' → '}
+                      {s.end_time ? new Date(s.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => handleDelete(s.id)} hitSlop={8} style={styles.deleteBtn}>
+                    <Trash2 size={16} color={COLORS.error} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
+        </Card>
+      )}
         </Animated.View>
       </ScrollView>
     </View>
@@ -328,11 +414,6 @@ function SectionTitle({ title, sub }: { title: string; sub?: string }) {
 }
 
 // ── Helper functions ───────────────────────────────────────────────────────────
-
-function getTodayStr(): string {
-  const t = new Date();
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-}
 
 function getThisWeekDates(): string[] {
   const today = new Date();
@@ -358,7 +439,7 @@ function getCurrentMonthDates(): string[] {
 
 function getWeeksInCurrentMonth(monthData: DaySleep[]) {
   if (monthData.length === 0) return [];
-  const weeks: any[] = [];
+  const weeks: { data: DaySleep[]; dateRange: string }[] = [];
   for (let i = 0; i < monthData.length; i += 7) {
     const weekData = monthData.slice(i, i + 7);
     if (weekData.length === 0) continue; // Skip if somehow empty
@@ -377,7 +458,7 @@ function getWeeksInCurrentMonth(monthData: DaySleep[]) {
 function calculateMonthStats(monthData: DaySleep[], goalMinutes: number) {
   const days = monthData.filter(d => d.duration > 0);
   return {
-    avgSleep: days.length ? Math.round(days.reduce((s, d) => s + d.duration, 0) / days.length) : 0,
+    avgSleep: monthData.length ? Math.round(monthData.reduce((s, d) => s + d.duration, 0) / monthData.length) : 0,
     mostSleep: days.length ? Math.max(...days.map(d => d.duration)) : 0,
     leastSleep: days.length ? Math.min(...days.map(d => d.duration)) : 0,
     trackedDays: days.length,
@@ -459,4 +540,30 @@ const styles = StyleSheet.create({
   monthButtonTextDisabled: {
     color: COLORS.textMuted,
   },
+  logsDateLabel: {
+    fontSize: TYPOGRAPHY.size.xs,
+    color: COLORS.textMuted,
+    fontWeight: TYPOGRAPHY.weight.semibold,
+    marginTop: SPACING.xs,
+    marginBottom: 2,
+  },
+  logRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.glassBorder,
+  },
+  logInfo: { flex: 1 },
+  logDuration: {
+    fontSize: TYPOGRAPHY.size.sm,
+    fontWeight: TYPOGRAPHY.weight.bold,
+    color: COLORS.sleep,
+  },
+  logTime: {
+    fontSize: TYPOGRAPHY.size.xs,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  deleteBtn: { padding: SPACING.xs },
 });
