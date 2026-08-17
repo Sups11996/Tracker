@@ -62,7 +62,7 @@ export function StepSettingsSection() {
     try {
       await db.runAsync(
         'UPDATE step_tracking_state SET daily_goal = ?, updated_at = ? WHERE id = 1',
-        [newGoal, new Date().toISOString()]
+        [newGoal, Date.now()]
       );
       useStepStore.setState({ dailyGoal: newGoal });
       setIsEditing(false);

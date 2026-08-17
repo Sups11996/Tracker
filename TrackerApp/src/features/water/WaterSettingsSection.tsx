@@ -41,8 +41,8 @@ export function WaterSettingsSection() {
     }
     try {
       await db.runAsync(
-        'UPDATE user_profile SET water_goal_ml = ?, updated_at = ? WHERE id = 1',
-        [val, new Date().toISOString()]
+        'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+        ['water_daily_goal', val.toString()]
       );
       useWaterStore.setState({ dailyGoal: val });
       setEditingGoal(false);
@@ -52,7 +52,7 @@ export function WaterSettingsSection() {
 
   async function handleAddContainer() {
     const cap = parseInt(newCapacity, 10);
-    if (!newName.trim() || isNaN(cap) || cap < 10) return;
+    if (!newName.trim() || isNaN(cap) || cap < 10 || cap > 5000) return;
 
     try {
       const now = Date.now();

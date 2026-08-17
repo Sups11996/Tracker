@@ -2,11 +2,14 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Animated, Easing } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useWaterStore, hydrateWaterStore } from '../../stores/waterStore';
+import { Trash2 } from 'lucide-react-native';
+import { useWaterStore, hydrateWaterStore, deleteWaterLog } from '../../stores/waterStore';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { BarChart } from '../steps/BarChart';
 import { SkeletonCard } from '../../components/ui/SkeletonCard';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { getTodayLocal } from '../../lib/dateUtils';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 interface DayWater {
@@ -18,7 +21,8 @@ interface DayWater {
 
 export function WaterDashboard() {
   const db = useSQLiteContext();
-  const { todayTotal, dailyGoal } = useWaterStore();
+  const { todayTotal, dailyGoal, logs } = useWaterStore();
+  const { showConfirm } = useCustomAlert();
   const tabBarHeight = useBottomTabBarHeight();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -32,8 +36,14 @@ export function WaterDashboard() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
+  // Initial load on mount
   useEffect(() => {
-    hydrateWaterStore(db);
+    const init = async () => {
+      await hydrateWaterStore(db);
+      loadWeekAndMonth();
+      loadSelectedMonth(selectedMonth);
+    };
+    init();
   }, []);
 
   // Slide up + fade in when loading completes
@@ -56,19 +66,24 @@ export function WaterDashboard() {
     }
   }, [isLoading]);
 
-  // Reload week + current month whenever todayTotal changes
+  // Reload when todayTotal changes (after initial load is done)
+  const isFirstRender = useRef(true);
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     loadWeekAndMonth();
-  }, [todayTotal, db]);
+  }, [todayTotal]);
 
   useEffect(() => {
     loadSelectedMonth(selectedMonth);
-  }, [selectedMonth, db]);
+  }, [selectedMonth]);
 
   async function loadWeekAndMonth() {
     try {
       setIsLoading(true);
-      const todayStr = getTodayStr();
+      const todayStr = getTodayLocal();
 
       // ── This week ──────────────────────────────────────────────────────────
       const weekDates = getThisWeekDates();
@@ -106,13 +121,14 @@ export function WaterDashboard() {
       await new Promise(resolve => setTimeout(resolve, 200));
       setIsLoading(false);
     } catch (e) {
+      console.error('[WaterDashboard] loadWeekAndMonth failed:', e);
       setIsLoading(false);
     }
   }
 
   async function loadSelectedMonth(month: Date) {
     try {
-      const todayStr = getTodayStr();
+      const todayStr = getTodayLocal();
       const year = month.getFullYear();
       const monthIndex = month.getMonth();
       const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -134,6 +150,7 @@ export function WaterDashboard() {
       }
       setSelectedMonthData(data);
     } catch (e) {
+      console.error('[WaterDashboard] loadSelectedMonth failed:', e);
     }
   }
 
@@ -145,8 +162,8 @@ export function WaterDashboard() {
 
   const selectedStats = calculateMonthStats(selectedMonthData, dailyGoal);
 
-  // Stats card
-  const avgMl = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.total_ml, 0) / allDays.length) : 0;
+  // Stats card — divide by calendar days, not active days
+  const avgMl = currentMonthData.length ? Math.round(currentMonthData.reduce((s, d) => s + d.total_ml, 0) / currentMonthData.length) : 0;
   const lowMl = allDays.length ? Math.min(...allDays.map(d => d.total_ml)) : 0;
   const goalDays = allDays.filter(d => d.goal_met).length;
 
@@ -169,7 +186,7 @@ export function WaterDashboard() {
     setSelectedBar({ date: d.date, total_ml: d.total_ml, chartId, barIndex });
   }
 
-  const todayStr = getTodayStr();
+  const todayStr = getTodayLocal();
   const displayMl = selectedBar ? selectedBar.total_ml : todayTotal;
   const displayDate = selectedBar ? selectedBar.date : todayStr;
   const displayProgress = Math.min(100, Math.round((displayMl / dailyGoal) * 100));
@@ -310,6 +327,39 @@ export function WaterDashboard() {
           <StatCard label="Monthly Tot" value={formatMl(allDays.reduce((s, d) => s + d.total_ml, 0))} accentColor={COLORS.water} fullWidth />
         </View>
       </Card>
+
+      {/* Today's Logs */}
+      {isToday && logs.length > 0 && (
+        <Card style={styles.section}>
+          <SectionTitle title="Today's Logs" sub={`${logs.length} entr${logs.length === 1 ? 'y' : 'ies'}`} />
+          {logs.map((log) => (
+            <View key={log.id} style={styles.logRow}>
+              <View style={styles.logInfo}>
+                <Text style={styles.logName}>{log.container_name}</Text>
+                <Text style={styles.logTime}>
+                  {new Date(log.logged_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </Text>
+              </View>
+              <Text style={styles.logMl}>{formatMl(log.capacity_ml)}</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  showConfirm(
+                    'Delete Log',
+                    `Remove ${formatMl(log.capacity_ml)} entry?`,
+                    () => deleteWaterLog(db, log.id),
+                    'Delete',
+                    true
+                  );
+                }}
+                hitSlop={8}
+                style={styles.deleteBtn}
+              >
+                <Trash2 size={16} color={COLORS.error} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </Card>
+      )}
         </Animated.View>
       </ScrollView>
     </View>
@@ -328,11 +378,6 @@ function SectionTitle({ title, sub }: { title: string; sub?: string }) {
 }
 
 // ── Helper functions ───────────────────────────────────────────────────────────
-
-function getTodayStr(): string {
-  const t = new Date();
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-}
 
 function getThisWeekDates(): string[] {
   const today = new Date();
@@ -359,7 +404,7 @@ function getCurrentMonthDates(): string[] {
 
 function getWeeksInCurrentMonth(monthData: DayWater[]) {
   if (monthData.length === 0) return [];
-  const weeks: any[] = [];
+  const weeks: { data: DayWater[]; dateRange: string }[] = [];
   for (let i = 0; i < monthData.length; i += 7) {
     const weekData = monthData.slice(i, i + 7);
     if (weekData.length === 0) continue; // Skip if somehow empty
@@ -379,7 +424,7 @@ function calculateMonthStats(monthData: DayWater[], dailyGoal: number) {
   const days = monthData.filter(d => d.total_ml > 0);
   return {
     totalMl: monthData.reduce((s, d) => s + d.total_ml, 0),
-    avgMl: days.length ? Math.round(monthData.reduce((s, d) => s + d.total_ml, 0) / days.length) : 0,
+    avgMl: monthData.length ? Math.round(monthData.reduce((s, d) => s + d.total_ml, 0) / monthData.length) : 0,
     mostMl: days.length ? Math.max(...days.map(d => d.total_ml)) : 0,
     leastMl: days.length ? Math.min(...days.map(d => d.total_ml)) : 0,
     goalReached: monthData.filter(d => d.goal_met).length,
@@ -449,4 +494,16 @@ const styles = StyleSheet.create({
   monthButtonTextDisabled: {
     color: COLORS.textMuted,
   },
+  logRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.glassBorder,
+  },
+  logInfo: { flex: 1 },
+  logName: { fontSize: TYPOGRAPHY.size.sm, fontWeight: TYPOGRAPHY.weight.semibold, color: COLORS.textPrimary },
+  logTime: { fontSize: TYPOGRAPHY.size.xs, color: COLORS.textMuted, marginTop: 2 },
+  logMl: { fontSize: TYPOGRAPHY.size.sm, fontWeight: TYPOGRAPHY.weight.bold, color: COLORS.water, marginRight: SPACING.md },
+  deleteBtn: { padding: SPACING.xs },
 });

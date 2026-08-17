@@ -24,8 +24,8 @@ export function GenderAgeScreen() {
 
   function handleNext() {
     const age = parseInt(data.age, 10);
-    if (!data.age || isNaN(age) || age < 10 || age > 100) {
-      setAgeError('Enter a valid age (10–100)');
+    if (!data.age || isNaN(age) || age < 1 || age > 120) {
+      setAgeError('Enter a valid age (1–120)');
       return;
     }
     setAgeError('');

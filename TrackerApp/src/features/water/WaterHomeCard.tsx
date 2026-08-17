@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import {
+  Alert,
   Animated,
   Modal,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -18,7 +18,6 @@ import {
   useWaterStore,
   hydrateWaterStore,
   logWater,
-  undoLastLog,
 } from '../../stores/waterStore';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
@@ -28,7 +27,7 @@ interface WaterHomeCardProps {
 
 export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   const db = useSQLiteContext();
-  const { todayTotal, dailyGoal, containers, undoStack } = useWaterStore();
+  const { todayTotal, dailyGoal, containers } = useWaterStore();
 
   const [showCustomInput, setShowCustomInput] = React.useState(false);
   const [customMl, setCustomMl] = React.useState('');
@@ -36,39 +35,11 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
 
   useEffect(() => { hydrateWaterStore(db); }, []);
 
-  const toastAnim = useRef(new Animated.Value(0)).current;
-  const toastVisible = useRef(false);
-  const [toastMounted, setToastMounted] = React.useState(false);
-
-  const hasUndo = undoStack.length > 0;
-  useEffect(() => {
-    if (hasUndo && !toastVisible.current) {
-      toastVisible.current = true;
-      setToastMounted(true);
-      Animated.timing(toastAnim, { toValue: 1, duration: 250, useNativeDriver: true }).start();
-    } else if (!hasUndo && toastVisible.current) {
-      Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-        toastVisible.current = false;
-        setToastMounted(false);
-      });
-    }
-  }, [hasUndo]);
-
   async function handleLog(container: typeof containers[0]) {
     try { 
       await logWater(db, container); 
     } catch (e) {
       console.error('[WaterHomeCard] Log water failed:', e);
-      // Error is already user-friendly from waterStore
-    }
-  }
-
-  async function handleUndo() {
-    try { 
-      await undoLastLog(db); 
-    } catch (e) {
-      console.error('[WaterHomeCard] Undo failed:', e);
-      // Error is already user-friendly from waterStore
     }
   }
 
@@ -84,8 +55,16 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
 
   async function confirmCustom() {
     const ml = parseInt(customMl, 10);
-    if (!isNaN(ml) && ml > 0) {
-      await logWater(db, { id: -1, name: 'Custom', capacity_ml: ml, sort_order: 999 });
+    if (!isNaN(ml) && ml > 0 && ml <= 5000) {
+      try {
+        await logWater(db, { id: -1, name: 'Custom', capacity_ml: ml, sort_order: 999 });
+      } catch {
+        Alert.alert('Error', 'Failed to log water. Please try again.');
+        return;
+      }
+    } else if (!isNaN(ml) && ml > 5000) {
+      Alert.alert('Too Much', 'Please enter an amount up to 5000ml.');
+      return;
     }
     setCustomMl('');
     setShowCustomInput(false);
@@ -143,29 +122,6 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
               <Text style={styles.containerBtnName}>Custom</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Undo toast */}
-          {toastMounted && (
-            <Animated.View
-              style={[
-                styles.toast,
-                {
-                  opacity: toastAnim,
-                  transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
-                },
-              ]}
-              pointerEvents={hasUndo ? 'auto' : 'none'}
-            >
-              <Text style={styles.toastText}>
-                {undoStack.length === 1
-                  ? 'Water logged'
-                  : `${undoStack.length} logs (${undoStack.reduce((sum, e) => sum + e.amount, 0)}ml)`}
-              </Text>
-              <TouchableOpacity onPress={handleUndo} hitSlop={8}>
-                <Text style={styles.toastUndo}>Undo</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
         </Card>
       </TouchableOpacity>
 
@@ -189,6 +145,7 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
           >
             <View>
               <BlurView intensity={80} tint="dark" style={styles.modalContent}>
+                <View style={styles.modalInner}>
                 <Text style={styles.modalTitle}>Custom Amount</Text>
                 <TextInput
                   ref={inputRef}
@@ -204,14 +161,6 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
                 />
                 <View style={styles.modalButtons}>
                   <Button
-                    label="Log"
-                    onPress={confirmCustom}
-                    variant="primary"
-                    size="sm"
-                    accentColor={COLORS.water}
-                    style={{ flex: 1 }}
-                  />
-                  <Button
                     label="Cancel"
                     onPress={cancelCustom}
                     variant="ghost"
@@ -219,6 +168,15 @@ export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
                     accentColor={COLORS.water}
                     style={{ flex: 1 }}
                   />
+                  <Button
+                    label="Log"
+                    onPress={confirmCustom}
+                    variant="primary"
+                    size="sm"
+                    accentColor={COLORS.water}
+                    style={{ flex: 1 }}
+                  />
+                </View>
                 </View>
               </BlurView>
             </View>
@@ -270,19 +228,6 @@ const styles = StyleSheet.create({
     backgroundColor: `${COLORS.water}08`,
     gap: 2,
   },
-  toast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.glassHighlight,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.glassBorder,
-  },
-  toastText: { fontSize: TYPOGRAPHY.size.sm, color: COLORS.textPrimary },
-  toastUndo: { fontSize: TYPOGRAPHY.size.sm, fontWeight: TYPOGRAPHY.weight.bold, color: COLORS.water },
   
   // Modal styles
   modalOverlay: {
@@ -299,12 +244,18 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
+    padding: 0,
     width: 300,
     gap: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
     overflow: 'hidden',
+  },
+  modalInner: {
+    backgroundColor: 'rgba(14, 16, 26, 0.97)',
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    gap: SPACING.md,
   },
   modalTitle: {
     fontSize: TYPOGRAPHY.size.lg,
