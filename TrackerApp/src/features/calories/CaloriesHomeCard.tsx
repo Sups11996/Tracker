@@ -36,10 +36,7 @@ export function CaloriesHomeCard({ onPress }: CaloriesHomeCardProps) {
 
   // Keep walking calories in sync with step store
   useEffect(() => {
-    useCaloriesStore.setState((s) => ({
-      walkingCalories: stepCal,
-      totalCalories: Math.round(stepCal + s.workoutCalories),
-    }));
+    useCaloriesStore.getState().setWalkingCalories(stepCal);
   }, [stepCal]);
 
   async function handleSaveWorkout(durationMins: number, intensity: Intensity, note: string, customCalories?: number) {

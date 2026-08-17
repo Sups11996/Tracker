@@ -1,71 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, Switch, TextInput } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
-import { useIsFocused } from '@react-navigation/native';
-import * as Notifications from 'expo-notifications';
 import { Circle } from 'lucide-react-native';
 import { Card } from '../../components/ui/Card';
 import { useUserStore } from '../../stores/userStore';
-import { useAbcStore, hydrateAbcStore } from '../../stores/abcStore';
+import { useAbcStore } from '../../stores/abcStore';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
-
-const ABC_SUMMARY_NOTIFICATION_ID = 'abc_daily_summary';
-const SUMMARY_HOUR = 22;   // 10 PM
-const SUMMARY_MINUTE = 0;
-
-async function scheduleAbcSummary() {
-  await Notifications.cancelScheduledNotificationAsync(ABC_SUMMARY_NOTIFICATION_ID);
-  // @ts-ignore - expo-notifications API version compatibility
-  await Notifications.scheduleNotificationAsync({
-    identifier: ABC_SUMMARY_NOTIFICATION_ID,
-    content: {
-      title: 'ABC Daily Summary',
-      body: "Check today's ABC progress before the day ends.",
-      sound: true,
-      // @ts-ignore
-      android: { channelId: 'default', smallIcon: 'ic_notification' },
-    },
-    // @ts-ignore
-    trigger: {
-      type: 'daily',
-      hour: SUMMARY_HOUR,
-      minute: SUMMARY_MINUTE,
-      repeats: true,
-    },
-  });
-}
-
-async function cancelAbcSummary() {
-  await Notifications.cancelScheduledNotificationAsync(ABC_SUMMARY_NOTIFICATION_ID);
-}
 
 export function AbcSettingsSection() {
   const db = useSQLiteContext();
-  const isFocused = useIsFocused();
   const { profile } = useUserStore();
   const { dailyGoal } = useAbcStore();
 
   const [abcEnabled, setAbcEnabled] = useState(!!(profile?.uses_abc));
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
   const [goalInput, setGoalInput] = useState(dailyGoal.toString());
-
-  // Load saved notification setting from DB
-  useEffect(() => {
-    if (!isFocused) return;
-    async function load() {
-      try {
-        const row = await db.getFirstAsync<{ value: string }>(
-          `SELECT value FROM kv_store WHERE key = 'abc_summary_enabled'`
-        );
-        setNotificationsEnabled(row?.value === '1');
-        setIsInitialized(true);
-      } catch {
-        setIsInitialized(true);
-      }
-    }
-    load();
-  }, [isFocused, db]);
 
   useEffect(() => {
     setGoalInput(dailyGoal.toString());
@@ -90,42 +38,16 @@ export function AbcSettingsSection() {
 
   async function handleAbcToggle(enabled: boolean) {
     setAbcEnabled(enabled);
-    if (!enabled) {
-      setNotificationsEnabled(false);
-      await cancelAbcSummary();
-      await db.runAsync(
-        'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
-        ['abc_summary_enabled', '0']
-      );
-    }
-
     try {
       await db.runAsync(
         'UPDATE user_profile SET uses_abc = ?, updated_at = ? WHERE id = 1',
-        [enabled ? 1 : 0, new Date().toISOString()]
+        [enabled ? 1 : 0, Date.now()]
       );
       if (profile) {
         useUserStore.getState().setProfile({ ...profile, uses_abc: enabled });
       }
     } catch (e) {
       setAbcEnabled(!enabled);
-    }
-  }
-
-  async function handleNotificationsToggle(enabled: boolean) {
-    setNotificationsEnabled(enabled);
-    try {
-      await db.runAsync(
-        'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
-        ['abc_summary_enabled', enabled ? '1' : '0']
-      );
-      if (enabled) {
-        await scheduleAbcSummary();
-      } else {
-        await cancelAbcSummary();
-      }
-    } catch (e) {
-      setNotificationsEnabled(!enabled);
     }
   }
 
@@ -153,7 +75,7 @@ export function AbcSettingsSection() {
           </View>
         </View>
 
-        {/* Daily goal */}
+        {/* Daily limit */}
         {abcEnabled && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Daily Limit</Text>
@@ -174,23 +96,6 @@ export function AbcSettingsSection() {
             </View>
           </View>
         )}
-
-        {/* Daily Summary Notification */}
-        <View style={styles.section}>
-          <View style={styles.row}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.sectionTitle}>Daily Summary</Text>
-              <Text style={styles.description}>Get a daily summary at 10:00 PM</Text>
-            </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={handleNotificationsToggle}
-              trackColor={{ false: COLORS.glassHighlight, true: COLORS.abc }}
-              thumbColor={COLORS.textPrimary}
-              disabled={!abcEnabled || !isInitialized}
-            />
-          </View>
-        </View>
       </Card>
 
       <Text style={styles.note}>

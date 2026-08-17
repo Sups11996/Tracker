@@ -2,11 +2,14 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Animated, Easing } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
-import { useAbcStore, hydrateAbcStore } from '../../stores/abcStore';
+import { Trash2 } from 'lucide-react-native';
+import { useAbcStore, hydrateAbcStore, deleteAbcEntry } from '../../stores/abcStore';
 import { Card } from '../../components/ui/Card';
 import { StatCard } from '../../components/ui/StatCard';
 import { BarChart } from '../steps/BarChart';
 import { SkeletonCard } from '../../components/ui/SkeletonCard';
+import { useCustomAlert } from '../../hooks/useCustomAlert';
+import { getTodayLocal } from '../../lib/dateUtils';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
 interface DayAbc {
@@ -18,7 +21,8 @@ interface DayAbc {
 
 export function AbcDashboard() {
   const db = useSQLiteContext();
-  const { todayCount, dailyGoal } = useAbcStore();
+  const { todayCount, dailyGoal, entries } = useAbcStore();
+  const { showConfirm } = useCustomAlert();
   const tabBarHeight = useBottomTabBarHeight();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -73,14 +77,14 @@ export function AbcDashboard() {
   async function loadWeekAndMonth() {
     try {
       setIsLoading(true);
-      const todayStr = getTodayStr();
+      const todayStr = getTodayLocal();
 
       // This week
       const weekDates = getThisWeekDates();
       const week: DayAbc[] = [];
       for (const dateStr of weekDates) {
         const count = await getCountForDate(dateStr, todayStr);
-        week.push({ date: dateStr, count, goal: dailyGoal, goal_met: count <= dailyGoal });
+        week.push({ date: dateStr, count, goal: dailyGoal, goal_met: count > 0 && count <= dailyGoal });
       }
       setThisWeekData(week);
 
@@ -89,7 +93,7 @@ export function AbcDashboard() {
       const month: DayAbc[] = [];
       for (const dateStr of monthDates) {
         const count = await getCountForDate(dateStr, todayStr);
-        month.push({ date: dateStr, count, goal: dailyGoal, goal_met: count <= dailyGoal });
+        month.push({ date: dateStr, count, goal: dailyGoal, goal_met: count > 0 && count <= dailyGoal });
       }
       setCurrentMonthData(month);
 
@@ -103,7 +107,7 @@ export function AbcDashboard() {
 
   async function loadSelectedMonth(month: Date) {
     try {
-      const todayStr = getTodayStr();
+      const todayStr = getTodayLocal();
       const year = month.getFullYear();
       const monthIndex = month.getMonth();
       const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -114,7 +118,7 @@ export function AbcDashboard() {
       for (let day = 1; day <= lastDay; day++) {
         const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const count = await getCountForDate(dateStr, todayStr);
-        data.push({ date: dateStr, count, goal: dailyGoal, goal_met: count <= dailyGoal });
+        data.push({ date: dateStr, count, goal: dailyGoal, goal_met: count > 0 && count <= dailyGoal });
       }
       setSelectedMonthData(data);
     } catch (e) {
@@ -131,7 +135,8 @@ export function AbcDashboard() {
 
   const selectedStats = calculateMonthStats(selectedMonthData, dailyGoal);
 
-  const avgCount = allDays.length ? Math.round(allDays.reduce((s, d) => s + d.count, 0) / allDays.length) : 0;
+  // Stats card — divide by calendar days, not active days
+  const avgCount = currentMonthData.length ? Math.round(currentMonthData.reduce((s, d) => s + d.count, 0) / currentMonthData.length) : 0;
   const lowCount = allDays.length ? Math.min(...allDays.map(d => d.count)) : 0;
   const goalDays = allDays.filter(d => d.goal_met).length;
 
@@ -154,7 +159,7 @@ export function AbcDashboard() {
     setSelectedBar({ date: d.date, count: d.count, goal: d.goal, chartId, barIndex });
   }
 
-  const todayStr = getTodayStr();
+  const todayStr = getTodayLocal();
   const displayCount = selectedBar ? selectedBar.count : todayCount;
   const displayGoal = selectedBar ? selectedBar.goal : dailyGoal;
   const displayDate = selectedBar ? selectedBar.date : todayStr;
@@ -296,6 +301,38 @@ export function AbcDashboard() {
           <StatCard label="Monthly Tot" value={allDays.reduce((s, d) => s + d.count, 0).toString()} accentColor={COLORS.abc} fullWidth />
         </View>
       </Card>
+
+      {/* Today's Logs */}
+      {isToday && entries.length > 0 && (
+        <Card style={styles.section}>
+          <SectionTitle title="Today's Logs" sub={`${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`} />
+          {entries.map((entry, index) => (
+            <View key={entry.id} style={styles.logRow}>
+              <View style={styles.logInfo}>
+                <Text style={styles.logLabel}>Entry {index + 1}</Text>
+                <Text style={styles.logTime}>
+                  {new Date(entry.logged_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  showConfirm(
+                    'Delete Entry',
+                    'Remove this ABC entry?',
+                    () => deleteAbcEntry(db, entry.id),
+                    'Delete',
+                    true
+                  );
+                }}
+                hitSlop={8}
+                style={styles.deleteBtn}
+              >
+                <Trash2 size={16} color={COLORS.error} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </Card>
+      )}
         </Animated.View>
       </ScrollView>
     </View>
@@ -309,11 +346,6 @@ function SectionTitle({ title, sub }: { title: string; sub?: string }) {
       {sub ? <Text style={styles.sectionSub}>{sub}</Text> : null}
     </View>
   );
-}
-
-function getTodayStr(): string {
-  const t = new Date();
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }
 
 function getThisWeekDates(): string[] {
@@ -340,7 +372,7 @@ function getCurrentMonthDates(): string[] {
 
 function getWeeksInCurrentMonth(monthData: DayAbc[]) {
   if (monthData.length === 0) return [];
-  const weeks: any[] = [];
+  const weeks: { data: DayAbc[]; dateRange: string }[] = [];
   for (let i = 0; i < monthData.length; i += 7) {
     const weekData = monthData.slice(i, i + 7);
     if (weekData.length === 0) continue; // Skip if somehow empty
@@ -358,13 +390,15 @@ function getWeeksInCurrentMonth(monthData: DayAbc[]) {
 
 function calculateMonthStats(monthData: DayAbc[], dailyGoal: number) {
   const days = monthData.filter(d => d.count > 0);
+  const goalReached = days.filter(d => d.count <= dailyGoal).length;
+  const goalMissed = days.filter(d => d.count > dailyGoal).length;
   return {
     total: monthData.reduce((s, d) => s + d.count, 0),
-    avg: days.length ? Math.round(monthData.reduce((s, d) => s + d.count, 0) / days.length) : 0,
+    avg: monthData.length ? Math.round(monthData.reduce((s, d) => s + d.count, 0) / monthData.length) : 0,
     most: days.length ? Math.max(...days.map(d => d.count)) : 0,
     least: days.length ? Math.min(...days.map(d => d.count)) : 0,
-    goalReached: monthData.filter(d => d.goal_met).length,
-    goalMissed: days.length - monthData.filter(d => d.goal_met).length,
+    goalReached,
+    goalMissed,
   };
 }
 
@@ -423,4 +457,15 @@ const styles = StyleSheet.create({
   monthButtonTextDisabled: {
     color: COLORS.textMuted,
   },
+  logRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.glassBorder,
+  },
+  logInfo: { flex: 1 },
+  logLabel: { fontSize: TYPOGRAPHY.size.sm, fontWeight: TYPOGRAPHY.weight.semibold, color: COLORS.textPrimary },
+  logTime: { fontSize: TYPOGRAPHY.size.xs, color: COLORS.textMuted, marginTop: 2 },
+  deleteBtn: { padding: SPACING.xs },
 });

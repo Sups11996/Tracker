@@ -1,6 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import {
-  Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -13,7 +12,6 @@ import {
   useAbcStore,
   hydrateAbcStore,
   logAbc,
-  undoLastAbc,
 } from '../../stores/abcStore';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '../../constants';
 
@@ -23,61 +21,35 @@ interface AbcHomeCardProps {
 
 export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
   const db = useSQLiteContext();
-  const { todayCount, lastLoggedAt, yesterdayCount, undoEntry, undoStack, dailyGoal } = useAbcStore();
-
-  const toastAnim = useRef(new Animated.Value(0)).current;
-  const toastVisible = useRef(false);
-  const [toastMounted, setToastMounted] = React.useState(false);
+  const { todayCount, lastLoggedAt, yesterdayCount, dailyGoal } = useAbcStore();
 
   useEffect(() => {
     hydrateAbcStore(db);
   }, []);
 
-  // Animate toast in/out when undoEntry changes
-  useEffect(() => {
-    if (undoEntry && !toastVisible.current) {
-      toastVisible.current = true;
-      setToastMounted(true);
-      Animated.timing(toastAnim, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    } else if (!undoEntry && toastVisible.current) {
-      Animated.timing(toastAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => {
-        toastVisible.current = false;
-        setToastMounted(false);
-      });
-    }
-  }, [undoEntry]);
-
   async function handleLog() {
     try {
       await logAbc(db);
     } catch (e) {
-      // silent fail — UI already updated optimistically
-    }
-  }
-
-  async function handleUndo() {
-    try {
-      await undoLastAbc(db);
-    } catch (e) {
-      // silent fail
+      console.error('[AbcHomeCard] Log failed:', e);
+      // logAbc throws on DB error — silently ignore in UI since
+      // the store was not updated (DB write guards store update)
     }
   }
 
   const diff = todayCount - yesterdayCount;
+  // Only show trend if yesterday had data (avoids misleading "more than yesterday" on day 1)
+  const hasTrend = yesterdayCount > 0 || todayCount > 0;
   const trendIcon =
+    !hasTrend ? <Minus size={14} color={COLORS.textMuted} /> :
     diff > 0 ? <TrendingUp size={14} color={COLORS.calories} /> :
     diff < 0 ? <TrendingDown size={14} color={COLORS.success} /> :
     <Minus size={14} color={COLORS.textMuted} />;
-  const trendText = diff === 0 ? 'Same as yesterday' : `${Math.abs(diff)} ${diff > 0 ? 'more' : 'less'} than yesterday`;
-  const trendColor = diff > 0 ? COLORS.calories : diff < 0 ? COLORS.success : COLORS.textMuted;
+  const trendText =
+    !hasTrend ? 'No data yet' :
+    diff === 0 ? 'Same as yesterday' :
+    `${Math.abs(diff)} ${diff > 0 ? 'more' : 'less'} than yesterday`;
+  const trendColor = !hasTrend ? COLORS.textMuted : diff > 0 ? COLORS.calories : diff < 0 ? COLORS.success : COLORS.textMuted;
 
   const lastLoggedStr = lastLoggedAt
     ? new Date(lastLoggedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
@@ -112,34 +84,6 @@ export function AbcHomeCard({ onPress }: AbcHomeCardProps) {
           <Plus size={20} color={COLORS.abc} />
           <Text style={styles.addBtnText}>Add ABC</Text>
         </TouchableOpacity>
-
-        {/* Undo toast — only mounted when there's something to undo */}
-        {toastMounted && (
-          <Animated.View
-            style={[
-              styles.toast,
-              {
-                opacity: toastAnim,
-                transform: [
-                  {
-                    translateY: toastAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [10, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-            pointerEvents={undoEntry ? 'auto' : 'none'}
-          >
-            <Text style={styles.toastText}>
-              {undoStack.length > 1 ? `${undoStack.length} logged` : 'ABC Logged'}
-            </Text>
-            <TouchableOpacity onPress={handleUndo} hitSlop={8}>
-              <Text style={styles.toastUndo}>Undo</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
       </Card>
     </TouchableOpacity>
   );
@@ -217,26 +161,6 @@ const styles = StyleSheet.create({
     backgroundColor: `${COLORS.abc}15`,
   },
   addBtnText: {
-    fontSize: TYPOGRAPHY.size.sm,
-    fontWeight: TYPOGRAPHY.weight.bold,
-    color: COLORS.abc,
-  },
-  toast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.glassHighlight,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.glassBorder,
-  },
-  toastText: {
-    fontSize: TYPOGRAPHY.size.sm,
-    color: COLORS.textPrimary,
-  },
-  toastUndo: {
     fontSize: TYPOGRAPHY.size.sm,
     fontWeight: TYPOGRAPHY.weight.bold,
     color: COLORS.abc,

@@ -59,11 +59,12 @@ export function WorkoutLogModal({
 
   function handleSave() {
     if (activeDuration < 1) return;
-    const caloriesOverride = useCustomCalories && customCalories 
-      ? parseInt(customCalories, 10) 
+    const caloriesOverride = useCustomCalories && customCalories
+      ? parseInt(customCalories, 10)
       : undefined;
+    // Guard against NaN or negative custom calories
+    if (caloriesOverride !== undefined && (isNaN(caloriesOverride) || caloriesOverride < 0)) return;
     onSave(activeDuration, intensity, note.trim(), caloriesOverride);
-    // Don't reset immediately - let modal close first
   }
 
   function handleCancel() {
@@ -216,8 +217,8 @@ export function WorkoutLogModal({
 
             {/* Actions */}
             <View style={styles.actions}>
-              <Button label="Log Workout" onPress={handleSave} variant="primary" accentColor={COLORS.calories} style={styles.actionBtn} />
               <Button label="Cancel" onPress={handleCancel} variant="ghost" style={styles.actionBtn} />
+              <Button label="Log Workout" onPress={handleSave} variant="primary" accentColor={COLORS.calories} style={styles.actionBtn} />
             </View>
                   </View>
               </ScrollView>
