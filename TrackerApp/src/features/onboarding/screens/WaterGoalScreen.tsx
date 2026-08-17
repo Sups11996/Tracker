@@ -18,11 +18,15 @@ export function WaterGoalScreen() {
   const goalMl = parseInt(data.water_goal_ml, 10) || 0;
   const goalL = (goalMl / 1000).toFixed(1);
 
+  const [goalError, setGoalError] = React.useState('');
+
   function handleNext() {
     const val = parseInt(data.water_goal_ml, 10);
     if (!val || val < 500 || val > 6000) {
-      update({ water_goal_ml: '2400' });
+      setGoalError('Enter a goal between 500 and 6000 ml');
+      return;
     }
+    setGoalError('');
     navigation.navigate('GymQuestion');
   }
 
@@ -45,10 +49,11 @@ export function WaterGoalScreen() {
         label="Edit goal (ml)"
         placeholder={String(goalMl)}
         value={data.water_goal_ml}
-        onChangeText={(v) => update({ water_goal_ml: v })}
+        onChangeText={(v) => { update({ water_goal_ml: v }); setGoalError(''); }}
         keyboardType="numeric"
         maxLength={4}
         hint="Min 500 ml · Max 6000 ml"
+        error={goalError}
         returnKeyType="done"
         onSubmitEditing={handleNext}
       />

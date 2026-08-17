@@ -58,6 +58,8 @@ let statusSub:    { remove: () => void } | null = null;
 
 export function subscribeToStepEvents() {
   if (Platform.OS !== 'android') return;
+  // Guard against double-subscription if component remounts
+  if (subscription !== null) return;
   try {
     // Use DeviceEventEmitter which works without a module reference on Android
     const { DeviceEventEmitter } = require('react-native');
@@ -100,16 +102,17 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
   try {
     const today = getTodayLocal();
 
-    // DON'T load today's steps from DB - they come from native service in real-time
-    // Only load if today's steps are currently 0 (app just started)
-    const currentSteps = useStepStore.getState().todaySteps;
-    if (currentSteps === 0) {
-      const row = await db.getFirstAsync<DayStepRecord>(
-        'SELECT * FROM daily_steps WHERE date = ?', [today]
-      );
-      if (row) {
-        useStepStore.getState().setToday(row.steps, row.distance_m, row.calories);
-      }
+    // Load today's steps from DB on hydration.
+    // Always load — the native service will overwrite with live data immediately,
+    // but we need the correct starting value (0 for a new day, or last-saved for resume).
+    const row = await db.getFirstAsync<DayStepRecord>(
+      'SELECT * FROM daily_steps WHERE date = ?', [today]
+    );
+    if (row) {
+      useStepStore.getState().setToday(row.steps, row.distance_m, row.calories);
+    } else {
+      // New day — explicitly reset to 0 so yesterday's in-memory value doesn't persist
+      useStepStore.getState().setToday(0, 0, 0);
     }
 
     // Tracking state
@@ -185,36 +188,27 @@ export async function saveStepData(db: SQLite.SQLiteDatabase, dateOverride?: str
       [dateToSave, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, dateToSave, now, now]
     );
 
-    
-    // Only refresh weekly/monthly historical data, don't reload today's data
-    // (today's data comes from the native service in real-time)
-    
-    const today = getTodayLocal();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-    const startOfWeek = `${sevenDaysAgo.getFullYear()}-${String(sevenDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(sevenDaysAgo.getDate()).padStart(2, '0')}`;
-    
-    const weekly = await db.getAllAsync<DayStepRecord>(
-      `SELECT * FROM daily_steps
-       WHERE date >= ? AND date <= ?
-       ORDER BY date ASC`,
-      [startOfWeek, today]
+    // Keep calories_daily_summary in sync so exports always show correct walking calories
+    // even on days with no workout logged
+    const workoutRow = await db.getFirstAsync<{ workout_calories: number; total_calories: number }>(
+      'SELECT workout_calories, total_calories FROM calories_daily_summary WHERE date = ?',
+      [dateToSave]
     );
-    useStepStore.getState().setWeeklyData(weekly);
-
-    const currentDate = new Date();
-    const startOfMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
-    
-    const monthly = await db.getAllAsync<DayStepRecord>(
-      `SELECT * FROM daily_steps
-       WHERE date >= ? AND date <= ?
-       ORDER BY date ASC`,
-      [startOfMonth, today]
+    const workoutCal = workoutRow?.workout_calories ?? 0;
+    const totalCal = Math.round(state.todayCalories + workoutCal);
+    await db.runAsync(
+      `INSERT INTO calories_daily_summary (date, walking_calories, workout_calories, total_calories, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(date) DO UPDATE SET
+         walking_calories = ?,
+         total_calories = ?,
+         updated_at = ?`,
+      [dateToSave, state.todayCalories, workoutCal, totalCal, now, now,
+       state.todayCalories, totalCal, now]
     );
-    useStepStore.getState().setMonthlyData(monthly);
-    
-  } catch (error) {
+  } catch (error: any) {
+    // DB connection closed (app resume race condition) — next foreground hydration will reconcile
     console.error('[StepStore] Save step data failed:', error);
-    // Don't throw - app continues without saving this update
+    // Don't throw - app continues
   }
 }

@@ -105,6 +105,51 @@ export async function hydrateAbcStore(db: SQLiteDatabase): Promise<void> {
 }
 
 /**
+ * Delete a specific ABC log entry by id (today only).
+ */
+export async function deleteAbcEntry(
+  db: SQLiteDatabase,
+  logId: number
+): Promise<void> {
+  const today = getTodayLocal();
+  const now = Date.now();
+  const state = useAbcStore.getState();
+
+  try {
+    await db.runAsync('DELETE FROM abc_logs WHERE id = ?', [logId]);
+
+    const newEntries = state.entries.filter(e => e.id !== logId);
+    const newCount = newEntries.length;
+    const newLastLoggedAt = newEntries.length > 0 ? newEntries[newEntries.length - 1].logged_at : null;
+
+    // Update daily summary
+    if (newCount === 0) {
+      await db.runAsync('DELETE FROM abc_daily_summary WHERE date = ?', [today]);
+    } else {
+      await db.runAsync(
+        'UPDATE abc_daily_summary SET count = ?, updated_at = ? WHERE date = ?',
+        [newCount, now, today]
+      );
+    }
+
+    // Filter undoStack to remove the deleted entry
+    const newUndoStack = state.undoStack.filter(u => u.logId !== logId);
+    const newUndoEntry = newUndoStack.length > 0 ? newUndoStack[newUndoStack.length - 1] : null;
+
+    useAbcStore.setState({
+      entries: newEntries,
+      todayCount: newCount,
+      lastLoggedAt: newLastLoggedAt,
+      undoStack: newUndoStack,
+      undoEntry: newUndoEntry,
+    });
+  } catch (error) {
+    console.error('[AbcStore] Delete entry failed:', error);
+    throw new Error('Failed to delete ABC entry');
+  }
+}
+
+/**
  * Log a new ABC entry (increment count).
  */
 export async function logAbc(db: SQLiteDatabase): Promise<void> {
@@ -119,6 +164,15 @@ export async function logAbc(db: SQLiteDatabase): Promise<void> {
       [today, now, now]
     );
 
+    // Update daily summary
+    await db.runAsync(
+      `INSERT INTO abc_daily_summary (date, count, created_at, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(date) DO UPDATE SET count = ?, updated_at = ?`,
+      [today, newCount, now, now, newCount, now]
+    );
+
+    // Both DB writes succeeded — now update the store
     const newEntry: AbcEntry = {
       id: result.lastInsertRowId,
       date: today,
@@ -148,17 +202,9 @@ export async function logAbc(db: SQLiteDatabase): Promise<void> {
       lastLoggedAt: now,
       entries: [...state.entries, newEntry],
       undoStack: newStack,
-      undoEntry: newUndoEntry, // keep for UI visibility
+      undoEntry: newUndoEntry,
       undoTimer: timer,
     });
-
-    // Update daily summary
-    await db.runAsync(
-      `INSERT INTO abc_daily_summary (date, count, created_at, updated_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(date) DO UPDATE SET count = ?, updated_at = ?`,
-      [today, newCount, now, now, newCount, now]
-    );
   } catch (error) {
     console.error('[AbcStore] Log ABC failed:', error);
     throw new Error('Failed to log ABC entry');
@@ -189,7 +235,17 @@ export async function undoLastAbc(db: SQLiteDatabase): Promise<void> {
       ? newEntries[newEntries.length - 1].logged_at
       : null;
 
-    // If stack still has items, reset timer; otherwise clear everything
+    // Update daily summary first — store only updated after both DB writes succeed
+    if (topEntry.previousCount === 0) {
+      await db.runAsync('DELETE FROM abc_daily_summary WHERE date = ?', [today]);
+    } else {
+      await db.runAsync(
+        'UPDATE abc_daily_summary SET count = ?, updated_at = ? WHERE date = ?',
+        [topEntry.previousCount, now, today]
+      );
+    }
+
+    // Both DB writes succeeded — now update the store
     if (newStack.length > 0) {
       if (undoTimer) clearTimeout(undoTimer);
       const timer = setTimeout(() => {
@@ -203,7 +259,7 @@ export async function undoLastAbc(db: SQLiteDatabase): Promise<void> {
         lastLoggedAt: newLastLoggedAt,
         entries: newEntries,
         undoStack: newStack,
-        undoEntry: newStack[newStack.length - 1], // show next undoable entry
+        undoEntry: newStack[newStack.length - 1],
         undoTimer: timer,
       });
     } else {
@@ -216,16 +272,6 @@ export async function undoLastAbc(db: SQLiteDatabase): Promise<void> {
         undoEntry: null,
         undoTimer: null,
       });
-    }
-
-    // Update daily summary
-    if (topEntry.previousCount === 0) {
-      await db.runAsync('DELETE FROM abc_daily_summary WHERE date = ?', [today]);
-    } else {
-      await db.runAsync(
-        'UPDATE abc_daily_summary SET count = ?, updated_at = ? WHERE date = ?',
-        [topEntry.previousCount, now, today]
-      );
     }
   } catch (error) {
     console.error('[AbcStore] Undo ABC failed:', error);

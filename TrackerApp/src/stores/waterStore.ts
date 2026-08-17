@@ -70,19 +70,37 @@ export async function hydrateWaterStore(db: SQLiteDatabase): Promise<void> {
       [today]
     );
 
-    // Today's total = last running_total entry, or 0
-    const todayTotal = logs.length > 0 ? logs[logs.length - 1].running_total : 0;
+    // Today's total = sum of capacity_ml (don't trust running_total — stale after deletions)
+    const todayTotal = logs.reduce((sum, l) => sum + l.capacity_ml, 0);
 
-    // Load daily goal from user profile
-    const profile = await db.getFirstAsync<{ water_goal_ml: number }>(
-      'SELECT water_goal_ml FROM user_profile WHERE id = 1'
+    // Load daily goal — prefer kv_store (new path), fall back to user_profile for backwards compatibility
+    const kvGoal = await db.getFirstAsync<{ value: string }>(
+      `SELECT value FROM kv_store WHERE key = 'water_daily_goal'`
     );
+    let waterGoal = 2400;
+    if (kvGoal) {
+      waterGoal = parseInt(kvGoal.value, 10);
+    } else {
+      const profile = await db.getFirstAsync<{ water_goal_ml: number }>(
+        'SELECT water_goal_ml FROM user_profile WHERE id = 1'
+      );
+      waterGoal = profile?.water_goal_ml ?? 2400;
+      // One-time migration: write to kv_store so it's the single source of truth going forward
+      await db.runAsync(
+        'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+        ['water_daily_goal', waterGoal.toString()]
+      );
+      // Clear user_profile back to default so it no longer diverges
+      await db.runAsync(
+        'UPDATE user_profile SET water_goal_ml = 2400 WHERE id = 1 AND water_goal_ml != 2400'
+      );
+    }
 
     useWaterStore.setState({
       containers,
       logs,
       todayTotal,
-      dailyGoal: profile?.water_goal_ml ?? 2400,
+      dailyGoal: waterGoal,
     });
   } catch (error) {
     console.error('[WaterStore] Hydration failed:', error);
@@ -96,6 +114,10 @@ export async function hydrateWaterStore(db: SQLiteDatabase): Promise<void> {
   }
 }
 
+// Serialisation lock — ensures concurrent logWater calls queue up and each
+// reads the committed total from the previous call, not a stale parallel snapshot.
+let logWaterLock: Promise<void> = Promise.resolve();
+
 /**
  * Log a water intake entry. Returns the new log id.
  */
@@ -103,9 +125,17 @@ export async function logWater(
   db: SQLiteDatabase,
   container: WaterContainer
 ): Promise<void> {
+  // Queue behind any in-flight logWater call
+  let resolveLock!: () => void;
+  const previousLock = logWaterLock;
+  logWaterLock = new Promise<void>(r => { resolveLock = r; });
+  await previousLock;
+
   const now = Date.now();
   const today = getTodayLocal();
+  // Re-read state AFTER acquiring lock so we get the committed total
   const state = useWaterStore.getState();
+  const { dailyGoal } = state;
   const newTotal = state.todayTotal + container.capacity_ml;
 
   try {
@@ -113,6 +143,22 @@ export async function logWater(
       `INSERT INTO water_logs (date, logged_at, container_id, container_name, capacity_ml, running_total, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [today, now, container.id, container.name, container.capacity_ml, newTotal, now]
+    );
+
+    // Update daily summary
+    await db.runAsync(
+      `INSERT INTO water_daily_summary (date, total_ml, goal_ml, goal_met, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(date) DO UPDATE SET total_ml = ?, goal_met = ?, updated_at = ?`,
+      [
+        today, newTotal,
+        dailyGoal,
+        newTotal >= dailyGoal ? 1 : 0,
+        now, now,
+        newTotal,
+        newTotal >= dailyGoal ? 1 : 0,
+        now,
+      ]
     );
 
     const newLog: WaterLog = {
@@ -154,14 +200,51 @@ export async function logWater(
     });
   } catch (error) {
     console.error('[WaterStore] Log water failed:', error);
-    // Re-throw for UI to handle (show error message)
     throw new Error('Failed to log water intake');
+  } finally {
+    // Always release the lock so the next queued call can proceed
+    resolveLock();
   }
 }
 
 /**
- * Undo the last water log entry within the 30-second window.
+ * Delete a specific water log entry by id (today only).
  */
+export async function deleteWaterLog(
+  db: SQLiteDatabase,
+  logId: number
+): Promise<void> {
+  const today = getTodayLocal();
+  const now = Date.now();
+  const state = useWaterStore.getState();
+
+  try {
+    await db.runAsync('DELETE FROM water_logs WHERE id = ?', [logId]);
+
+    const newLogs = state.logs.filter(l => l.id !== logId);
+    // Sum capacity_ml of remaining logs — don't trust running_total as it's stale after deletion
+    const newTotal = newLogs.reduce((sum, l) => sum + l.capacity_ml, 0);
+    const dailyGoal = state.dailyGoal;
+
+    // Update daily summary
+    if (newTotal <= 0) {
+      await db.runAsync('DELETE FROM water_daily_summary WHERE date = ?', [today]);
+    } else {
+      await db.runAsync(
+        'UPDATE water_daily_summary SET total_ml = ?, goal_met = ?, updated_at = ? WHERE date = ?',
+        [newTotal, newTotal >= dailyGoal ? 1 : 0, now, today]
+      );
+    }
+
+    useWaterStore.setState({
+      logs: newLogs,
+      todayTotal: newTotal,
+    });
+  } catch (error) {
+    console.error('[WaterStore] Delete log failed:', error);
+    throw new Error('Failed to delete water log');
+  }
+}
 export async function undoLastLog(db: SQLiteDatabase): Promise<void> {
   const state = useWaterStore.getState();
   const { undoStack } = state;
@@ -173,13 +256,31 @@ export async function undoLastLog(db: SQLiteDatabase): Promise<void> {
   try {
     await db.runAsync('DELETE FROM water_logs WHERE id = ?', [undoEntry.logId]);
 
-    // Remove from stack
+    // Update daily summary
+    const today = getTodayLocal();
+    const now = Date.now();
+    const newTotal = undoEntry.previousTotal;
+    const dailyGoal = useWaterStore.getState().dailyGoal;
+    if (newTotal <= 0) {
+      await db.runAsync('DELETE FROM water_daily_summary WHERE date = ?', [today]);
+    } else {
+      await db.runAsync(
+        'UPDATE water_daily_summary SET total_ml = ?, goal_met = ?, updated_at = ? WHERE date = ?',
+        [newTotal, newTotal >= dailyGoal ? 1 : 0, now, today]
+      );
+    }
+
+    // Remove from stack and clear timer if stack is now empty
     const newStack = undoStack.slice(0, -1);
+    if (newStack.length === 0 && state.undoTimer) {
+      clearTimeout(state.undoTimer);
+    }
 
     useWaterStore.setState({
       todayTotal: undoEntry.previousTotal,
       logs: state.logs.filter((l) => l.id !== undoEntry.logId),
       undoStack: newStack,
+      undoTimer: newStack.length === 0 ? null : state.undoTimer,
     });
   } catch (error) {
     console.error('[WaterStore] Undo failed:', error);

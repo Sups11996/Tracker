@@ -24,6 +24,9 @@ const StepServiceModule = Platform.OS === 'android' ? NativeModules.StepServiceM
  */
 export function useAppHydration(): { isReady: boolean } {
   const db = useSQLiteContext();
+  const dbRef = useRef(db);
+  useEffect(() => { dbRef.current = db; }, [db]);
+
   const { profile } = useUserStore();
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const hasHydratedOnce = useRef(false);
@@ -34,12 +37,12 @@ export function useAppHydration(): { isReady: boolean } {
   const isCheckingDate = useRef(false);
 
   async function handleDateChangeIfNeeded() {
+    const db = dbRef.current;
     // Prevent concurrent date checks
     if (isCheckingDate.current) return false;
     isCheckingDate.current = true;
     
     try {
-      // Make sure database is available
       if (!db) {
         console.error('[AppHydration] Database not available');
         return false;
@@ -47,10 +50,8 @@ export function useAppHydration(): { isReady: boolean } {
 
       const dateChanged = await checkDateChanged(db);
       if (dateChanged) {
-        // Get yesterday's date (the day that just ended)
         const yesterdayDate = getYesterdayLocal();
         
-        // Save yesterday's step data with yesterday's date
         try {
           const state = useStepStore.getState();
           const goalMet = state.todaySteps >= state.dailyGoal ? 1 : 0;
@@ -64,36 +65,29 @@ export function useAppHydration(): { isReady: boolean } {
             [yesterdayDate, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, yesterdayDate, now, now]
           );
           
-          // IMPORTANT: Only update last_known_date AFTER successful save
-          // This prevents data loss if app crashes during save
           await db.runAsync(
-            'UPDATE kv_store SET value = ? WHERE key = ?',
-            [getTodayLocal(), 'last_known_date']
+            'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+            ['last_known_date', getTodayLocal()]
           );
-        } catch (error) {
-          console.error('[AppHydration] Save yesterday data failed:', error);
-          // Continue with reset even if save fails
-        }
-        
-        // Reset step counter in store
-        useStepStore.setState({ todaySteps: 0, todayDistance: 0, todayCalories: 0 });
 
-        // Reset water in store
-        useWaterStore.setState({ todayTotal: 0, logs: [], undoStack: [] });
+          // Only reset stores AFTER DB write confirmed — prevents data loss on write failure
+          useStepStore.setState({ todaySteps: 0, todayDistance: 0, todayCalories: 0 });
+          useWaterStore.setState({ todayTotal: 0, logs: [], undoStack: [] });
 
-        // Tell native step service to reset
-        if (StepServiceModule) {
-          try {
-            await StepServiceModule.sendAction('reset');
-          } catch (error) {
-            console.error('[AppHydration] Native reset failed:', error);
-            // Continue - not critical
+          if (StepServiceModule) {
+            try {
+              await StepServiceModule.sendAction('reset');
+            } catch (error) {
+              console.error('[AppHydration] Native reset failed:', error);
+            }
           }
+        } catch (error) {
+          console.error('[AppHydration] Save yesterday data failed — stores NOT reset to preserve data:', error);
         }
         
-        return true; // Indicate that date changed
+        return true;
       }
-      return false; // No date change
+      return false;
     } catch (error) {
       console.error('[AppHydration] Date change check failed:', error);
       return false;
@@ -103,28 +97,36 @@ export function useAppHydration(): { isReady: boolean } {
   }
 
   async function hydrateAll() {
-    // Prevent concurrent hydrations
+    const db = dbRef.current;
     if (isHydrating.current) return;
     isHydrating.current = true;
     
     try {
-      // Make sure database is available
       if (!db) {
         console.error('[AppHydration] Database not available for hydration');
         return;
       }
 
-      // Run sequentially to avoid SQLite conflicts
       await hydrateStepStore(db);
       await hydrateSleepStore(db);
       await hydrateWaterStore(db);
       await hydrateCaloriesStore(db);
-      if (profile?.uses_abc) {
+      // Read profile fresh from DB — not from closure — so ABC hydration
+      // is never skipped on first launch when profile hasn't loaded yet
+      const freshProfile = await db.getFirstAsync<{ uses_abc: number }>(
+        'SELECT uses_abc FROM user_profile WHERE id = 1'
+      );
+      if (freshProfile?.uses_abc === 1) {
         await hydrateAbcStore(db);
       }
+      // Cancel any ABC summary notification scheduled by older app versions
+      try {
+        const { cancelScheduledNotificationAsync } = await import('expo-notifications');
+        await cancelScheduledNotificationAsync('abc_daily_summary');
+        await db.runAsync('DELETE FROM kv_store WHERE key = ?', ['abc_summary_enabled']);
+      } catch (_) {}
     } catch (e) {
       console.error('[AppHydration] Hydrate all stores failed:', e);
-      // Silent fail - app will retry on next focus
     } finally {
       isHydrating.current = false;
     }
@@ -158,7 +160,7 @@ export function useAppHydration(): { isReady: boolean } {
         appState.current === 'active' &&
         nextState.match(/inactive|background/)
       ) {
-        await saveStepData(db);
+        await saveStepData(dbRef.current);
       }
       
       // Re-hydrate when coming back to foreground
@@ -166,29 +168,24 @@ export function useAppHydration(): { isReady: boolean } {
         appState.current.match(/inactive|background/) &&
         nextState === 'active'
       ) {
-        // Reload step tracking status from database
+        // Wait briefly for Expo SQLite to finish reconnecting after app resume
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         try {
-          const result = await db.getFirstAsync<{ is_tracking: number; is_paused: number }>(
+          const result = await dbRef.current.getFirstAsync<{ is_tracking: number; is_paused: number }>(
             'SELECT is_tracking, is_paused FROM step_tracking_state WHERE id = 1'
           );
           if (result) {
             const isTracking = result.is_tracking === 1;
             const isPaused = result.is_paused === 1;
-            
             let newStatus: 'tracking' | 'paused' | 'unavailable';
-            if (!isTracking) {
-              newStatus = 'unavailable';
-            } else if (isPaused) {
-              newStatus = 'paused';
-            } else {
-              newStatus = 'tracking';
-            }
-            
+            if (!isTracking) newStatus = 'unavailable';
+            else if (isPaused) newStatus = 'paused';
+            else newStatus = 'tracking';
             useStepStore.getState().setStatus(newStatus);
           }
         } catch (error) {
           console.error('[AppHydration] Reload tracking status failed:', error);
-          // Continue with hydration even if status load fails
         }
         
         await handleDateChangeIfNeeded();
@@ -199,7 +196,7 @@ export function useAppHydration(): { isReady: boolean } {
 
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.uses_abc]);
+  }, []);  // No deps — hydrateAll reads fresh profile from store inside the callback
 
   // Save step data when tab switches to Dashboard (triggered by MainTabs)
   useEffect(() => {
@@ -208,15 +205,13 @@ export function useAppHydration(): { isReady: boolean } {
     const sub = DeviceEventEmitter.addListener('SAVE_STEPS_NOW', async () => {
       const currentSteps = useStepStore.getState().todaySteps;
       if (currentSteps !== lastSavedSteps) {
-        await saveStepData(db);
+        await saveStepData(dbRef.current);
         lastSavedSteps = currentSteps;
-      } else {
-        // Steps haven't changed, skip save
       }
     });
 
     return () => sub.remove();
-  }, [db]);
+  }, []);
 
   // Subscribe to native step events once
   useEffect(() => {
@@ -232,19 +227,16 @@ export function useAppHydration(): { isReady: boolean } {
 
     const interval = setInterval(async () => {
       if (AppState.currentState !== 'active') return;
-      
-      // Check for date change every 30 seconds (covers midnight transition)
       await handleDateChangeIfNeeded();
-      
       const currentSteps = useStepStore.getState().todaySteps;
       if (currentSteps !== lastSavedSteps) {
-        await saveStepData(db);
+        await saveStepData(dbRef.current);
         lastSavedSteps = currentSteps;
       }
     }, 30 * 1000);
 
     return () => clearInterval(interval);
-  }, [db]);
+  }, []);
 
   return { isReady };
 }

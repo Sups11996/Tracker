@@ -79,8 +79,13 @@ export async function hydrateCaloriesStore(db: SQLiteDatabase): Promise<void> {
   try {
     const today = getTodayLocal();
 
-    // Walking calories — pull directly from step store
-    const walkingCal = useStepStore.getState().todayCalories;
+    // Walking calories — read directly from DB so this doesn't depend on
+    // step store hydration order (BUG-11)
+    const stepRow = await db.getFirstAsync<{ calories: number }>(
+      'SELECT calories FROM daily_steps WHERE date = ?',
+      [today]
+    );
+    const walkingCal = stepRow?.calories ?? useStepStore.getState().todayCalories;
 
     // Today's workout logs
     const logs = await db.getAllAsync<WorkoutLog>(
@@ -156,10 +161,32 @@ export async function logWorkout(
     const newLogs = [...state.workoutLogs, newLog];
     const workoutCal = newLogs.reduce((sum, l) => sum + l.calories, 0);
 
+    // Read walking calories from DB directly — store may not be hydrated yet
+    // (e.g. first workout logged right after install)
+    const stepRow = await db.getFirstAsync<{ calories: number }>(
+      'SELECT calories FROM daily_steps WHERE date = ?', [today]
+    );
+    const walkingCal = stepRow?.calories ?? state.walkingCalories;
+    const newTotal = Math.round(walkingCal + workoutCal);
+    const dailyGoal = state.dailyGoal;
+
+    // Keep calories_daily_summary in sync for export
+    await db.runAsync(
+      `INSERT INTO calories_daily_summary (date, walking_calories, workout_calories, total_calories, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(date) DO UPDATE SET
+         walking_calories = ?,
+         workout_calories = ?,
+         total_calories = ?,
+         updated_at = ?`,
+      [today, walkingCal, workoutCal, newTotal, now, now,
+       walkingCal, workoutCal, newTotal, now]
+    );
+
     useCaloriesStore.setState({
       workoutLogs: newLogs,
       workoutCalories: workoutCal,
-      totalCalories: Math.round(state.walkingCalories + workoutCal),
+      totalCalories: newTotal,
     });
   } catch (error) {
     console.error('[CaloriesStore] Log workout failed:', error);
@@ -180,11 +207,37 @@ export async function deleteWorkout(
     const state = useCaloriesStore.getState();
     const newLogs = state.workoutLogs.filter(l => l.id !== logId);
     const workoutCal = newLogs.reduce((sum, l) => sum + l.calories, 0);
+    const today = getTodayLocal();
+    const now = Date.now();
+
+    // Read walking calories from DB — don't trust store if not yet hydrated
+    const stepRow = await db.getFirstAsync<{ calories: number }>(
+      'SELECT calories FROM daily_steps WHERE date = ?', [today]
+    );
+    const walkingCal = stepRow?.calories ?? state.walkingCalories;
+    const newTotal = Math.round(walkingCal + workoutCal);
+
+    // Keep calories_daily_summary in sync for export
+    if (workoutCal === 0 && walkingCal === 0) {
+      await db.runAsync('DELETE FROM calories_daily_summary WHERE date = ?', [today]);
+    } else {
+      await db.runAsync(
+        `INSERT INTO calories_daily_summary (date, walking_calories, workout_calories, total_calories, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(date) DO UPDATE SET
+           walking_calories = ?,
+           workout_calories = ?,
+           total_calories = ?,
+           updated_at = ?`,
+        [today, walkingCal, workoutCal, newTotal, now, now,
+         walkingCal, workoutCal, newTotal, now]
+      );
+    }
 
     useCaloriesStore.setState({
       workoutLogs: newLogs,
       workoutCalories: workoutCal,
-      totalCalories: Math.round(state.walkingCalories + workoutCal),
+      totalCalories: newTotal,
     });
   } catch (error) {
     console.error('[CaloriesStore] Delete workout failed:', error);
