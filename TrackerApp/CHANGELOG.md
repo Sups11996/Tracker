@@ -2,7 +2,70 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.4.1] - 2025-01-27
+## [1.5.0] - 2025-07-26
+
+### Fixed
+- **Critical**: Fixed `endSleepSession` scoping UPDATE to `WHERE id = ?` instead of `WHERE is_active = 1` — previously could corrupt multiple sleep sessions simultaneously
+- **Critical**: Fixed step data reset before DB write confirmed — store was wiped even if the save failed, causing data loss on resume
+- **Critical**: Fixed `logWater` race condition on rapid taps — added promise lock so concurrent calls queue correctly and totals never go wrong
+- Fixed `hydrateStepStore` always loading from DB on hydration — removed `currentSteps === 0` guard that caused wrong step count after date rollover
+- Fixed `hydrateCaloriesStore` reading walking calories directly from DB — no longer depends on step store being hydrated first
+- Fixed `logManualSleep` date derived from start timestamp — no longer hardcoded to yesterday
+- Fixed nap midnight crossing — end time now rolls to next day automatically when end < start
+- Fixed `WaterGoalScreen` silently replacing invalid goal with 2400 — now blocks navigation and shows inline error
+- Fixed `SleepSettingsSection` stale goal on revert — inputs now sync with live store value
+- Fixed `AbcSettingsSection` partial DB write on toggle error — kv_store no longer left in inconsistent state
+- Fixed `CaloriesHomeCard` stale `totalCalories` — now uses store's `setWalkingCalories` action instead of raw `setState`
+- Fixed `abcStore` `undoLastAbc` store updated before DB write — both DB writes must succeed before store is updated
+- Fixed `WorkoutLogModal` allowing NaN/negative custom calories through to DB
+- Fixed `SleepHomeCard` duplicate `const today/yesterday` declarations — compile error preventing build
+- Fixed `WaterContainersScreen` `setSaving(false)` never called on success — button permanently stuck in loading state
+- Fixed `WaterHomeCard` `confirmCustom` frozen modal on DB error — now shows alert and keeps modal open for retry
+- Fixed `ExportSection` `performImport` now awaits `hydrateStepStore` before parallel hydrations
+- Fixed `HeightWeightScreen` floating-point precision bug — `5.11` was parsed as `5'1"` instead of `5'11"`
+- Fixed `GenderAgeScreen` age validation range aligned to `1–120` to match SettingsScreen
+- Fixed `RootNavigator` silent DB failure — now shows error screen with retry (max 3 attempts)
+- Fixed `ProgressRing` missing `circumference` in `useEffect` deps
+- Fixed `AbcHomeCard` misleading trend on day 1 — shows "No data yet" when no history exists
+- Fixed `SleepDashboard` `recentSessions` removed from `useEffect` deps — no more skeleton flash on every hydration
+- Fixed `CaloriesDashboard` stray `}` syntax error causing build failure
+- Fixed `SleepDashboard` stray `}` syntax error causing build failure
+- Fixed ABC daily summary notification removed — was silently failing on Android 8+
+- Fixed `workoutReminders.ts` restored after accidental deletion
+- Fixed water goal auto-migrated from `user_profile` to `kv_store` on first hydration
+- Fixed `RootNavigator` duplicate React import
+- Fixed `saveStepData` no longer runs unnecessary weekly/monthly DB queries on every save
+- Fixed `StepHomeCard` fire-and-forget DB update for paused state — now awaited with error logging
+- Fixed `StepHomeCard` double-subscription guard for step event listener
+- Fixed `GymQuestionScreen` icon color uses strict `=== true` check instead of truthy
+
+### Added
+- Manual sleep date picker — log sleep up to 7 days back using `‹ Yesterday ›` arrows
+- Sleep end-time midnight rollover for both Night Sleep and Nap sessions
+- `CardErrorBoundary` component — each home card now fails independently without blanking the screen
+- `RootNavigator` boot error screen with retry limit (3 attempts then shows force-quit message)
+- Water logging serialisation lock — concurrent taps now queue correctly
+- `saveStepData` now syncs `calories_daily_summary` walking calories on every save
+- Backup version reads from `expo-constants` dynamically instead of hardcoded string
+- 26 automated tests across waterStore, abcStore, sleepStore, and importUtils
+- Water custom modal upper bound — rejects amounts over 5000ml with user feedback
+- Water custom modal dark background
+
+### Changed
+- ABC Settings section: removed daily summary notification toggle (feature removed)
+- Manual sleep modal: Cancel button moved to left, action button to right
+- Workout log modal: Cancel button moved to left, action button to right
+- `Daily Avg` stats in all dashboards now divide by calendar days not active days only
+- App version bumped to 1.5.0
+
+### Technical
+- All meaningful `any` TypeScript types replaced with proper interfaces across stores, lib, and feature files
+- `DayStepData`, `WeekGroup`, `ExportPayload`, `BackupPayload` interfaces added
+- `workoutReminders.ts` dead file removed then restored (used by `CaloriesSettingsSection`)
+- Jest configured with `jest-expo` preset and `@react-native/jest-preset` peer dependency
+- `expo-sqlite` mock at `src/__mocks__/expo-sqlite.ts` for unit tests
+
+
 
 ### Fixed
 - Fixed Physical Activity permission not updating in real-time when granted from Android Settings

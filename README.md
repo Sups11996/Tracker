@@ -49,6 +49,8 @@ Real-time background step counting using your phone's hardware sensor. Set daily
 ### Sleep Tracking
 Session-based sleep tracking with:
 - Sleep latency calculation (time to fall asleep)
+- Manual sleep logging for past sessions — up to 7 days back with date picker
+- Midnight crossing support for night sleep and naps
 - Customizable bedtime and wake-up reminders
 - Sleep quality rating
 - Weekly and monthly sleep patterns
@@ -63,7 +65,7 @@ Quick logging with customizable drink containers. Add custom amounts and track d
 - Weekly and monthly summaries
 
 ### ABC (Activity-Based Counter)
-Daily habit limiter for tracking behaviors you want to reduce. Set daily limits with summary notifications.
+Daily habit limiter for tracking behaviors you want to reduce. Set daily limits and monitor your progress.
 
 ### Data Visualization
 - Weekly bar charts for all metrics
