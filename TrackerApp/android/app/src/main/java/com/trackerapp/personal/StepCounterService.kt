@@ -27,6 +27,7 @@ class StepCounterService : Service(), SensorEventListener {
         const val ACTION_PAUSE = "pause"
         const val ACTION_RESUME = "resume"
         const val ACTION_RESET = "reset"
+        const val ACTION_SYNC = "sync"  // Immediately emit current step count to JS
         const val PREF_NAME = "step_prefs"
         const val PREF_STEPS = "steps"
         const val PREF_DATE = "date"
@@ -121,6 +122,7 @@ class StepCounterService : Service(), SensorEventListener {
                 updateNotification()
             }
             ACTION_RESET  -> resetSteps()
+            ACTION_SYNC   -> emitSteps()  // Immediately push current count to JS
             else -> {
                 // Default start: begin foreground service and register sensor
                 try {
