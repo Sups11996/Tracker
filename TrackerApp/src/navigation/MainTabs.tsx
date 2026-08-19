@@ -51,8 +51,17 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             : isFocused;               // After press, only focused tab is active
 
           const onPressIn = () => {
-            // INSTANT visual feedback - clear previous and set new
             setPressedIndex(index);
+          };
+
+          const onPressOut = () => {
+            // If finger lifts without triggering onPress (e.g. swipe away),
+            // clear the highlight so the wrong tab doesn't stay active-coloured
+            // Use a tiny delay so onPress (which fires after onPressOut) can
+            // still clear it itself — avoids a flicker on normal taps
+            setTimeout(() => {
+              setPressedIndex(prev => prev === index ? null : prev);
+            }, 50);
           };
 
           const onPress = () => {
@@ -97,6 +106,7 @@ function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel}
               onPressIn={onPressIn}
+              onPressOut={onPressOut}
               onPress={onPress}
               style={styles.tabButton}
               activeOpacity={1}
