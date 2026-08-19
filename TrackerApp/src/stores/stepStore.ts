@@ -103,16 +103,23 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
     const today = getTodayLocal();
 
     // Load today's steps from DB on hydration.
-    // Always load — the native service will overwrite with live data immediately,
-    // but we need the correct starting value (0 for a new day, or last-saved for resume).
+    // Take the higher of DB value and current store value (native service may have
+    // already sent a STEP_UPDATE with a more recent count before hydration ran).
     const row = await db.getFirstAsync<DayStepRecord>(
       'SELECT * FROM daily_steps WHERE date = ?', [today]
     );
     if (row) {
-      useStepStore.getState().setToday(row.steps, row.distance_m, row.calories);
+      const currentSteps = useStepStore.getState().todaySteps;
+      // Only overwrite if DB has more steps — native service value takes precedence
+      if (row.steps > currentSteps) {
+        useStepStore.getState().setToday(row.steps, row.distance_m, row.calories);
+      }
     } else {
-      // New day — explicitly reset to 0 so yesterday's in-memory value doesn't persist
-      useStepStore.getState().setToday(0, 0, 0);
+      // New day — only reset if native service hasn't sent anything yet
+      const currentSteps = useStepStore.getState().todaySteps;
+      if (currentSteps === 0) {
+        useStepStore.getState().setToday(0, 0, 0);
+      }
     }
 
     // Tracking state

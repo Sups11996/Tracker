@@ -141,6 +141,10 @@ export function useAppHydration(): { isReady: boolean } {
           await handleDateChangeIfNeeded();
           // Always hydrate after date check (whether date changed or not)
           await hydrateAll();
+          // Request native service to immediately emit current step count
+          if (StepServiceModule) {
+            try { await StepServiceModule.sendAction('sync'); } catch (_) {}
+          }
           setIsReady(true);
         } catch (error) {
           console.error('[AppHydration] Initial hydration failed:', error);
@@ -190,6 +194,12 @@ export function useAppHydration(): { isReady: boolean } {
         
         await handleDateChangeIfNeeded();
         await hydrateAll();
+
+        // Request native service to immediately emit current step count
+        // so the app shows live steps without waiting for the next step event
+        if (StepServiceModule) {
+          try { await StepServiceModule.sendAction('sync'); } catch (_) {}
+        }
       }
       appState.current = nextState;
     });
