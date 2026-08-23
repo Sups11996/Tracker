@@ -192,9 +192,9 @@ class StepCounterService : Service(), SensorEventListener {
         latestSensorValue = rawValue
         
         // Check if date changed (do this even when paused to reset at midnight)
-        // Use UTC to avoid timezone-change issues (user traveling across timezones)
+        // Use local timezone to match the JS side (getTodayLocal)
         val today = try {
-            LocalDate.now(java.time.ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE)
+            LocalDate.now(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ISO_LOCAL_DATE)
         } catch (e: Exception) {
             // Clock error or DateTimeException - keep current date
             currentDate
@@ -371,9 +371,9 @@ class StepCounterService : Service(), SensorEventListener {
     }
 
     private fun loadPersistedState() {
-        // Use UTC to avoid timezone-change issues
+        // Use local timezone to match JS side
         val today = try {
-            LocalDate.now(java.time.ZoneOffset.UTC).format(DateTimeFormatter.ISO_LOCAL_DATE)
+            LocalDate.now(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ISO_LOCAL_DATE)
         } catch (e: Exception) {
             // Clock error - use empty string, will force reset
             ""
