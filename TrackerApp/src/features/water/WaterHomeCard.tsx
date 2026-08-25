@@ -25,7 +25,15 @@ interface WaterHomeCardProps {
   onPress?: () => void;
 }
 
-export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
+/**
+ * WaterHomeCard — quick-log water from the home screen.
+ *
+ * - Tap a container button to instantly log that amount
+ * - Tap Custom to enter any amount (1–5000 ml)
+ * - Undo available for 30 seconds after each log
+ * - Concurrent taps are serialised via logWaterLock to prevent
+ *   race conditions producing wrong totals
+ */
   const db = useSQLiteContext();
   const { todayTotal, dailyGoal, containers } = useWaterStore();
 
