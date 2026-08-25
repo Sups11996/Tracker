@@ -196,7 +196,16 @@ const tf = StyleSheet.create({
   periodText: { fontSize: TYPOGRAPHY.size.xs, fontWeight: TYPOGRAPHY.weight.bold, color: COLORS.sleep },
 });
 
-export function ManualSleepModal({ visible, onClose }: ManualSleepModalProps) {
+/**
+ * ManualSleepModal — lets users log past sleep sessions.
+ *
+ * Supports:
+ * - Night sleep and nap session types
+ * - Date picker: up to 7 days back using ‹ › arrows
+ * - Automatic midnight rollover for both night sleep and naps
+ *   (end time < start time → end rolls to next calendar day)
+ * - Form resets cleanly when modal closes
+ */
   const db = useSQLiteContext();
 
   const [type, setType] = useState<SessionType>('night');
