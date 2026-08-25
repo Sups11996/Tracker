@@ -25,7 +25,11 @@ function TabBarBackground() {
 }
 
 /**
- * Custom tab bar with instant color switching on tap
+ * MainTabs — bottom tab navigator with custom tab bar.
+ *
+ * Provides instant visual feedback on press (onPressIn) while
+ * correctly handling swipe-away gestures via onPressOut cleanup.
+ * Saves step data whenever the Dashboard tab is focused.
  */
 function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   // Local state for instant visual feedback on press
