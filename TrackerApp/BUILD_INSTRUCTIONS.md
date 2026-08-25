@@ -269,7 +269,16 @@ The APK includes native libraries for:
 
 **Note:** x86/x86_64 architectures are excluded to avoid Windows-specific build issues.
 
-## Additional Resources
+## Running Tests
+
+```bash
+cd TrackerApp
+npm test
+```
+
+26 unit tests cover the core store logic (water, ABC, sleep, import). Run before every release to catch regressions.
+
+
 
 - [React Native Documentation](https://reactnative.dev/docs/getting-started)
 - [Expo Documentation](https://docs.expo.dev/)
