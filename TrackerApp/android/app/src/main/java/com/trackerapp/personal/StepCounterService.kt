@@ -200,9 +200,13 @@ class StepCounterService : Service(), SensorEventListener {
             currentDate
         }
         if (today != currentDate) {
+            var previousDate = ""
+            var previousSteps = 0
             synchronized(this) {
                 // Double-check inside sync block
                 if (today != currentDate) {
+                    previousDate = currentDate
+                    previousSteps = todaySteps
                     currentDate = today
                     sensorBase = rawValue
                     todaySteps = 0
@@ -212,6 +216,9 @@ class StepCounterService : Service(), SensorEventListener {
                     latestSensorValue = rawValue  // Reset to current value for new day
                     saveState()
                 }
+            }
+            if (previousDate.isNotEmpty() && previousSteps > 0) {
+                saveDailyStepsToDatabase(previousDate, previousSteps)
             }
             emitSteps()  // Emit zero steps for new day
             updateNotification()
@@ -299,42 +306,9 @@ class StepCounterService : Service(), SensorEventListener {
                     saveState()
                 } else {
                     val totalSteps = totalStepsLong.toInt()
-                    
-                    // Smooth out sensor batching spikes using time-based rate limiting
-                    // Problem: After idle period, Android batches sensor events causing sudden spikes
-                    // Solution: Limit step increase based on time elapsed since last update
-                    val currentTime = SystemClock.elapsedRealtime()  // Use monotonic clock (immune to time changes)
-                    val stepIncrease = totalSteps - todaySteps
-                    
-                    if (stepIncrease > 0) {
-                        if (lastUpdateTime > 0) {
-                            val timeSinceLastUpdate = currentTime - lastUpdateTime  // milliseconds
-                            
-                            // If last update was < 5 seconds ago, limit step increase
-                            // Normal walking: ~2 steps/second, running: ~3 steps/second
-                            // Allow up to 20 steps per update as reasonable maximum
-                            if (timeSinceLastUpdate < 5000 && stepIncrease > 20) {
-                                // Likely a batched spike - limit to 20 steps this update
-                                // The remaining steps will be added in subsequent sensor readings
-                                // as the sensor continues to fire and timeSinceLastUpdate grows
-                                // Check for overflow before adding
-                                val newStepsLong = todaySteps.toLong() + 20
-                                if (newStepsLong > Int.MAX_VALUE) {
-                                    todaySteps = Int.MAX_VALUE
-                                } else {
-                                    todaySteps += 20
-                                }
-                                lastUpdateTime = currentTime
-                            } else {
-                                // Either enough time passed (>5 sec), or reasonable increase (<=20 steps) - accept all
-                                todaySteps = totalSteps
-                                lastUpdateTime = currentTime
-                            }
-                        } else {
-                            // First update - accept all steps
-                            todaySteps = totalSteps
-                            lastUpdateTime = currentTime
-                        }
+                    if (totalSteps > todaySteps) {
+                        todaySteps = totalSteps
+                        lastUpdateTime = SystemClock.elapsedRealtime()
                         saveState()
                     }
                     // If stepIncrease <= 0, no update (prevents decreasing)
@@ -361,7 +335,7 @@ class StepCounterService : Service(), SensorEventListener {
         synchronized(this) {
             todaySteps = 0
             preRebootSteps = 0
-            sensorBase = -1L
+            sensorBase = if (latestSensorValue >= 0) latestSensorValue else -1L
             sensorResetDetected = false
             lastUpdateTime = 0  // Reset rate limiting timer
             saveState()
@@ -382,6 +356,9 @@ class StepCounterService : Service(), SensorEventListener {
         val prefsInstance = prefs ?: return  // Exit if prefs unavailable
         val savedDate = prefsInstance.getString(PREF_DATE, "") ?: ""
         
+        var previousDateToArchive = ""
+        var previousStepsToArchive = 0
+
         synchronized(this) {
             if (savedDate == today && savedDate.isNotEmpty()) {
                 todaySteps = prefsInstance.getInt(PREF_STEPS, 0)
@@ -389,12 +366,20 @@ class StepCounterService : Service(), SensorEventListener {
                 preRebootSteps = prefsInstance.getInt(PREF_PRE_REBOOT_STEPS, 0)
                 latestSensorValue = prefsInstance.getLong(PREF_LATEST_SENSOR_VALUE, -1L)
             } else {
+                if (savedDate.isNotEmpty()) {
+                    previousDateToArchive = savedDate
+                    previousStepsToArchive = prefsInstance.getInt(PREF_STEPS, 0)
+                }
                 todaySteps = 0
                 sensorBase = -1L
                 preRebootSteps = 0
                 latestSensorValue = -1L
             }
             currentDate = today
+        }
+
+        if (previousDateToArchive.isNotEmpty() && previousStepsToArchive > 0) {
+            saveDailyStepsToDatabase(previousDateToArchive, previousStepsToArchive)
         }
     }
 
@@ -556,16 +541,110 @@ class StepCounterService : Service(), SensorEventListener {
 
     // ── Database Sync ─────────────────────────────────────────────────────────
 
+    private fun getDatabase(readOnly: Boolean = false): android.database.sqlite.SQLiteDatabase? {
+        try {
+            val appFilesDir = applicationContext.filesDir
+            val possiblePaths = mutableListOf<java.io.File>()
+            
+            // Expo SQLite path (primary for Expo)
+            val sqliteDir = java.io.File(appFilesDir, "SQLite")
+            if (sqliteDir.exists()) {
+                possiblePaths.add(java.io.File(sqliteDir, "tracker.db"))
+            }
+            
+            // Standard Android path
+            possiblePaths.add(applicationContext.getDatabasePath("tracker.db"))
+            
+            // Check all subdirectories in files
+            appFilesDir?.listFiles()?.forEach { dir ->
+                if (dir.isDirectory) {
+                    val trackerDb = java.io.File(dir, "tracker.db")
+                    if (trackerDb.exists()) {
+                        possiblePaths.add(trackerDb)
+                    }
+                }
+            }
+            
+            for (path in possiblePaths) {
+                if (path.exists()) {
+                    val flags = if (readOnly) android.database.sqlite.SQLiteDatabase.OPEN_READONLY else android.database.sqlite.SQLiteDatabase.OPEN_READWRITE
+                    return android.database.sqlite.SQLiteDatabase.openDatabase(
+                        path.path, null, flags
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            // Silently fail
+        }
+        return null
+    }
+
+    private fun saveDailyStepsToDatabase(date: String, steps: Int) {
+        if (date.isEmpty() || steps <= 0) return
+        var db: android.database.sqlite.SQLiteDatabase? = null
+        var cursor: android.database.Cursor? = null
+        try {
+            db = getDatabase(readOnly = false) ?: return
+            val distance = (steps * STEP_LENGTH_M).toDouble()
+            val calories = (steps * CAL_PER_STEP).toDouble()
+            val now = System.currentTimeMillis()
+            
+            var goal = 8000
+            try {
+                cursor = db.rawQuery("SELECT daily_goal FROM step_tracking_state WHERE id = 1", null)
+                if (cursor.moveToFirst()) {
+                    goal = cursor.getInt(0)
+                }
+            } catch (e: Exception) {
+                // Ignore query error, use default goal 8000
+            } finally {
+                cursor?.close()
+                cursor = null
+            }
+            
+            val goalMet = if (steps >= goal) 1 else 0
+            
+            var existingSteps = -1
+            try {
+                cursor = db.rawQuery("SELECT steps FROM daily_steps WHERE date = ?", arrayOf(date))
+                if (cursor.moveToFirst()) {
+                    existingSteps = cursor.getInt(0)
+                }
+            } catch (e: Exception) {
+                // Ignore query error
+            } finally {
+                cursor?.close()
+                cursor = null
+            }
+            
+            if (existingSteps < steps) {
+                db.execSQL(
+                    """INSERT INTO daily_steps (date, steps, distance_m, calories, goal, goal_met, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(date) DO UPDATE SET
+                         steps = ?,
+                         distance_m = ?,
+                         calories = ?,
+                         goal_met = ?,
+                         updated_at = ?""",
+                    arrayOf(
+                        date, steps, distance, calories, goal, goalMet, now, now,
+                        steps, distance, calories, goalMet, now
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            // Silently fail
+        } finally {
+            db?.close()
+        }
+    }
+
     private fun loadPauseStateFromDatabase() {
         var db: android.database.sqlite.SQLiteDatabase? = null
         var cursor: android.database.Cursor? = null
         try {
-            val dbPath = getDatabasePath("tracker.db")
-            if (!dbPath.exists()) return
-            
-            db = android.database.sqlite.SQLiteDatabase.openDatabase(
-                dbPath.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
-            )
+            db = getDatabase(readOnly = true) ?: return
             
             cursor = db.rawQuery(
                 "SELECT is_paused FROM step_tracking_state WHERE id = 1", null
@@ -594,41 +673,7 @@ class StepCounterService : Service(), SensorEventListener {
     private fun updateDatabasePauseState(paused: Boolean) {
         var db: android.database.sqlite.SQLiteDatabase? = null
         try {
-            val appFilesDir = applicationContext.filesDir
-            val possiblePaths = mutableListOf<java.io.File>()
-            
-            // Standard Android path
-            possiblePaths.add(applicationContext.getDatabasePath("tracker.db"))
-            
-            // Expo SQLite path
-            val sqliteDir = java.io.File(appFilesDir, "SQLite")
-            if (sqliteDir.exists()) {
-                possiblePaths.add(java.io.File(sqliteDir, "tracker.db"))
-            }
-            
-            // Check all subdirectories in files
-            appFilesDir?.listFiles()?.forEach { dir ->
-                if (dir.isDirectory) {
-                    val trackerDb = java.io.File(dir, "tracker.db")
-                    if (trackerDb.exists()) {
-                        possiblePaths.add(trackerDb)
-                    }
-                }
-            }
-            
-            var dbPath: java.io.File? = null
-            for (path in possiblePaths) {
-                if (path.exists()) {
-                    dbPath = path
-                    break
-                }
-            }
-            
-            if (dbPath == null) return
-            
-            db = android.database.sqlite.SQLiteDatabase.openDatabase(
-                dbPath.path, null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE
-            )
+            db = getDatabase(readOnly = false) ?: return
             
             // Get current timestamp in milliseconds
             val now = System.currentTimeMillis()
