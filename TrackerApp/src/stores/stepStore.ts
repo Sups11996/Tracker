@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import { getTodayLocal } from '../lib/dateUtils';
 
@@ -102,24 +102,45 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
   try {
     const today = getTodayLocal();
 
-    // Load today's steps from DB on hydration.
-    // Take the higher of DB value and current store value (native service may have
-    // already sent a STEP_UPDATE with a more recent count before hydration ran).
+    // 1. Fetch live step data from native service if available on Android
+    let nativeSteps = 0;
+    let nativeDistance = 0;
+    let nativeCalories = 0;
+
+    if (Platform.OS === 'android') {
+      try {
+        const StepServiceModule = NativeModules.StepServiceModule;
+        if (StepServiceModule?.getStepData) {
+          const data = await StepServiceModule.getStepData();
+          if (data && data.date === today) {
+            nativeSteps = Math.floor(data.steps ?? 0);
+            nativeDistance = data.distance ?? 0;
+            nativeCalories = data.calories ?? 0;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Load today's steps from SQLite DB
     const row = await db.getFirstAsync<DayStepRecord>(
       'SELECT * FROM daily_steps WHERE date = ?', [today]
     );
-    if (row) {
-      const currentSteps = useStepStore.getState().todaySteps;
-      // Only overwrite if DB has more steps — native service value takes precedence
-      if (row.steps > currentSteps) {
+    const dbSteps = row?.steps ?? 0;
+    const currentSteps = useStepStore.getState().todaySteps;
+
+    // Pick the highest valid value among Native, DB, and current in-memory store
+    const bestSteps = Math.max(nativeSteps, dbSteps, currentSteps);
+
+    if (bestSteps > 0) {
+      if (bestSteps === nativeSteps) {
+        useStepStore.getState().setToday(nativeSteps, nativeDistance, nativeCalories);
+      } else if (bestSteps === dbSteps && row) {
         useStepStore.getState().setToday(row.steps, row.distance_m, row.calories);
       }
+      // Save the best count to DB so DB stays up-to-date
+      await saveStepData(db, today);
     } else {
-      // New day — only reset if native service hasn't sent anything yet
-      const currentSteps = useStepStore.getState().todaySteps;
-      if (currentSteps === 0) {
-        useStepStore.getState().setToday(0, 0, 0);
-      }
+      useStepStore.getState().setToday(0, 0, 0);
     }
 
     // Tracking state
@@ -177,7 +198,7 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
 
 /**
  * Save current step data to the database.
- * Uses INSERT OR REPLACE to update today's record or create if it doesn't exist.
+ * Uses UPSERT with MAX(steps, excluded.steps) so step counts never decrease.
  * @param dateOverride - Optional date to save to (for saving yesterday's data on date change)
  */
 export async function saveStepData(db: SQLite.SQLiteDatabase, dateOverride?: string): Promise<void> {
@@ -188,11 +209,16 @@ export async function saveStepData(db: SQLite.SQLiteDatabase, dateOverride?: str
     const now = Date.now();
 
     await db.runAsync(
-      `INSERT OR REPLACE INTO daily_steps (date, steps, distance_m, calories, goal, goal_met, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 
-         COALESCE((SELECT created_at FROM daily_steps WHERE date = ?), ?),
-         ?)`,
-      [dateToSave, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, dateToSave, now, now]
+      `INSERT INTO daily_steps (date, steps, distance_m, calories, goal, goal_met, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(date) DO UPDATE SET
+         steps = MAX(steps, excluded.steps),
+         distance_m = CASE WHEN excluded.steps >= steps THEN excluded.distance_m ELSE distance_m END,
+         calories = CASE WHEN excluded.steps >= steps THEN excluded.calories ELSE calories END,
+         goal = excluded.goal,
+         goal_met = CASE WHEN MAX(steps, excluded.steps) >= excluded.goal THEN 1 ELSE 0 END,
+         updated_at = excluded.updated_at`,
+      [dateToSave, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, now, now]
     );
 
     // Keep calories_daily_summary in sync so exports always show correct walking calories
