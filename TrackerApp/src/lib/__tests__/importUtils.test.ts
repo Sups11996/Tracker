@@ -67,7 +67,7 @@ test('importing same backup twice does not duplicate sleep sessions', async () =
   await importFullBackup(db, '', 'merge');
   await importFullBackup(db, '', 'merge');
 
-  const sleepInserts = db._insertLog.filter(r => r.table === 'sleep_sessions');
+  const sleepInserts = db._insertLog.filter((r: any) => r.table === 'sleep_sessions');
   // INSERT OR REPLACE with same id — DB deduplicates, but we should only attempt 2 inserts total (one per import)
   expect(sleepInserts).toHaveLength(2);
   // Both inserts should use the same id=1 so the DB replaces rather than adds
@@ -95,7 +95,7 @@ test('ABC logs use real timestamps from backup.abc.logs when present', async () 
   const db = makeDb();
   await importFullBackup(db, '', 'merge');
 
-  const abcInserts = db._insertLog.filter(r => r.table === 'abc_logs');
+  const abcInserts = db._insertLog.filter((r: any) => r.table === 'abc_logs');
   expect(abcInserts).toHaveLength(2);
   // logged_at should be the real timestamp, not a synthetic one
   expect(abcInserts[0].params[1]).toBe(realTs);
@@ -116,7 +116,7 @@ test('ABC logs fall back to synthetic timestamps when backup.abc.logs absent', a
   const db = makeDb();
   await importFullBackup(db, '', 'merge');
 
-  const abcInserts = db._insertLog.filter(r => r.table === 'abc_logs');
+  const abcInserts = db._insertLog.filter((r: any) => r.table === 'abc_logs');
   // Should still insert 2 synthetic rows (count = 2)
   expect(abcInserts).toHaveLength(2);
 });

@@ -18,7 +18,7 @@ export function makeDb() {
       Object.keys(tables).forEach(k => delete tables[k]);
     },
 
-    async runAsync(sql: string, params: any[] = {}): Promise<{ lastInsertRowId: number }> {
+    async runAsync(sql: string, params: any[] = []): Promise<{ lastInsertRowId: number }> {
       const s = sql.trim().toUpperCase();
 
       // INSERT INTO <table>
@@ -34,7 +34,7 @@ export function makeDb() {
       return { lastInsertRowId: 0 };
     },
 
-    async getFirstAsync<T>(sql: string, params: any[] = {}): Promise<T | null> {
+    async getFirstAsync<T>(sql: string, params: any[] = []): Promise<T | null> {
       // SELECT value FROM kv_store WHERE key = ?
       const kvMatch = sql.match(/FROM\s+kv_store/i);
       if (kvMatch) return null; // no kv rows by default
@@ -54,7 +54,7 @@ export function makeDb() {
       return null;
     },
 
-    async getAllAsync<T>(sql: string, params: any[] = {}): Promise<T[]> {
+    async getAllAsync<T>(sql: string, params: any[] = []): Promise<T[]> {
       const tableMatch = sql.match(/FROM\s+(\w+)/i);
       if (tableMatch) return getTable(tableMatch[1]) as unknown as T[];
       return [];
