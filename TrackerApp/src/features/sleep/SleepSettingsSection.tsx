@@ -123,11 +123,11 @@ export function SleepSettingsSection() {
     }
   }
 
-  async function handleBedtimeTimeChange(_event: unknown, selectedDate?: Date) {
+  async function handleBedtimeTimeChange(event: any, selectedDate?: Date) {
     if (Platform.OS === 'android') {
       setShowBedtimePicker(false);
       
-      if (event.type === 'dismissed') {
+      if (event?.type === 'dismissed') {
         return; // User cancelled
       }
     }
@@ -150,11 +150,11 @@ export function SleepSettingsSection() {
     }
   }
 
-  async function handleWakeTimeChange(_event: unknown, selectedDate?: Date) {
+  async function handleWakeTimeChange(event: any, selectedDate?: Date) {
     if (Platform.OS === 'android') {
       setShowWakePicker(false);
       
-      if (event.type === 'dismissed') {
+      if (event?.type === 'dismissed') {
         return; // User cancelled
       }
     }

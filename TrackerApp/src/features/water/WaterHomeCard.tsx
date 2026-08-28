@@ -34,6 +34,7 @@ interface WaterHomeCardProps {
  * - Concurrent taps are serialised via logWaterLock to prevent
  *   race conditions producing wrong totals
  */
+export function WaterHomeCard({ onPress }: WaterHomeCardProps) {
   const db = useSQLiteContext();
   const { todayTotal, dailyGoal, containers } = useWaterStore();
 

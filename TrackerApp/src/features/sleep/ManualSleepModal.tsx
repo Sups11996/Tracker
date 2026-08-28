@@ -206,6 +206,7 @@ const tf = StyleSheet.create({
  *   (end time < start time → end rolls to next calendar day)
  * - Form resets cleanly when modal closes
  */
+export function ManualSleepModal({ visible, onClose }: ManualSleepModalProps) {
   const db = useSQLiteContext();
 
   const [type, setType] = useState<SessionType>('night');
