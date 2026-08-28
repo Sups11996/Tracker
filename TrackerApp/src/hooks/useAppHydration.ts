@@ -6,7 +6,7 @@ import { hydrateStepStore, subscribeToStepEvents, unsubscribeFromStepEvents, use
 import { hydrateSleepStore } from '../stores/sleepStore';
 import { hydrateWaterStore, useWaterStore } from '../stores/waterStore';
 import { hydrateCaloriesStore } from '../stores/caloriesStore';
-import { hydrateAbcStore } from '../stores/abcStore';
+import { hydrateAbcStore, useAbcStore } from '../stores/abcStore';
 import { checkDateChanged, getTodayLocal, getYesterdayLocal } from '../lib/dateUtils';
 
 const StepServiceModule = Platform.OS === 'android' ? NativeModules.StepServiceModule : null;
@@ -48,41 +48,49 @@ export function useAppHydration(): { isReady: boolean } {
         return false;
       }
 
-      const dateChanged = await checkDateChanged(db);
-      if (dateChanged) {
-        const yesterdayDate = getYesterdayLocal();
-        
+      const today = getTodayLocal();
+      const row = await db.getFirstAsync<{ value: string }>(
+        'SELECT value FROM kv_store WHERE key = ?',
+        ['last_known_date']
+      );
+
+      if (!row) {
+        // First launch ever — initialize last_known_date
+        await db.runAsync(
+          'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+          ['last_known_date', today]
+        );
+        return false;
+      }
+
+      const lastDate = row.value;
+      if (lastDate !== today) {
         try {
+          // If the app was actively running in memory across midnight (hasHydratedOnce is true)
+          // and had accumulated steps for the previous date, safely archive them
           const state = useStepStore.getState();
-          const goalMet = state.todaySteps >= state.dailyGoal ? 1 : 0;
-          const now = Date.now();
-          
-          await db.runAsync(
-            `INSERT OR REPLACE INTO daily_steps (date, steps, distance_m, calories, goal, goal_met, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, 
-               COALESCE((SELECT created_at FROM daily_steps WHERE date = ?), ?),
-               ?)`,
-            [yesterdayDate, state.todaySteps, state.todayDistance, state.todayCalories, state.dailyGoal, goalMet, yesterdayDate, now, now]
-          );
-          
-          await db.runAsync(
-            'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
-            ['last_known_date', getTodayLocal()]
-          );
-
-          // Only reset stores AFTER DB write confirmed — prevents data loss on write failure
-          useStepStore.setState({ todaySteps: 0, todayDistance: 0, todayCalories: 0 });
-          useWaterStore.setState({ todayTotal: 0, logs: [], undoStack: [] });
-
-          if (StepServiceModule) {
-            try {
-              await StepServiceModule.sendAction('reset');
-            } catch (error) {
-              console.error('[AppHydration] Native reset failed:', error);
+          if (hasHydratedOnce.current && state.todaySteps > 0 && lastDate) {
+            const existing = await db.getFirstAsync<{ steps: number }>(
+              'SELECT steps FROM daily_steps WHERE date = ?', [lastDate]
+            );
+            if (!existing || state.todaySteps > existing.steps) {
+              await saveStepData(db, lastDate);
             }
           }
+
+          // Update last_known_date in database
+          await db.runAsync(
+            'INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)',
+            ['last_known_date', today]
+          );
+
+          // Reset transient daily stores for the new day
+          // (StepStore will be hydrated with today's live steps from native service / DB)
+          useWaterStore.setState({ todayTotal: 0, logs: [], undoStack: [] });
+          useAbcStore.setState({ todayCount: 0, entries: [], lastLoggedAt: null, undoStack: [], undoEntry: null });
+
         } catch (error) {
-          console.error('[AppHydration] Save yesterday data failed — stores NOT reset to preserve data:', error);
+          console.error('[AppHydration] Date change handling failed:', error);
         }
         
         return true;
