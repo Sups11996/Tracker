@@ -126,15 +126,17 @@ export async function hydrateStepStore(db: SQLite.SQLiteDatabase) {
       'SELECT * FROM daily_steps WHERE date = ?', [today]
     );
     const dbSteps = row?.steps ?? 0;
-    const currentSteps = useStepStore.getState().todaySteps;
 
-    // Pick the highest valid value among Native, DB, and current in-memory store
-    const bestSteps = Math.max(nativeSteps, dbSteps, currentSteps);
+    // Pick the highest value between Native and DB (both are date-filtered to today).
+    // Do NOT include the in-memory store value — it has no date association and may
+    // hold yesterday's stale count after midnight, causing the bug where opening the
+    // app shows yesterday's steps instead of today's.
+    const bestSteps = Math.max(nativeSteps, dbSteps);
 
     if (bestSteps > 0) {
-      if (bestSteps === nativeSteps) {
+      if (nativeSteps >= dbSteps) {
         useStepStore.getState().setToday(nativeSteps, nativeDistance, nativeCalories);
-      } else if (bestSteps === dbSteps && row) {
+      } else if (row) {
         useStepStore.getState().setToday(row.steps, row.distance_m, row.calories);
       }
       // Save the best count to DB so DB stays up-to-date

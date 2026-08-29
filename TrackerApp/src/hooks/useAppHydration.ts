@@ -85,7 +85,9 @@ export function useAppHydration(): { isReady: boolean } {
           );
 
           // Reset transient daily stores for the new day
-          // (StepStore will be hydrated with today's live steps from native service / DB)
+          // Step store MUST be reset BEFORE hydrateStepStore runs, otherwise
+          // Math.max(native=0, db=0, currentSteps=YESTERDAY) picks yesterday's stale count
+          useStepStore.setState({ todaySteps: 0, todayDistance: 0, todayCalories: 0 });
           useWaterStore.setState({ todayTotal: 0, logs: [], undoStack: [] });
           useAbcStore.setState({ todayCount: 0, entries: [], lastLoggedAt: null, undoStack: [], undoEntry: null });
 
